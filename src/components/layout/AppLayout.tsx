@@ -1,0 +1,35 @@
+import { Outlet, Navigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { Sidebar } from './Sidebar';
+import { Skeleton } from '@/components/ui/skeleton';
+
+export function AppLayout() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="space-y-4 w-full max-w-md p-8">
+          <Skeleton className="h-8 w-48 mx-auto" />
+          <Skeleton className="h-4 w-32 mx-auto" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  return (
+    <div className="flex min-h-screen w-full bg-background">
+      <Sidebar />
+      <main className="flex-1 overflow-auto">
+        <div className="p-6">
+          <Outlet />
+        </div>
+      </main>
+    </div>
+  );
+}

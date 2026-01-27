@@ -1,0 +1,102 @@
+import { NavLink, useLocation } from 'react-router-dom';
+import { 
+  LayoutDashboard, 
+  Users, 
+  UserCog, 
+  Settings, 
+  LogOut,
+  ChevronLeft,
+  ChevronRight
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
+import { useState } from 'react';
+
+const menuItems = [
+  { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/clientes', icon: Users, label: 'Clientes' },
+  { to: '/consultores', icon: UserCog, label: 'Consultores' },
+  { to: '/configuracoes', icon: Settings, label: 'Configurações' },
+];
+
+export function Sidebar() {
+  const [collapsed, setCollapsed] = useState(false);
+  const { signOut, user } = useAuth();
+  const location = useLocation();
+
+  return (
+    <aside 
+      className={cn(
+        "flex flex-col h-screen bg-sidebar border-r border-sidebar-border transition-all duration-300",
+        collapsed ? "w-16" : "w-64"
+      )}
+    >
+      {/* Logo */}
+      <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
+        {!collapsed && (
+          <div>
+            <h1 className="text-xl font-bold text-primary">CUPOLA</h1>
+            <p className="text-[10px] text-muted-foreground tracking-widest">CONSULTORIA</p>
+          </div>
+        )}
+        {collapsed && (
+          <span className="text-primary font-bold text-xl mx-auto">C</span>
+        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setCollapsed(!collapsed)}
+          className="text-muted-foreground hover:text-foreground"
+        >
+          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+        </Button>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 p-2 space-y-1">
+        {menuItems.map((item) => {
+          const isActive = location.pathname === item.to || 
+            (item.to !== '/' && location.pathname.startsWith(item.to));
+          
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2 rounded-md transition-colors",
+                isActive 
+                  ? "bg-primary text-primary-foreground" 
+                  : "text-sidebar-foreground hover:bg-sidebar-accent",
+                collapsed && "justify-center"
+              )}
+            >
+              <item.icon className="h-5 w-5 flex-shrink-0" />
+              {!collapsed && <span>{item.label}</span>}
+            </NavLink>
+          );
+        })}
+      </nav>
+
+      {/* User section */}
+      <div className="p-4 border-t border-sidebar-border">
+        {!collapsed && user && (
+          <p className="text-xs text-muted-foreground mb-2 truncate">
+            {user.email}
+          </p>
+        )}
+        <Button
+          variant="ghost"
+          onClick={signOut}
+          className={cn(
+            "w-full text-muted-foreground hover:text-destructive hover:bg-destructive/10",
+            collapsed ? "justify-center px-2" : "justify-start"
+          )}
+        >
+          <LogOut className="h-4 w-4" />
+          {!collapsed && <span className="ml-2">Sair</span>}
+        </Button>
+      </div>
+    </aside>
+  );
+}
