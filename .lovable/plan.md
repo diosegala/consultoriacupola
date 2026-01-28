@@ -1,101 +1,146 @@
 
 
-# Sistema de Gestão de Clientes - Cupola Consultoria
+# Plano de Importação de Dados da Planilha
 
 ## Visão Geral
-Sistema completo de gestão de clientes de consultoria imobiliária com tema escuro, cores da marca Cupola (verde #b0f90a e preto), integração com Pipedrive via webhook, e controle de MRR/Churn.
+
+Vou criar uma **edge function** que processará os dados da planilha e inserirá diretamente no banco de dados. Isso é mais seguro e eficiente do que fazer pelo frontend.
 
 ---
 
-## Fase 1: Fundação
+## Dados a Importar
 
-### 1.1 Configuração do Backend
-- Ativar Lovable Cloud para banco de dados e edge functions
-- Criar todas as tabelas conforme modelo de dados (clientes, contratos, onboarding, atendimentos, ferramentas_cliente, consultores, encerramentos, tipos_consultoria, crms, webhook_logs)
-- Configurar políticas de segurança (RLS)
+### 1. Clientes Ativos (28 registros)
+| Campo Planilha | Campo Banco | Observação |
+|----------------|-------------|------------|
+| Nome do cliente | clientes.nome | Direto |
+| Consultor | clientes.consultor_id | Lookup pelo nome |
+| Cidade/UF | clientes.cidade + clientes.uf | Separar por "/" |
+| Status | clientes.status | Converter para 'ativo' |
 
-### 1.2 Autenticação
-- Tela de login com email/senha (tema escuro Cupola)
-- Autenticação para diretores (todos veem todos os clientes)
-- Proteção de rotas - redireciona para login se não autenticado
+### 2. Contratos (28 registros)
+| Campo Planilha | Campo Banco | Observação |
+|----------------|-------------|------------|
+| Tipo de Consultoria | contratos.tipo_consultoria_id | Lookup pelo nome |
+| Prazo (em meses) | contratos.prazo_meses | Converter para integer |
+| Inicio do Contrato | contratos.data_inicio | Converter formato DD/MM/YYYY |
+| Renovação/Finalização | contratos.data_fim | Converter formato |
+| Remuneração total | contratos.remuneracao_total | Limpar formatação R$ |
+| Parcelas | contratos.parcelas | Integer |
+| Vencimento Parcela | contratos.tipo_vencimento | Normalizar para 'antecipado'/'postecipado' |
+| MRR | contratos.remuneracao_mensal | Limpar formatação |
+| Momento | contratos.momento | Texto livre |
+| Link Contrato | contratos.link_contrato | Direto |
+| Particularidades | contratos.particularidades | Direto |
 
-### 1.3 Dados Iniciais
-- Seed dos 9 consultores (Janile, Cristiano, Dioner, etc.)
-- Seed dos 11 tipos de consultoria
-- Seed dos 8 CRMs
-- Script de migração para os 28 clientes ativos
+### 3. Onboarding (28 registros)
+| Campo Planilha | Campo Banco | Observação |
+|----------------|-------------|------------|
+| Data Pré Onboarding | onboarding.data_pre_onboarding | Converter formato |
+| etapa_atual | Definir como 'concluido' | Todos são clientes ativos |
 
----
-
-## Fase 2: Estrutura Principal
-
-### 2.1 Layout e Navegação
-- Sidebar escuro com logo Cupola
-- Menu: Dashboard, Clientes, Consultores, Configurações
-- Header com indicador de usuário logado e botão de logout
-
-### 2.2 Dashboard
-- **4 Cards de KPI**: Clientes Ativos, MRR Total, Aguardando Renovação, Churn do Mês
-- **Gráfico de linha**: Evolução do MRR (últimos 12 meses)
-- **Tabela de Alertas**: Contratos vencendo, reuniões atrasadas, onboarding pendente
-- Filtro por consultor
-
-### 2.3 Listagem de Clientes
-- Busca por nome
-- Filtros: Status, Consultor, Tipo de Consultoria, Cidade/UF
-- Tabela ordenável e paginada (20 por página)
-- Badges coloridos por status (Novo=azul, Ativo=verde, Aguardando=amarelo, Encerrado=cinza)
-
----
-
-## Fase 3: Gestão de Clientes
-
-### 3.1 Detalhe do Cliente (4 abas)
-- **Aba Contrato**: Dados do contrato ativo, histórico de contratos, botões Editar/Renovar/Encerrar
-- **Aba Onboarding**: Timeline visual das etapas (Pré-onboarding → Imersões 1, 2, 3 → Concluído)
-- **Aba Atendimento**: Periodicidade, datas de reuniões, cliente oculto, OKRs
-- **Aba Ferramentas**: CRM utilizado, links de dashboards, ConectaLead
-
-### 3.2 Formulário de Cliente/Contrato
-- Seções organizadas: Dados do Cliente, Contrato, Onboarding
-- Cálculo automático de MRR (valor total ÷ prazo)
-- Cálculo automático de data fim (data início + prazo)
-- Validações conforme especificado
-
-### 3.3 Fluxos de Contrato
-- **Renovação**: Cria novo contrato, desativa anterior, incrementa "momento"
-- **Encerramento**: Modal com classificação (Churn/Fim de Contrato) e justificativa
-- **Registro de Reunião**: Atualiza última reunião, calcula próxima baseado na periodicidade
+### 4. Encerramentos (10 registros)
+| Campo Planilha | Campo Banco | Observação |
+|----------------|-------------|------------|
+| Cliente | encerramentos.cliente_id | Criar cliente com status 'encerrado' |
+| MMR | encerramentos.mrr_perdido | Limpar formatação |
+| Classificação | encerramentos.classificacao | Normalizar 'churn'/'fim_contrato' |
+| Justificativa | encerramentos.justificativa | Direto |
+| N° clientes ativos | encerramentos.clientes_ativos_momento | Integer |
+| Data encerramento | encerramentos.data_encerramento | Converter formato |
 
 ---
 
-## Fase 4: Webhook e Integração
+## Implementação Técnica
 
-### 4.1 Edge Function para Pipedrive
-- Endpoint POST /functions/v1/pipedrive-webhook
-- Valida payload e status "won"
-- Cria cliente com status "novo"
-- Registra em webhook_logs para auditoria
-- Tratamento de duplicatas (mesmo deal_id)
+### Edge Function: `import-clientes`
+
+```text
+POST /functions/v1/import-clientes
+Authorization: Bearer {service_role_key}
+Content-Type: application/json
+
+{
+  "clientes": [...],
+  "encerramentos": [...]
+}
+```
+
+**Processo:**
+1. Recebe array de clientes e encerramentos
+2. Busca IDs de consultores e tipos de consultoria pelo nome
+3. Insere clientes em lote
+4. Insere contratos vinculados
+5. Insere registros de onboarding
+6. Insere registros de atendimentos (padrão: quinzenal)
+7. Processa encerramentos (cria cliente + contrato inativo + registro de encerramento)
+8. Retorna resumo da importação
+
+### Tratamento de Dados
+
+**Limpeza de valores monetários:**
+```
+"R$ 95,988.00" → 95988.00
+"R$ 7.999,00" → 7999.00
+```
+
+**Normalização de datas:**
+```
+"21/01/2025" → "2025-01-21"
+"5/7/2026" → "2026-07-05"
+```
+
+**Mapeamento de consultores:**
+```
+"Janile" → UUID do consultor Janile
+"Vivan" / "Vivian" → UUID do consultor Vivian (tratar typos)
+```
+
+**Mapeamento de tipos de consultoria:**
+```
+"Consultoria Padrão" → UUID existente
+"Diagnóstico de Funil + Assessoria" → Criar novo tipo se não existir
+```
 
 ---
 
-## Fase 5: Administração
+## Tratamento de Casos Especiais
 
-### 5.1 Gestão de Consultores
-- Listagem com clientes ativos e MRR sob gestão
-- Cadastro/edição de consultores
-- Proteção contra exclusão de consultor com clientes
-
-### 5.2 Configurações (Cadastros Auxiliares)
-- CRUD de Tipos de Consultoria
-- CRUD de CRMs
+| Caso | Tratamento |
+|------|------------|
+| Cidade sem UF (ex: "Viana e Moura") | Usar cidade vazia e UF vazia |
+| Valores vazios de MRR | Usar 0 ou calcular (total/prazo) |
+| Datas vazias | Deixar NULL |
+| Tipos de consultoria não existentes | Criar automaticamente |
+| Typos em nomes de consultores ("Vivan" vs "Vivian") | Normalizar automaticamente |
 
 ---
 
-## Estilo Visual
-- **Tema escuro** como padrão
-- **Cores**: Verde #b0f90a (primária), Preto #000000 (fundo), Cards em #121212
-- **Tipografia**: Inter
-- **Componentes**: shadcn/ui com personalização para tema escuro
+## Arquivos a Criar/Modificar
+
+1. **`supabase/functions/import-clientes/index.ts`**
+   - Edge function para processar e inserir os dados
+   - Validação e normalização
+   - Inserção em lote com transações
+
+2. **Executar via Lovable**
+   - Chamar a edge function com os dados extraídos da planilha
+   - Exibir resultado da importação
+
+---
+
+## Resultado Esperado
+
+Após a importação:
+- **38 clientes** no banco (28 ativos + 10 encerrados)
+- **38 contratos** (28 ativos + 10 inativos)
+- **28 registros de onboarding** (clientes ativos)
+- **28 registros de atendimentos** (clientes ativos)
+- **10 registros de encerramentos**
+
+O Dashboard mostrará automaticamente:
+- Clientes Ativos: 28
+- MRR Total: ~R$ 175.000
+- Aguardando Renovação: X (baseado nas datas)
+- Histórico de Churn disponível
 
