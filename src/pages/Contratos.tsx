@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { FileText, Search, Eye, X, ExternalLink, Calendar, DollarSign, User, Building, Pencil, ArrowUpDown, ArrowUp, ArrowDown, XCircle, RefreshCw } from 'lucide-react';
+import { FileText, Search, Eye, X, ExternalLink, Calendar, DollarSign, User, Building, Pencil, ArrowUpDown, ArrowUp, ArrowDown, XCircle, RefreshCw, Pause, Play, CalendarPlus } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -35,7 +35,11 @@ import { Separator } from '@/components/ui/separator';
 import { useAllContratos, AllContratosFilters, ContratoComCliente } from '@/hooks/useContratos';
 import { useConsultores } from '@/hooks/useConsultores';
 import { useTiposConsultoria } from '@/hooks/useDadosAuxiliares';
+import { usePausaAtiva } from '@/hooks/usePausasContrato';
 import { ContratoFormDialog, EncerrarContratoDialog, RenovarContratoDialog } from '@/components/cliente/ClienteDialogs';
+import { PausaContratoDialog } from '@/components/contrato/PausaContratoDialog';
+import { RetomarContratoDialog } from '@/components/contrato/RetomarContratoDialog';
+import { ProrrogarContratoDialog } from '@/components/contrato/ProrrogarContratoDialog';
 import { cn } from '@/lib/utils';
 
 function formatCurrency(value: number) {
@@ -45,7 +49,7 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
-function getContratoStatusInfo(contrato: ContratoComCliente) {
+function getContratoStatusInfo(contrato: ContratoComCliente & { pausado?: boolean }) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const dataFim = new Date(contrato.data_fim);
@@ -53,6 +57,10 @@ function getContratoStatusInfo(contrato: ContratoComCliente) {
 
   if (!contrato.ativo) {
     return { label: 'Inativo', variant: 'secondary' as const, color: 'bg-muted text-muted-foreground' };
+  }
+
+  if (contrato.pausado) {
+    return { label: 'Pausado', variant: 'warning' as const, color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' };
   }
 
   if (diasRestantes < 0) {
@@ -83,6 +91,12 @@ export default function Contratos() {
   const [encerrandoContrato, setEncerrandoContrato] = useState<ContratoComCliente | null>(null);
   const [showRenovar, setShowRenovar] = useState(false);
   const [renovandoContrato, setRenovandoContrato] = useState<ContratoComCliente | null>(null);
+  const [showPausar, setShowPausar] = useState(false);
+  const [pausandoContrato, setPausandoContrato] = useState<ContratoComCliente | null>(null);
+  const [showRetomar, setShowRetomar] = useState(false);
+  const [retomandoContrato, setRetomandoContrato] = useState<ContratoComCliente | null>(null);
+  const [showProrrogar, setShowProrrogar] = useState(false);
+  const [prorrogandoContrato, setProrrogandoContrato] = useState<ContratoComCliente | null>(null);
   const [sortField, setSortField] = useState<ContratoSortField>('cliente');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
@@ -605,7 +619,7 @@ export default function Contratos() {
 
                 {/* Ações */}
                 <Separator />
-                <div className="flex gap-2 justify-end">
+                <div className="flex flex-wrap gap-2 justify-end">
                   <Button 
                     variant="outline" 
                     size="sm"
@@ -620,6 +634,45 @@ export default function Contratos() {
                   </Button>
                   {selectedContrato.ativo && (
                     <>
+                      {(selectedContrato as any).pausado ? (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            setRetomandoContrato(selectedContrato);
+                            setSelectedContrato(null);
+                            setShowRetomar(true);
+                          }}
+                        >
+                          <Play className="h-4 w-4 mr-2" />
+                          Retomar
+                        </Button>
+                      ) : (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            setPausandoContrato(selectedContrato);
+                            setSelectedContrato(null);
+                            setShowPausar(true);
+                          }}
+                        >
+                          <Pause className="h-4 w-4 mr-2" />
+                          Pausar
+                        </Button>
+                      )}
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          setProrrogandoContrato(selectedContrato);
+                          setSelectedContrato(null);
+                          setShowProrrogar(true);
+                        }}
+                      >
+                        <CalendarPlus className="h-4 w-4 mr-2" />
+                        Prorrogar
+                      </Button>
                       <Button 
                         variant="outline" 
                         size="sm"
@@ -712,6 +765,76 @@ export default function Contratos() {
           onSuccess={() => setRenovandoContrato(null)}
         />
       )}
+
+      {/* Dialog de Pausar */}
+      {pausandoContrato && (
+        <PausaContratoDialog
+          open={showPausar}
+          onOpenChange={(open) => {
+            setShowPausar(open);
+            if (!open) setPausandoContrato(null);
+          }}
+          contratoId={pausandoContrato.id}
+          clienteId={pausandoContrato.cliente_id}
+          clienteNome={pausandoContrato.cliente?.nome || ''}
+          onSuccess={() => setPausandoContrato(null)}
+        />
+      )}
+
+      {/* Dialog de Retomar */}
+      <RetomarContratoWrapper
+        showRetomar={showRetomar}
+        setShowRetomar={setShowRetomar}
+        retomandoContrato={retomandoContrato}
+        setRetomandoContrato={setRetomandoContrato}
+      />
+
+      {/* Dialog de Prorrogar */}
+      {prorrogandoContrato && (
+        <ProrrogarContratoDialog
+          open={showProrrogar}
+          onOpenChange={(open) => {
+            setShowProrrogar(open);
+            if (!open) setProrrogandoContrato(null);
+          }}
+          contratoId={prorrogandoContrato.id}
+          clienteId={prorrogandoContrato.cliente_id}
+          clienteNome={prorrogandoContrato.cliente?.nome || ''}
+          dataFimAtual={prorrogandoContrato.data_fim}
+          onSuccess={() => setProrrogandoContrato(null)}
+        />
+      )}
     </div>
+  );
+}
+
+// Componente wrapper para buscar pausa ativa
+function RetomarContratoWrapper({
+  showRetomar,
+  setShowRetomar,
+  retomandoContrato,
+  setRetomandoContrato
+}: {
+  showRetomar: boolean;
+  setShowRetomar: (v: boolean) => void;
+  retomandoContrato: ContratoComCliente | null;
+  setRetomandoContrato: (v: ContratoComCliente | null) => void;
+}) {
+  const { data: pausaAtiva } = usePausaAtiva(retomandoContrato?.id);
+
+  if (!retomandoContrato || !pausaAtiva) return null;
+
+  return (
+    <RetomarContratoDialog
+      open={showRetomar}
+      onOpenChange={(open) => {
+        setShowRetomar(open);
+        if (!open) setRetomandoContrato(null);
+      }}
+      pausa={pausaAtiva}
+      clienteNome={retomandoContrato.cliente?.nome || ''}
+      dataFimContrato={retomandoContrato.data_fim}
+      onSuccess={() => setRetomandoContrato(null)}
+    />
   );
 }
