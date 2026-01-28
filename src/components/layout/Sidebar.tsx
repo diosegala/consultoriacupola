@@ -6,7 +6,8 @@ import {
   Settings, 
   LogOut,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  FileText
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -16,6 +17,7 @@ import { useState } from 'react';
 const menuItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/clientes', icon: Users, label: 'Clientes' },
+  { to: '/contratos', icon: FileText, label: 'Contratos' },
   { to: '/consultores', icon: UserCog, label: 'Consultores' },
   { to: '/configuracoes', icon: Settings, label: 'Configurações' },
 ];
