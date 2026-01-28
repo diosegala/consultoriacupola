@@ -72,7 +72,7 @@ type SortDirection = 'asc' | 'desc';
 export default function Contratos() {
   const navigate = useNavigate();
   const [filters, setFilters] = useState<AllContratosFilters>({
-    ativo: 'all',
+    ativo: true,
     vencimento: 'all',
   });
   const [searchInput, setSearchInput] = useState('');
@@ -83,7 +83,7 @@ export default function Contratos() {
   const [encerrandoContrato, setEncerrandoContrato] = useState<ContratoComCliente | null>(null);
   const [showRenovar, setShowRenovar] = useState(false);
   const [renovandoContrato, setRenovandoContrato] = useState<ContratoComCliente | null>(null);
-  const [sortField, setSortField] = useState<ContratoSortField>('data_fim');
+  const [sortField, setSortField] = useState<ContratoSortField>('cliente');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   const { data: contratosRaw, isLoading } = useAllContratos({
@@ -175,7 +175,7 @@ export default function Contratos() {
   }, [contratosRaw]);
 
   const handleClearFilters = () => {
-    setFilters({ ativo: 'all', vencimento: 'all' });
+    setFilters({ ativo: true, vencimento: 'all' });
     setSearchInput('');
   };
 
