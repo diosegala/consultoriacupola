@@ -100,11 +100,11 @@ export function ContratoFormDialog({ open, onOpenChange, clienteId, contrato }: 
   const watchPrazo = form.watch('prazo_meses');
 
   useEffect(() => {
-    if (watchDataInicio && watchPrazo && !isEditing) {
+    if (watchDataInicio && watchPrazo) {
       const novaDataFim = addMonths(watchDataInicio, watchPrazo);
       form.setValue('data_fim', novaDataFim);
     }
-  }, [watchDataInicio, watchPrazo, form, isEditing]);
+  }, [watchDataInicio, watchPrazo, form]);
 
   // Recalcular remuneracao_mensal quando remuneracao_total ou parcelas mudar
   const watchTotal = form.watch('remuneracao_total');

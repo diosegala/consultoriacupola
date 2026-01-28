@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -16,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Search, Plus, Trash2, Loader2 } from 'lucide-react';
+import { Search, Plus, Trash2, Loader2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { useClientes, useDeleteCliente, ClienteComDetalhes } from '@/hooks/useClientes';
 import { useConsultores } from '@/hooks/useConsultores';
 import { useTiposConsultoria } from '@/hooks/useDadosAuxiliares';
@@ -32,6 +32,9 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
+type SortField = 'nome' | 'cidade' | 'consultor' | 'tipo' | 'mrr' | 'status' | 'data_fim';
+type SortDirection = 'asc' | 'desc';
+
 export default function Clientes() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -39,6 +42,8 @@ export default function Clientes() {
   const [statusFilter, setStatusFilter] = useState('todos');
   const [consultorFilter, setConsultorFilter] = useState('todos');
   const [tipoFilter, setTipoFilter] = useState('todos');
+  const [sortField, setSortField] = useState<SortField>('nome');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clienteToDelete, setClienteToDelete] = useState<ClienteComDetalhes | null>(null);
@@ -53,11 +58,66 @@ export default function Clientes() {
   const { data: tiposConsultoria } = useTiposConsultoria();
   const deleteCliente = useDeleteCliente();
 
-  // Filtro adicional por tipo de consultoria (client-side já que é um join)
-  const clientesFiltrados = clientes?.filter(cliente => {
-    if (tipoFilter === 'todos') return true;
-    return cliente.contrato_ativo?.tipo_consultoria_id === tipoFilter;
-  });
+  // Filtro adicional por tipo de consultoria e ordenação
+  const clientesFiltrados = useMemo(() => {
+    let result = clientes?.filter(cliente => {
+      if (tipoFilter === 'todos') return true;
+      return cliente.contrato_ativo?.tipo_consultoria_id === tipoFilter;
+    }) || [];
+
+    // Ordenação
+    result.sort((a, b) => {
+      let comparison = 0;
+      
+      switch (sortField) {
+        case 'nome':
+          comparison = a.nome.localeCompare(b.nome);
+          break;
+        case 'cidade':
+          comparison = `${a.cidade}/${a.uf}`.localeCompare(`${b.cidade}/${b.uf}`);
+          break;
+        case 'consultor':
+          comparison = (a.consultor?.nome || '').localeCompare(b.consultor?.nome || '');
+          break;
+        case 'tipo':
+          comparison = (a.contrato_ativo?.tipo_consultoria?.nome || '').localeCompare(b.contrato_ativo?.tipo_consultoria?.nome || '');
+          break;
+        case 'mrr':
+          const mrrA = Number(a.contrato_ativo?.remuneracao_mensal) || 0;
+          const mrrB = Number(b.contrato_ativo?.remuneracao_mensal) || 0;
+          comparison = mrrA - mrrB;
+          break;
+        case 'status':
+          comparison = a.status.localeCompare(b.status);
+          break;
+        case 'data_fim':
+          const dataA = a.contrato_ativo?.data_fim ? new Date(a.contrato_ativo.data_fim).getTime() : 0;
+          const dataB = b.contrato_ativo?.data_fim ? new Date(b.contrato_ativo.data_fim).getTime() : 0;
+          comparison = dataA - dataB;
+          break;
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+
+    return result;
+  }, [clientes, tipoFilter, sortField, sortDirection]);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="h-4 w-4 ml-1" /> 
+      : <ArrowDown className="h-4 w-4 ml-1" />;
+  };
 
   const openDeleteDialog = (cliente: ClienteComDetalhes, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -168,13 +228,62 @@ export default function Clientes() {
             <Table>
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
-                  <TableHead className="text-muted-foreground">Nome</TableHead>
-                  <TableHead className="text-muted-foreground">Cidade/UF</TableHead>
-                  <TableHead className="text-muted-foreground">Consultor</TableHead>
-                  <TableHead className="text-muted-foreground">Tipo</TableHead>
-                  <TableHead className="text-muted-foreground">MRR</TableHead>
-                  <TableHead className="text-muted-foreground">Status</TableHead>
-                  <TableHead className="text-muted-foreground">Fim Contrato</TableHead>
+                  <TableHead 
+                    className="text-muted-foreground cursor-pointer hover:text-foreground"
+                    onClick={() => handleSort('nome')}
+                  >
+                    <div className="flex items-center">
+                      Nome <SortIcon field="nome" />
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="text-muted-foreground cursor-pointer hover:text-foreground"
+                    onClick={() => handleSort('cidade')}
+                  >
+                    <div className="flex items-center">
+                      Cidade/UF <SortIcon field="cidade" />
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="text-muted-foreground cursor-pointer hover:text-foreground"
+                    onClick={() => handleSort('consultor')}
+                  >
+                    <div className="flex items-center">
+                      Consultor <SortIcon field="consultor" />
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="text-muted-foreground cursor-pointer hover:text-foreground"
+                    onClick={() => handleSort('tipo')}
+                  >
+                    <div className="flex items-center">
+                      Tipo <SortIcon field="tipo" />
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="text-muted-foreground cursor-pointer hover:text-foreground"
+                    onClick={() => handleSort('mrr')}
+                  >
+                    <div className="flex items-center">
+                      MRR <SortIcon field="mrr" />
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="text-muted-foreground cursor-pointer hover:text-foreground"
+                    onClick={() => handleSort('status')}
+                  >
+                    <div className="flex items-center">
+                      Status <SortIcon field="status" />
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="text-muted-foreground cursor-pointer hover:text-foreground"
+                    onClick={() => handleSort('data_fim')}
+                  >
+                    <div className="flex items-center">
+                      Fim Contrato <SortIcon field="data_fim" />
+                    </div>
+                  </TableHead>
                   <TableHead className="w-[120px] text-muted-foreground">Ações</TableHead>
                 </TableRow>
               </TableHeader>
