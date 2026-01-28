@@ -3,10 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, Pencil, RefreshCw, XCircle } from 'lucide-react';
+import { Loader2, Plus, Pencil, RefreshCw } from 'lucide-react';
 import { useContratos, useContratoAtivo, ContratoComTipo } from '@/hooks/useContratos';
 import { format, parseISO } from 'date-fns';
-import { ContratoFormDialog, EncerrarContratoDialog, RenovarContratoDialog } from './ClienteDialogs';
+import { ContratoFormDialog, RenovarContratoDialog } from './ClienteDialogs';
 
 interface ContratoTabProps {
   clienteId: string;
@@ -26,7 +26,6 @@ export function ContratoTab({ clienteId, clienteStatus }: ContratoTabProps) {
 
   const [showForm, setShowForm] = useState(false);
   const [editingContrato, setEditingContrato] = useState<ContratoComTipo | null>(null);
-  const [showEncerrar, setShowEncerrar] = useState(false);
   const [showRenovar, setShowRenovar] = useState(false);
 
   const handleEdit = (contrato: ContratoComTipo) => {
@@ -68,10 +67,6 @@ export function ContratoTab({ clienteId, clienteStatus }: ContratoTabProps) {
               <Button variant="outline" size="sm" onClick={() => setShowRenovar(true)}>
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Renovar
-              </Button>
-              <Button variant="destructive" size="sm" onClick={() => setShowEncerrar(true)}>
-                <XCircle className="h-4 w-4 mr-2" />
-                Encerrar
               </Button>
             </div>
           </CardHeader>
@@ -204,20 +199,12 @@ export function ContratoTab({ clienteId, clienteStatus }: ContratoTabProps) {
       />
 
       {contratoAtivo && (
-        <>
-          <EncerrarContratoDialog
-            open={showEncerrar}
-            onOpenChange={setShowEncerrar}
-            clienteId={clienteId}
-            contrato={contratoAtivo}
-          />
-          <RenovarContratoDialog
-            open={showRenovar}
-            onOpenChange={setShowRenovar}
-            clienteId={clienteId}
-            contratoAtual={contratoAtivo}
-          />
-        </>
+        <RenovarContratoDialog
+          open={showRenovar}
+          onOpenChange={setShowRenovar}
+          clienteId={clienteId}
+          contratoAtual={contratoAtivo}
+        />
       )}
     </div>
   );
