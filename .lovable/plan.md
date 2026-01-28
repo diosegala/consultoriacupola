@@ -1,80 +1,155 @@
 
+# Plano: Nova Página de Contratos
 
-# Plano de Correção: Atualizar Datas dos Contratos
+## Contexto
 
-## Problema Identificado
+Você está correto! A estrutura atual mostra contratos apenas dentro da página de cada cliente, mas uma visão consolidada de todos os contratos facilita:
 
-As datas de início e fim dos contratos foram importadas incorretamente. A edge function usou datas genéricas ao invés das datas exatas da planilha.
+- Ver todos os contratos que vencem em breve (independente do cliente)
+- Filtrar por status (ativos/inativos)
+- Analisar histórico completo de renovações
+- Identificar rapidamente contratos que precisam de ação
 
-### Exemplos de Erros
+## Arquitetura Proposta
 
-| Cliente | Data Fim na Planilha | Data Fim no Banco | Status |
-|---------|---------------------|-------------------|--------|
-| Agulha no Celeiro | 25/10/2025 | 2026-02-01 | ❌ Errado |
-| Lobato Machado | 20/02/2025 | 2026-01-01 | ❌ Errado |
-| Redeplan | 28/02/2026 | 2026-02-01 | ❌ Errado |
-| Abias | 24/06/2026 | 2026-01-01 | ❌ Errado |
-| Blue House | 01/06/2026 | 2025-09-01 | ❌ Errado |
-| Bortolini | 05/07/2026 | 2026-02-01 | ❌ Errado |
-| Zireh | 13/03/2026 | 2025-08-01 | ❌ Errado |
-
----
-
-## Solução
-
-Executar um script SQL para atualizar todas as datas de contratos com os valores corretos extraídos diretamente da planilha.
-
-### Dados Corretos a Aplicar
-
-Com base na planilha, as datas corretas são:
-
-| Cliente | Data Início | Data Fim | Prazo |
-|---------|-------------|----------|-------|
-| Bertoni | 2025-01-21 | 2026-01-21 | 12 |
-| Agulha no Celeiro | 2025-02-26 | 2025-10-25 | 7 |
-| Lobato Machado | 2024-02-20 | 2025-02-20 | 12 |
-| Redeplan | 2026-01-14 | 2026-02-28 | 1.5 |
-| Abias | 2025-06-24 | 2026-06-24 | 12 |
-| Blue House | 2026-01-12 | 2026-06-01 | 4 |
-| Bortolini | 2026-01-06 | 2026-07-05 | 6 |
-| AMO Imóveis | 2020-10-13 | 2026-01-01 | 12 |
-| Exo Investimento | 2025-09-15 | 2026-10-05 | 12 |
-| Campos Incorporadora | 2025-09-10 | 2026-03-10 | 6 |
-| Citas | 2025-05-12 | 2026-05-12 | 12 |
-| Copa Azul | 2025-11-03 | 2025-03-03 (erro na planilha?) | 4 |
-| Jair Amintas | 2025-07-24 | 2026-07-24 | 12 |
-| Zireh | 2025-08-21 | 2026-03-13 | 6 |
-| Helmer | 2024-08-15 | 2026-10-21 | 12 |
-| JBem | 2022-09-22 | 2025-04-04 | 12 |
-| E demais clientes... |
-
----
-
-## Implementação
-
-### Etapa 1: Script SQL de Correção
-
-Executar UPDATE para cada contrato com as datas exatas da planilha:
-
-```sql
-UPDATE contratos SET 
-  data_inicio = 'data_correta',
-  data_fim = 'data_correta',
-  prazo_meses = valor_correto
-WHERE cliente_id = (SELECT id FROM clientes WHERE nome = 'NomeCliente');
+```text
++------------------+       +-------------------+
+|   /clientes      |       |    /contratos     |
+|------------------|       |-------------------|
+| Lista de         |       | Lista de TODOS    |
+| CLIENTES com     |       | CONTRATOS com     |
+| contrato ativo   |       | filtros por:      |
+| resumido         |       | - Status (ativo/  |
+|                  |       |   inativo)        |
+| Click -> Detalhe |       | - Cliente         |
++------------------+       | - Consultor       |
+                           | - Vencimento      |
+                           |                   |
+                           | Click -> Detalhe  |
+                           | do Cliente        |
+                           +-------------------+
 ```
 
-### Etapa 2: Validação
+---
 
-Após a correção, verificar:
-- Alertas de "contratos vencendo" exibem apenas os que realmente vencem nos próximos 30 dias
-- Gráfico de MRR histórico calcula corretamente
+## Funcionalidades da Nova Página
+
+### Filtros Disponíveis
+- **Status**: Ativos, Inativos, Todos
+- **Cliente**: Busca por nome
+- **Consultor**: Dropdown
+- **Tipo de Consultoria**: Dropdown
+- **Vencimento**: Próximos 30/60/90 dias, Vencidos
+
+### Colunas da Tabela
+| Cliente | Tipo | Início | Fim | MRR | Status | Ações |
+|---------|------|--------|-----|-----|--------|-------|
+
+### Ações por Contrato
+- **Ver Cliente**: Navega para `/clientes/:id`
+- **Editar**: Abre form de edição (apenas contratos ativos)
+- **Renovar**: Abre form de renovação (apenas contratos ativos)
+- **Encerrar**: Abre form de encerramento (apenas contratos ativos)
 
 ---
 
-## Resultado Esperado
+## Implementação Técnica
 
-- Dashboard sem alertas falsos de contratos vencendo
-- Datas de renovação precisas para planejamento
-- Histórico de MRR calculado corretamente
+### Etapa 1: Novo Hook para Listar Todos os Contratos
 
+Criar `useAllContratos` em `src/hooks/useContratos.ts`:
+
+```typescript
+export function useAllContratos(filters?: {
+  ativo?: boolean;
+  consultor_id?: string;
+  tipo_consultoria_id?: string;
+  search?: string;
+}) {
+  return useQuery({
+    queryKey: ['all-contratos', filters],
+    queryFn: async () => {
+      let query = supabase
+        .from('contratos')
+        .select(`
+          *,
+          tipo_consultoria:tipos_consultoria(*),
+          cliente:clientes!contratos_cliente_id_fkey(
+            id, nome, cidade, uf, status,
+            consultor:consultores(id, nome)
+          )
+        `)
+        .order('data_fim', { ascending: true });
+
+      if (filters?.ativo !== undefined) {
+        query = query.eq('ativo', filters.ativo);
+      }
+      // ... outros filtros
+
+      return data;
+    }
+  });
+}
+```
+
+### Etapa 2: Nova Página de Contratos
+
+Criar `src/pages/Contratos.tsx` com:
+- Filtros por status, cliente, consultor, tipo, vencimento
+- Tabela com todos os contratos
+- Badges coloridos para status (Ativo = verde, Inativo = cinza)
+- Destaque para contratos vencendo em breve (amarelo)
+- Destaque para contratos vencidos (vermelho)
+
+### Etapa 3: Atualizar Navegação
+
+Adicionar item no Sidebar (`src/components/layout/Sidebar.tsx`):
+```typescript
+{ to: '/contratos', icon: FileText, label: 'Contratos' },
+```
+
+Adicionar rota em `src/App.tsx`:
+```typescript
+<Route path="/contratos" element={<Contratos />} />
+```
+
+---
+
+## Interface Visual
+
+### Cards de Resumo (Topo)
+| Ativos | Vencendo (30d) | Vencidos | MRR Total |
+|--------|----------------|----------|-----------|
+| 28     | 1              | 3        | R$ 179k   |
+
+### Tabela Principal
+Exibe todos os contratos com:
+- Nome do cliente clicável (navega para detalhe)
+- Tipo de consultoria
+- Período (início - fim)
+- MRR
+- Badge de status com cores:
+  - **Ativo**: Verde
+  - **Vencendo**: Amarelo
+  - **Vencido**: Vermelho
+  - **Encerrado**: Cinza
+
+---
+
+## Benefícios
+
+1. **Visão Consolidada**: Ver todos os contratos em um só lugar
+2. **Gestão Proativa**: Identificar contratos que precisam de atenção
+3. **Histórico Completo**: Ver renovações e encerramentos
+4. **Relatórios**: Facilita análise de churn e retenção
+
+---
+
+## Arquivos a Criar/Modificar
+
+| Arquivo | Ação |
+|---------|------|
+| `src/pages/Contratos.tsx` | Criar |
+| `src/hooks/useContratos.ts` | Adicionar `useAllContratos` |
+| `src/components/layout/Sidebar.tsx` | Adicionar link |
+| `src/App.tsx` | Adicionar rota |
