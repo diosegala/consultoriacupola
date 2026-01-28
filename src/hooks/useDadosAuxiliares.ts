@@ -133,3 +133,61 @@ export function useUpdateCRM() {
     }
   });
 }
+
+// Delete Tipo Consultoria
+export function useDeleteTipoConsultoria() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      // Verificar se há contratos usando este tipo
+      const { count } = await supabase
+        .from('contratos')
+        .select('*', { count: 'exact', head: true })
+        .eq('tipo_consultoria_id', id);
+
+      if (count && count > 0) {
+        throw new Error('Não é possível excluir: existem contratos usando este tipo de consultoria');
+      }
+
+      const { error } = await supabase
+        .from('tipos_consultoria')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tipos-consultoria'] });
+    }
+  });
+}
+
+// Delete CRM
+export function useDeleteCRM() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      // Verificar se há ferramentas_cliente usando este CRM
+      const { count } = await supabase
+        .from('ferramentas_cliente')
+        .select('*', { count: 'exact', head: true })
+        .eq('crm_id', id);
+
+      if (count && count > 0) {
+        throw new Error('Não é possível excluir: existem clientes usando este CRM');
+      }
+
+      const { error } = await supabase
+        .from('crms')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crms'] });
+    }
+  });
+}

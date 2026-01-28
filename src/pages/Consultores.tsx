@@ -12,8 +12,18 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Plus, Pencil, Loader2 } from 'lucide-react';
-import { useConsultoresComStats, useCreateConsultor, useUpdateConsultor, Consultor } from '@/hooks/useConsultores';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { useConsultoresComStats, useCreateConsultor, useUpdateConsultor, useDeleteConsultor, Consultor } from '@/hooks/useConsultores';
 import { useToast } from '@/hooks/use-toast';
 
 function formatCurrency(value: number): string {
@@ -30,10 +40,14 @@ export default function Consultores() {
   const { data: consultores, isLoading } = useConsultoresComStats();
   const createConsultor = useCreateConsultor();
   const updateConsultor = useUpdateConsultor();
+  const deleteConsultor = useDeleteConsultor();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingConsultor, setEditingConsultor] = useState<Consultor | null>(null);
   const [formData, setFormData] = useState({ nome: '', email: '' });
+  
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [consultorToDelete, setConsultorToDelete] = useState<Consultor | null>(null);
 
   const openNewDialog = () => {
     setEditingConsultor(null);
@@ -45,6 +59,11 @@ export default function Consultores() {
     setEditingConsultor(consultor);
     setFormData({ nome: consultor.nome, email: consultor.email || '' });
     setDialogOpen(true);
+  };
+
+  const openDeleteDialog = (consultor: Consultor) => {
+    setConsultorToDelete(consultor);
+    setDeleteDialogOpen(true);
   };
 
   const handleSubmit = async () => {
@@ -83,6 +102,26 @@ export default function Consultores() {
       toast({
         title: 'Erro',
         description: error.message || 'Erro ao salvar consultor',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!consultorToDelete) return;
+
+    try {
+      await deleteConsultor.mutateAsync(consultorToDelete.id);
+      toast({
+        title: 'Sucesso',
+        description: 'Consultor excluído com sucesso'
+      });
+      setDeleteDialogOpen(false);
+      setConsultorToDelete(null);
+    } catch (error: any) {
+      toast({
+        title: 'Erro',
+        description: error.message || 'Erro ao excluir consultor',
         variant: 'destructive'
       });
     }
@@ -140,7 +179,7 @@ export default function Consultores() {
                   <TableHead className="text-muted-foreground text-center">Clientes Ativos</TableHead>
                   <TableHead className="text-muted-foreground">MRR sob Gestão</TableHead>
                   <TableHead className="text-muted-foreground">Status</TableHead>
-                  <TableHead className="w-[150px] text-muted-foreground text-right">Ações</TableHead>
+                  <TableHead className="w-[200px] text-muted-foreground text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -176,6 +215,14 @@ export default function Consultores() {
                             onClick={() => openEditDialog(consultor)}
                           >
                             <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => openDeleteDialog(consultor)}
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                           <Button 
                             variant={consultor.ativo ? 'secondary' : 'default'}
@@ -245,6 +292,30 @@ export default function Consultores() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog de Confirmação de Exclusão */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-foreground">Excluir Consultor</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o consultor <strong>{consultorToDelete?.nome}</strong>?
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-border">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleteConsultor.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteConsultor.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
