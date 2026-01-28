@@ -1,146 +1,109 @@
 
+# Plano de Correção: Reimportação dos Dados Reais
 
-# Plano de Importação de Dados da Planilha
+## Problema Identificado
+Os dados inseridos no banco de dados são de outra fonte (grandes construtoras como Cyrela, MRV, Even, Tenda) e **não correspondem** à planilha fornecida.
 
-## Visão Geral
+## Dados Reais da Planilha
 
-Vou criar uma **edge function** que processará os dados da planilha e inserirá diretamente no banco de dados. Isso é mais seguro e eficiente do que fazer pelo frontend.
+### 28 Clientes Ativos
+| Cliente | Consultor | Cidade/UF | Tipo Consultoria | MRR |
+|---------|-----------|-----------|------------------|-----|
+| Bertoni | Janile | Arapongas/PR | Consultoria Padrão | R$ 7.999 |
+| Agulha no Celeiro | Cristiano | São Paulo/SP | Assessoria de Funil | R$ 5.274,90 |
+| Lobato Machado | Dioner | Foz do Iguaçu/PR | Consultoria Padrão | R$ 7.700 |
+| Redeplan | Dioner | Volta Redonda/RJ | Mapeamento | R$ 7.270 |
+| Abias | Janile | São Carlos/SP | Consultoria de Locação | R$ 7.000 |
+| Blue House | Cristiano | Curitiba/PR | Diagnóstico + Assessoria | - |
+| Bortolini | Cristiano | Passo Fundo/RS | Assessoria de Funil | R$ 9.000 |
+| AMO Imóveis | Dioner | Brusque/SC | Consultoria Padrão | R$ 6.960 |
+| Exo Investimento | Vivian | Balneário Camboriu/SC | Consultoria de Vendas | R$ 6.900 |
+| Campos Incorporadora | Cristiano | Marília/SP | Assessoria de Funil | R$ 9.600 |
+| Citas | Vivian | São Paulo/SP | Consultoria de Locação | R$ 6.887,50 |
+| Copa Azul | Cristiano | Rio de Janeiro/RJ | Diagnóstico + Assessoria | - |
+| Jair Amintas | Janile | Montes Claros/MG | Consultoria Padrão | R$ 6.850 |
+| Zireh | Dioner | Curitiba/PR | Consultoria Start Locação | R$ 6.666,67 |
+| Helmer | Vivian | Linhares/ES | Consultoria Padrão | R$ 6.650 |
+| JBem | Dioner | Santa Rosa/RS | Consultoria Padrão | R$ 6.550 |
+| Bispo Imóveis | Vivian | Americana/SP | Consultoria Padrão | R$ 6.450 |
+| Intermedial | Dioner | Boituva/SP | Consultoria Padrão | R$ 6.400 |
+| Familia | Dioner | Santos/SP | Consultoria Padrão | R$ 6.300 |
+| Recanto 21 | Vivian | São Paulo/SP | Consultoria Start Venda | R$ 6.166,67 |
+| Marcovic Incorporadora | Cristiano | Campo Mourão/PR | Assessoria de Funil | R$ 7.500 |
+| Buriti | Janile | Belo Horizonte/MG | Consultoria de Locação | R$ 6.000 |
+| Verdi | Vivian | Passo Fundo/RS | Consultoria Padrão | R$ 5.400 |
+| Valphi | Vivian | Curitiba/PR | Consultoria de Vendas | R$ 3.333,33 |
+| Nuclear | Vivian | São Paulo/SP | Assessoria Alta Performance | R$ 2.273,75 |
+| Campo Salles | Janile | Socorro/SP | Mapeamento Aluguel | R$ 4.571,43 |
+| Goes | Emillyn | Criciúma/SC | Personalizado | - |
+| Viana e Moura | Emillyn | (sem cidade) | Personalizado | - |
 
----
-
-## Dados a Importar
-
-### 1. Clientes Ativos (28 registros)
-| Campo Planilha | Campo Banco | Observação |
-|----------------|-------------|------------|
-| Nome do cliente | clientes.nome | Direto |
-| Consultor | clientes.consultor_id | Lookup pelo nome |
-| Cidade/UF | clientes.cidade + clientes.uf | Separar por "/" |
-| Status | clientes.status | Converter para 'ativo' |
-
-### 2. Contratos (28 registros)
-| Campo Planilha | Campo Banco | Observação |
-|----------------|-------------|------------|
-| Tipo de Consultoria | contratos.tipo_consultoria_id | Lookup pelo nome |
-| Prazo (em meses) | contratos.prazo_meses | Converter para integer |
-| Inicio do Contrato | contratos.data_inicio | Converter formato DD/MM/YYYY |
-| Renovação/Finalização | contratos.data_fim | Converter formato |
-| Remuneração total | contratos.remuneracao_total | Limpar formatação R$ |
-| Parcelas | contratos.parcelas | Integer |
-| Vencimento Parcela | contratos.tipo_vencimento | Normalizar para 'antecipado'/'postecipado' |
-| MRR | contratos.remuneracao_mensal | Limpar formatação |
-| Momento | contratos.momento | Texto livre |
-| Link Contrato | contratos.link_contrato | Direto |
-| Particularidades | contratos.particularidades | Direto |
-
-### 3. Onboarding (28 registros)
-| Campo Planilha | Campo Banco | Observação |
-|----------------|-------------|------------|
-| Data Pré Onboarding | onboarding.data_pre_onboarding | Converter formato |
-| etapa_atual | Definir como 'concluido' | Todos são clientes ativos |
-
-### 4. Encerramentos (10 registros)
-| Campo Planilha | Campo Banco | Observação |
-|----------------|-------------|------------|
-| Cliente | encerramentos.cliente_id | Criar cliente com status 'encerrado' |
-| MMR | encerramentos.mrr_perdido | Limpar formatação |
-| Classificação | encerramentos.classificacao | Normalizar 'churn'/'fim_contrato' |
-| Justificativa | encerramentos.justificativa | Direto |
-| N° clientes ativos | encerramentos.clientes_ativos_momento | Integer |
-| Data encerramento | encerramentos.data_encerramento | Converter formato |
-
----
-
-## Implementação Técnica
-
-### Edge Function: `import-clientes`
-
-```text
-POST /functions/v1/import-clientes
-Authorization: Bearer {service_role_key}
-Content-Type: application/json
-
-{
-  "clientes": [...],
-  "encerramentos": [...]
-}
-```
-
-**Processo:**
-1. Recebe array de clientes e encerramentos
-2. Busca IDs de consultores e tipos de consultoria pelo nome
-3. Insere clientes em lote
-4. Insere contratos vinculados
-5. Insere registros de onboarding
-6. Insere registros de atendimentos (padrão: quinzenal)
-7. Processa encerramentos (cria cliente + contrato inativo + registro de encerramento)
-8. Retorna resumo da importação
-
-### Tratamento de Dados
-
-**Limpeza de valores monetários:**
-```
-"R$ 95,988.00" → 95988.00
-"R$ 7.999,00" → 7999.00
-```
-
-**Normalização de datas:**
-```
-"21/01/2025" → "2025-01-21"
-"5/7/2026" → "2026-07-05"
-```
-
-**Mapeamento de consultores:**
-```
-"Janile" → UUID do consultor Janile
-"Vivan" / "Vivian" → UUID do consultor Vivian (tratar typos)
-```
-
-**Mapeamento de tipos de consultoria:**
-```
-"Consultoria Padrão" → UUID existente
-"Diagnóstico de Funil + Assessoria" → Criar novo tipo se não existir
-```
+### 10 Encerramentos
+| Cliente | Consultor | Data | MRR Perdido | Classificação |
+|---------|-----------|------|-------------|---------------|
+| Barreto MS | Vivian | Fev 2025 | R$ 6.500 | Fim de contrato |
+| AE Patrimônio | Cristiano | Abr 2025 | R$ 8.800 | Churn |
+| Vivali | Dioner | Mai 2025 | R$ 6.800 | Churn |
+| Sant Imob | Dioner | Mai 2025 | R$ 6.750 | Fim de contrato |
+| Toni | Natália | Jul 2025 | R$ 6.450 | Fim de contrato |
+| Especiale | Dioner | Jul 2025 | R$ 7.700 | Fim de contrato |
+| Valoriza | Vivian | Ago 2025 | R$ 6.450 | Churn |
+| Castelucci | Vivian | Ago 2025 | R$ 7.400 | Fim de contrato |
+| Colmeia | Dioner | Ago 2025 | R$ 7.700 | Fim de contrato |
+| Bartholomeu | Dioner | Ago 2025 | R$ 7.900 | Fim de contrato |
 
 ---
 
-## Tratamento de Casos Especiais
+## Etapas de Correção
 
-| Caso | Tratamento |
-|------|------------|
-| Cidade sem UF (ex: "Viana e Moura") | Usar cidade vazia e UF vazia |
-| Valores vazios de MRR | Usar 0 ou calcular (total/prazo) |
-| Datas vazias | Deixar NULL |
-| Tipos de consultoria não existentes | Criar automaticamente |
-| Typos em nomes de consultores ("Vivan" vs "Vivian") | Normalizar automaticamente |
+### Etapa 1: Limpar Dados Incorretos
+Deletar todos os registros das tabelas na ordem correta para respeitar as foreign keys:
+1. encerramentos
+2. ferramentas_cliente
+3. atendimentos
+4. onboarding
+5. contratos
+6. clientes
 
----
+Manter apenas os consultores e tipos de consultoria originais (seeds).
 
-## Arquivos a Criar/Modificar
+### Etapa 2: Adicionar Tipos de Consultoria Faltantes
+Criar os tipos que não existem no banco mas estão na planilha:
+- "Diagnóstico de Funil + Assessoria"
+- "Consultoria Start Venda"
+- "Assessoria de Alta Performance em Captação"
+- "Mapeamento de Performance e Oportunidades Aluguel"
 
-1. **`supabase/functions/import-clientes/index.ts`**
-   - Edge function para processar e inserir os dados
-   - Validação e normalização
-   - Inserção em lote com transações
+### Etapa 3: Corrigir Consultores
+- Manter os 9 consultores originais
+- Remover os que foram criados erroneamente (Sonia, Gislane, Larissa)
+- Adicionar "Natália" que aparece nos encerramentos (se não existir)
 
-2. **Executar via Lovable**
-   - Chamar a edge function com os dados extraídos da planilha
-   - Exibir resultado da importação
+### Etapa 4: Atualizar Edge Function
+Modificar a edge function `import-clientes` para:
+- Usar os dados EXATOS da planilha
+- Processar corretamente cada campo
+- Validar antes de inserir
+
+### Etapa 5: Executar Importação Correta
+Chamar a edge function com os dados corretos extraídos da planilha.
 
 ---
 
 ## Resultado Esperado
 
-Após a importação:
-- **38 clientes** no banco (28 ativos + 10 encerrados)
-- **38 contratos** (28 ativos + 10 inativos)
-- **28 registros de onboarding** (clientes ativos)
-- **28 registros de atendimentos** (clientes ativos)
-- **10 registros de encerramentos**
+Após a correção:
+- **28 clientes ativos** com os nomes corretos (Bertoni, Lobato Machado, AMO Imóveis, etc.)
+- **10 clientes encerrados** (Barreto MS, AE Patrimônio, etc.)
+- **38 contratos** vinculados
+- **MRR Total** calculado corretamente (~R$ 175.000)
+- **Dashboard** exibindo dados reais
 
-O Dashboard mostrará automaticamente:
-- Clientes Ativos: 28
-- MRR Total: ~R$ 175.000
-- Aguardando Renovação: X (baseado nas datas)
-- Histórico de Churn disponível
+---
+
+## Arquivos a Modificar
+
+1. **`supabase/functions/import-clientes/index.ts`** - Atualizar com dados corretos
+2. **Executar queries de limpeza** - Via ferramenta de migração
+3. **Chamar edge function** - Com payload correto
 
