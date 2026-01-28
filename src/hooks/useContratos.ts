@@ -128,12 +128,23 @@ export function useRenovarContrato() {
         .single();
 
       if (error) throw error;
+
+      // Atualizar status do cliente para ativo (caso esteja aguardando renovação)
+      const { error: clienteError } = await supabase
+        .from('clientes')
+        .update({ status: 'ativo' })
+        .eq('id', novoContrato.cliente_id);
+
+      if (clienteError) throw clienteError;
+
       return data;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['contratos', data.cliente_id] });
       queryClient.invalidateQueries({ queryKey: ['contrato-ativo', data.cliente_id] });
+      queryClient.invalidateQueries({ queryKey: ['all-contratos'] });
       queryClient.invalidateQueries({ queryKey: ['clientes'] });
+      queryClient.invalidateQueries({ queryKey: ['cliente', data.cliente_id] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     }
   });
