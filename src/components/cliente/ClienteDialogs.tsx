@@ -101,8 +101,11 @@ export function ContratoFormDialog({ open, onOpenChange, clienteId, contrato }: 
 
   useEffect(() => {
     if (watchDataInicio && watchPrazo) {
-      const novaDataFim = addMonths(watchDataInicio, watchPrazo);
-      form.setValue('data_fim', novaDataFim);
+      const prazoNumero = Number(watchPrazo);
+      if (!isNaN(prazoNumero) && prazoNumero > 0) {
+        const novaDataFim = addMonths(watchDataInicio, prazoNumero);
+        form.setValue('data_fim', novaDataFim);
+      }
     }
   }, [watchDataInicio, watchPrazo, form]);
 
