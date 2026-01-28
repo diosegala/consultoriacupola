@@ -1,1 +1,4 @@
 project_id = "wmmnbonigciftewukvum"
+
+[functions.import-clientes]
+verify_jwt = false
