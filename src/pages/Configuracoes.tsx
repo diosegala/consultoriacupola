@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
 import { 
-  useTiposConsultoria, 
+  useTiposConsultoriaComContratos, 
   useCreateTipoConsultoria, 
   useUpdateTipoConsultoria,
   useDeleteTipoConsultoria,
@@ -33,7 +33,7 @@ import {
   useCreateCRM,
   useUpdateCRM,
   useDeleteCRM,
-  TipoConsultoria,
+  TipoConsultoriaComContratos,
   CRM
 } from '@/hooks/useDadosAuxiliares';
 import { useToast } from '@/hooks/use-toast';
@@ -42,7 +42,7 @@ export default function Configuracoes() {
   const { toast } = useToast();
   
   // Tipos de Consultoria
-  const { data: tiposConsultoria, isLoading: loadingTipos } = useTiposConsultoria(false);
+  const { data: tiposConsultoria, isLoading: loadingTipos } = useTiposConsultoriaComContratos(false);
   const createTipo = useCreateTipoConsultoria();
   const updateTipo = useUpdateTipoConsultoria();
   const deleteTipo = useDeleteTipoConsultoria();
@@ -55,10 +55,10 @@ export default function Configuracoes() {
 
   // Dialog states
   const [tipoDialogOpen, setTipoDialogOpen] = useState(false);
-  const [editingTipo, setEditingTipo] = useState<TipoConsultoria | null>(null);
+  const [editingTipo, setEditingTipo] = useState<TipoConsultoriaComContratos | null>(null);
   const [tipoNome, setTipoNome] = useState('');
   const [deleteTipoDialogOpen, setDeleteTipoDialogOpen] = useState(false);
-  const [tipoToDelete, setTipoToDelete] = useState<TipoConsultoria | null>(null);
+  const [tipoToDelete, setTipoToDelete] = useState<TipoConsultoriaComContratos | null>(null);
 
   const [crmDialogOpen, setCRMDialogOpen] = useState(false);
   const [editingCRM, setEditingCRM] = useState<CRM | null>(null);
@@ -73,13 +73,13 @@ export default function Configuracoes() {
     setTipoDialogOpen(true);
   };
 
-  const openEditTipoDialog = (tipo: TipoConsultoria) => {
+  const openEditTipoDialog = (tipo: TipoConsultoriaComContratos) => {
     setEditingTipo(tipo);
     setTipoNome(tipo.nome);
     setTipoDialogOpen(true);
   };
 
-  const openDeleteTipoDialog = (tipo: TipoConsultoria) => {
+  const openDeleteTipoDialog = (tipo: TipoConsultoriaComContratos) => {
     setTipoToDelete(tipo);
     setDeleteTipoDialogOpen(true);
   };
@@ -117,7 +117,7 @@ export default function Configuracoes() {
     }
   };
 
-  const toggleTipoAtivo = async (tipo: TipoConsultoria) => {
+  const toggleTipoAtivo = async (tipo: TipoConsultoriaComContratos) => {
     try {
       await updateTipo.mutateAsync({ id: tipo.id, ativo: !tipo.ativo });
       toast({ title: 'Sucesso', description: `Tipo ${tipo.ativo ? 'desativado' : 'ativado'}` });
@@ -219,6 +219,7 @@ export default function Configuracoes() {
                   <TableHeader>
                     <TableRow className="border-border hover:bg-transparent">
                       <TableHead className="text-muted-foreground">Nome</TableHead>
+                      <TableHead className="text-muted-foreground text-center">Contratos</TableHead>
                       <TableHead className="text-muted-foreground">Status</TableHead>
                       <TableHead className="text-muted-foreground text-right w-[200px]">Ações</TableHead>
                     </TableRow>
@@ -227,6 +228,11 @@ export default function Configuracoes() {
                     {tiposConsultoria?.map(tipo => (
                       <TableRow key={tipo.id} className="border-border">
                         <TableCell className="font-medium text-foreground">{tipo.nome}</TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className="border-border text-foreground">
+                            {tipo.total_contratos}
+                          </Badge>
+                        </TableCell>
                         <TableCell>
                           <Badge 
                             className={tipo.ativo 
