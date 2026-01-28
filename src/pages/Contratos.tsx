@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { FileText, Search, Eye, X, ExternalLink, Calendar, DollarSign, User, Building, Pencil } from 'lucide-react';
+import { FileText, Search, Eye, X, ExternalLink, Calendar, DollarSign, User, Building, Pencil, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -66,6 +66,9 @@ function getContratoStatusInfo(contrato: ContratoComCliente) {
   return { label: 'Ativo', variant: 'default' as const, color: 'bg-[#b0f90a]/20 text-[#b0f90a] border-[#b0f90a]/30' };
 }
 
+type ContratoSortField = 'cliente' | 'tipo' | 'data_inicio' | 'data_fim' | 'mrr' | 'status';
+type SortDirection = 'asc' | 'desc';
+
 export default function Contratos() {
   const navigate = useNavigate();
   const [filters, setFilters] = useState<AllContratosFilters>({
@@ -76,17 +79,69 @@ export default function Contratos() {
   const [selectedContrato, setSelectedContrato] = useState<ContratoComCliente | null>(null);
   const [showEditForm, setShowEditForm] = useState(false);
   const [editingContrato, setEditingContrato] = useState<ContratoComCliente | null>(null);
+  const [sortField, setSortField] = useState<ContratoSortField>('data_fim');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
-  const { data: contratos, isLoading } = useAllContratos({
+  const { data: contratosRaw, isLoading } = useAllContratos({
     ...filters,
     search: searchInput,
   });
   const { data: consultores } = useConsultores();
   const { data: tiposConsultoria } = useTiposConsultoria();
 
+  // Ordenar contratos
+  const contratos = useMemo(() => {
+    if (!contratosRaw) return [];
+    
+    return [...contratosRaw].sort((a, b) => {
+      let comparison = 0;
+      
+      switch (sortField) {
+        case 'cliente':
+          comparison = (a.cliente?.nome || '').localeCompare(b.cliente?.nome || '');
+          break;
+        case 'tipo':
+          comparison = (a.tipo_consultoria?.nome || '').localeCompare(b.tipo_consultoria?.nome || '');
+          break;
+        case 'data_inicio':
+          comparison = new Date(a.data_inicio).getTime() - new Date(b.data_inicio).getTime();
+          break;
+        case 'data_fim':
+          comparison = new Date(a.data_fim).getTime() - new Date(b.data_fim).getTime();
+          break;
+        case 'mrr':
+          comparison = Number(a.remuneracao_mensal) - Number(b.remuneracao_mensal);
+          break;
+        case 'status':
+          const statusA = getContratoStatusInfo(a).label;
+          const statusB = getContratoStatusInfo(b).label;
+          comparison = statusA.localeCompare(statusB);
+          break;
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+  }, [contratosRaw, sortField, sortDirection]);
+
+  const handleSort = (field: ContratoSortField) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const SortIcon = ({ field }: { field: ContratoSortField }) => {
+    if (sortField !== field) return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="h-4 w-4 ml-1" /> 
+      : <ArrowDown className="h-4 w-4 ml-1" />;
+  };
+
   // Calcular KPIs
   const kpis = useMemo(() => {
-    if (!contratos) return { ativos: 0, vencendo30: 0, vencidos: 0, mrrTotal: 0 };
+    if (!contratosRaw) return { ativos: 0, vencendo30: 0, vencidos: 0, mrrTotal: 0 };
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -96,7 +151,7 @@ export default function Contratos() {
     let vencidos = 0;
     let mrrTotal = 0;
 
-    contratos.forEach(c => {
+    contratosRaw.forEach(c => {
       if (!c.ativo) return;
 
       const dataFim = new Date(c.data_fim);
@@ -113,7 +168,7 @@ export default function Contratos() {
     });
 
     return { ativos, vencendo30, vencidos, mrrTotal };
-  }, [contratos]);
+  }, [contratosRaw]);
 
   const handleClearFilters = () => {
     setFilters({ ativo: 'all', vencimento: 'all' });
@@ -292,12 +347,54 @@ export default function Contratos() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Início</TableHead>
-                  <TableHead>Fim</TableHead>
-                  <TableHead className="text-right">MRR</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:text-foreground"
+                    onClick={() => handleSort('cliente')}
+                  >
+                    <div className="flex items-center">
+                      Cliente <SortIcon field="cliente" />
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:text-foreground"
+                    onClick={() => handleSort('tipo')}
+                  >
+                    <div className="flex items-center">
+                      Tipo <SortIcon field="tipo" />
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:text-foreground"
+                    onClick={() => handleSort('data_inicio')}
+                  >
+                    <div className="flex items-center">
+                      Início <SortIcon field="data_inicio" />
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:text-foreground"
+                    onClick={() => handleSort('data_fim')}
+                  >
+                    <div className="flex items-center">
+                      Fim <SortIcon field="data_fim" />
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="text-right cursor-pointer hover:text-foreground"
+                    onClick={() => handleSort('mrr')}
+                  >
+                    <div className="flex items-center justify-end">
+                      MRR <SortIcon field="mrr" />
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:text-foreground"
+                    onClick={() => handleSort('status')}
+                  >
+                    <div className="flex items-center">
+                      Status <SortIcon field="status" />
+                    </div>
+                  </TableHead>
                   <TableHead className="w-[60px]"></TableHead>
                 </TableRow>
               </TableHeader>
