@@ -1,0 +1,166 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+
+export type Cliente = Tables<'clientes'>;
+export type ClienteInsert = TablesInsert<'clientes'>;
+export type ClienteUpdate = TablesUpdate<'clientes'>;
+
+export interface ClienteComDetalhes extends Cliente {
+  consultor?: Tables<'consultores'> | null;
+  contrato_ativo?: (Tables<'contratos'> & { 
+    tipo_consultoria?: Tables<'tipos_consultoria'> | null 
+  }) | null;
+}
+
+interface UseClientesFilters {
+  status?: string;
+  consultor_id?: string;
+  tipo_consultoria_id?: string;
+  cidade?: string;
+  search?: string;
+}
+
+export function useClientes(filters?: UseClientesFilters) {
+  return useQuery({
+    queryKey: ['clientes', filters],
+    queryFn: async () => {
+      let query = supabase
+        .from('clientes')
+        .select(`
+          *,
+          consultor:consultores(*),
+          contrato_ativo:contratos!contratos_cliente_id_fkey(
+            *,
+            tipo_consultoria:tipos_consultoria(*)
+          )
+        `)
+        .order('nome');
+
+      if (filters?.status && filters.status !== 'todos') {
+        query = query.eq('status', filters.status as 'novo' | 'ativo' | 'aguardando_renovacao' | 'encerrado');
+      }
+      if (filters?.consultor_id) {
+        query = query.eq('consultor_id', filters.consultor_id);
+      }
+      if (filters?.search) {
+        query = query.ilike('nome', `%${filters.search}%`);
+      }
+      if (filters?.cidade) {
+        query = query.ilike('cidade', `%${filters.cidade}%`);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      // Filtrar para pegar apenas o contrato ativo
+      return (data as any[]).map(cliente => ({
+        ...cliente,
+        contrato_ativo: cliente.contrato_ativo?.find((c: any) => c.ativo) || null
+      })) as ClienteComDetalhes[];
+    }
+  });
+}
+
+export function useCliente(id: string | undefined) {
+  return useQuery({
+    queryKey: ['cliente', id],
+    queryFn: async () => {
+      if (!id) return null;
+
+      const { data, error } = await supabase
+        .from('clientes')
+        .select(`
+          *,
+          consultor:consultores(*),
+          contrato_ativo:contratos!contratos_cliente_id_fkey(
+            *,
+            tipo_consultoria:tipos_consultoria(*)
+          )
+        `)
+        .eq('id', id)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data) return null;
+
+      return {
+        ...data,
+        contrato_ativo: (data as any).contrato_ativo?.find((c: any) => c.ativo) || null
+      } as ClienteComDetalhes;
+    },
+    enabled: !!id
+  });
+}
+
+export function useCreateCliente() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (cliente: ClienteInsert) => {
+      const { data, error } = await supabase
+        .from('clientes')
+        .insert(cliente)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clientes'] });
+    }
+  });
+}
+
+export function useUpdateCliente() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: ClienteUpdate & { id: string }) => {
+      const { data, error } = await supabase
+        .from('clientes')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['clientes'] });
+      queryClient.invalidateQueries({ queryKey: ['cliente', variables.id] });
+    }
+  });
+}
+
+export function useClientesAtivos() {
+  return useQuery({
+    queryKey: ['clientes', 'ativos-count'],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('clientes')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'ativo');
+
+      if (error) throw error;
+      return count || 0;
+    }
+  });
+}
+
+export function useClientesAguardandoRenovacao() {
+  return useQuery({
+    queryKey: ['clientes', 'aguardando-renovacao-count'],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('clientes')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'aguardando_renovacao');
+
+      if (error) throw error;
+      return count || 0;
+    }
+  });
+}

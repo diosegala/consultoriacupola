@@ -1,45 +1,46 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Filter } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { StatusBadge } from '@/components/ui/status-badge';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { StatusCliente } from '@/types/database';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { Search, Plus, Loader2 } from 'lucide-react';
+import { useClientes } from '@/hooks/useClientes';
+import { useConsultores } from '@/hooks/useConsultores';
+import { useTiposConsultoria } from '@/hooks/useDadosAuxiliares';
+import { format, parseISO } from 'date-fns';
 
-// Dados mockados para demonstração
-const mockClientes = [
-  { id: '1', nome: 'Imobiliária Alpha', cidade: 'São Paulo', uf: 'SP', consultor: 'Janile', tipo: 'Consultoria Padrão', mrr: 12000, status: 'ativo' as StatusCliente, dataFim: '2026-06-15' },
-  { id: '2', nome: 'Imóveis Beta', cidade: 'Curitiba', uf: 'PR', consultor: 'Cristiano', tipo: 'Consultoria de Vendas', mrr: 8500, status: 'ativo' as StatusCliente, dataFim: '2026-03-20' },
-  { id: '3', nome: 'Nova Imob', cidade: 'Florianópolis', uf: 'SC', consultor: null, tipo: null, mrr: 0, status: 'novo' as StatusCliente, dataFim: null },
-  { id: '4', nome: 'Casa & Lar', cidade: 'Porto Alegre', uf: 'RS', consultor: 'Dioner', tipo: 'Consultoria Start Vendas', mrr: 6000, status: 'aguardando_renovacao' as StatusCliente, dataFim: '2026-02-10' },
-];
-
-const formatCurrency = (value: number) => {
+function formatCurrency(value: number): string {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
     minimumFractionDigits: 0,
+    maximumFractionDigits: 0
   }).format(value);
-};
-
-const formatDate = (date: string | null) => {
-  if (!date) return '-';
-  return new Date(date).toLocaleDateString('pt-BR');
-};
+}
 
 export default function Clientes() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState('todos');
+  const [consultorFilter, setConsultorFilter] = useState('todos');
+  const [tipoFilter, setTipoFilter] = useState('todos');
 
-  const filteredClientes = mockClientes.filter((cliente) => {
-    const matchesSearch = cliente.nome.toLowerCase().includes(search.toLowerCase()) ||
-      cliente.cidade.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || cliente.status === statusFilter;
-    return matchesSearch && matchesStatus;
+  const { data: clientes, isLoading } = useClientes({
+    search: search || undefined,
+    status: statusFilter !== 'todos' ? statusFilter : undefined,
+    consultor_id: consultorFilter !== 'todos' ? consultorFilter : undefined
+  });
+
+  const { data: consultores } = useConsultores();
+  const { data: tiposConsultoria } = useTiposConsultoria();
+
+  // Filtro adicional por tipo de consultoria (client-side já que é um join)
+  const clientesFiltrados = clientes?.filter(cliente => {
+    if (tipoFilter === 'todos') return true;
+    return cliente.contrato_ativo?.tipo_consultoria_id === tipoFilter;
   });
 
   return (
@@ -49,10 +50,7 @@ export default function Clientes() {
           <h1 className="text-2xl font-bold text-foreground">Clientes</h1>
           <p className="text-muted-foreground">Gerencie sua carteira de clientes</p>
         </div>
-        <Button 
-          onClick={() => navigate('/clientes/novo')}
-          className="bg-primary text-primary-foreground hover:bg-primary/90"
-        >
+        <Button onClick={() => navigate('/clientes/novo')} className="bg-primary text-primary-foreground hover:bg-primary/90">
           <Plus className="h-4 w-4 mr-2" />
           Novo Cliente
         </Button>
@@ -61,27 +59,51 @@ export default function Clientes() {
       {/* Filtros */}
       <Card className="bg-card border-border">
         <CardContent className="pt-6">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="lg:col-span-2 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar por nome ou cidade..."
+                placeholder="Buscar por nome..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-10 bg-input border-border"
+                className="pl-9 bg-input border-border"
               />
             </div>
+            
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-48 bg-input border-border">
-                <Filter className="h-4 w-4 mr-2" />
+              <SelectTrigger className="bg-input border-border">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border">
-                <SelectItem value="all">Todos os status</SelectItem>
+                <SelectItem value="todos">Todos os status</SelectItem>
                 <SelectItem value="novo">Novo</SelectItem>
                 <SelectItem value="ativo">Ativo</SelectItem>
                 <SelectItem value="aguardando_renovacao">Aguardando Renovação</SelectItem>
                 <SelectItem value="encerrado">Encerrado</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={consultorFilter} onValueChange={setConsultorFilter}>
+              <SelectTrigger className="bg-input border-border">
+                <SelectValue placeholder="Consultor" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover border-border">
+                <SelectItem value="todos">Todos os consultores</SelectItem>
+                {consultores?.map(c => (
+                  <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={tipoFilter} onValueChange={setTipoFilter}>
+              <SelectTrigger className="bg-input border-border">
+                <SelectValue placeholder="Tipo de Consultoria" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover border-border">
+                <SelectItem value="todos">Todos os tipos</SelectItem>
+                {tiposConsultoria?.map(t => (
+                  <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -92,49 +114,81 @@ export default function Clientes() {
       <Card className="bg-card border-border">
         <CardHeader>
           <CardTitle className="text-foreground">
-            {filteredClientes.length} cliente{filteredClientes.length !== 1 ? 's' : ''}
+            {clientesFiltrados?.length || 0} cliente{(clientesFiltrados?.length || 0) !== 1 ? 's' : ''}
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow className="border-border hover:bg-transparent">
-                <TableHead className="text-muted-foreground">Nome</TableHead>
-                <TableHead className="text-muted-foreground">Cidade/UF</TableHead>
-                <TableHead className="text-muted-foreground">Consultor</TableHead>
-                <TableHead className="text-muted-foreground">Tipo</TableHead>
-                <TableHead className="text-muted-foreground">MRR</TableHead>
-                <TableHead className="text-muted-foreground">Status</TableHead>
-                <TableHead className="text-muted-foreground">Data Fim</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredClientes.map((cliente) => (
-                <TableRow 
-                  key={cliente.id} 
-                  className="border-border cursor-pointer hover:bg-secondary/50"
-                  onClick={() => navigate(`/clientes/${cliente.id}`)}
-                >
-                  <TableCell className="font-medium text-foreground">{cliente.nome}</TableCell>
-                  <TableCell className="text-foreground">{cliente.cidade}/{cliente.uf}</TableCell>
-                  <TableCell className="text-foreground">{cliente.consultor || '-'}</TableCell>
-                  <TableCell className="text-muted-foreground">{cliente.tipo || '-'}</TableCell>
-                  <TableCell className="text-foreground">
-                    {cliente.mrr > 0 ? formatCurrency(cliente.mrr) : '-'}
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge status={cliente.status} />
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{formatDate(cliente.dataFim)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          
-          {filteredClientes.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
-              Nenhum cliente encontrado
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin" />
             </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border hover:bg-transparent">
+                  <TableHead className="text-muted-foreground">Nome</TableHead>
+                  <TableHead className="text-muted-foreground">Cidade/UF</TableHead>
+                  <TableHead className="text-muted-foreground">Consultor</TableHead>
+                  <TableHead className="text-muted-foreground">Tipo</TableHead>
+                  <TableHead className="text-muted-foreground">MRR</TableHead>
+                  <TableHead className="text-muted-foreground">Status</TableHead>
+                  <TableHead className="text-muted-foreground">Fim Contrato</TableHead>
+                  <TableHead className="w-[100px] text-muted-foreground">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {clientesFiltrados?.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      Nenhum cliente encontrado
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  clientesFiltrados?.map(cliente => (
+                    <TableRow 
+                      key={cliente.id} 
+                      className="border-border cursor-pointer hover:bg-secondary/50"
+                      onClick={() => navigate(`/clientes/${cliente.id}`)}
+                    >
+                      <TableCell className="font-medium text-foreground">{cliente.nome}</TableCell>
+                      <TableCell className="text-foreground">{cliente.cidade}/{cliente.uf}</TableCell>
+                      <TableCell className="text-foreground">{cliente.consultor?.nome || '-'}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {cliente.contrato_ativo?.tipo_consultoria?.nome || '-'}
+                      </TableCell>
+                      <TableCell className="text-foreground">
+                        {cliente.contrato_ativo 
+                          ? formatCurrency(Number(cliente.contrato_ativo.remuneracao_mensal))
+                          : '-'
+                        }
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge status={cliente.status} />
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {cliente.contrato_ativo?.data_fim 
+                          ? format(parseISO(cliente.contrato_ativo.data_fim), 'dd/MM/yyyy')
+                          : '-'
+                        }
+                      </TableCell>
+                      <TableCell>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          className="border-border"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/clientes/${cliente.id}`);
+                          }}
+                        >
+                          Ver
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>

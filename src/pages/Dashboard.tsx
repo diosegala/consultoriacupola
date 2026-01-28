@@ -1,64 +1,79 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, DollarSign, Clock, TrendingDown, AlertTriangle } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
+import { Users, DollarSign, Clock, TrendingDown, AlertTriangle, CalendarX, BookOpen, Loader2 } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useClientesAtivos, useClientesAguardandoRenovacao } from '@/hooks/useClientes';
+import { useMRRTotal } from '@/hooks/useContratos';
+import { useChurnDoMes } from '@/hooks/useEncerramentos';
+import { useAlertas, useMRRHistorico } from '@/hooks/useDashboard';
+import { useConsultores } from '@/hooks/useConsultores';
+import { useState } from 'react';
 
-// Dados mockados para demonstração inicial
-const mockKPIs = {
-  clientesAtivos: 28,
-  mrrTotal: 285000,
-  aguardandoRenovacao: 3,
-  churnMes: 2.1,
-};
-
-const mockAlertas = [
-  { tipo: 'contrato_vencendo', cliente_id: '1', cliente_nome: 'Imobiliária Alpha', detalhe: 'Vence em 15 dias' },
-  { tipo: 'reuniao_atrasada', cliente_id: '2', cliente_nome: 'Imóveis Beta', detalhe: 'Atrasada há 5 dias' },
-  { tipo: 'onboarding_pendente', cliente_id: '3', cliente_nome: 'Nova Imob', detalhe: 'Aguardando 1ª imersão' },
-];
-
-const formatCurrency = (value: number) => {
+function formatCurrency(value: number): string {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
   }).format(value);
-};
+}
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const [consultorFiltro, setConsultorFiltro] = useState<string>('todos');
 
-  const getAlertaIcon = (tipo: string) => {
-    switch (tipo) {
-      case 'contrato_vencendo':
-        return <Clock className="h-4 w-4 text-warning" />;
-      case 'reuniao_atrasada':
-        return <AlertTriangle className="h-4 w-4 text-destructive" />;
-      case 'onboarding_pendente':
-        return <Users className="h-4 w-4 text-info" />;
-      default:
-        return null;
-    }
+  const { data: clientesAtivos, isLoading: loadingClientes } = useClientesAtivos();
+  const { data: mrrTotal, isLoading: loadingMRR } = useMRRTotal();
+  const { data: aguardandoRenovacao, isLoading: loadingRenovacao } = useClientesAguardandoRenovacao();
+  const { data: churnMes, isLoading: loadingChurn } = useChurnDoMes();
+  const { data: alertas, isLoading: loadingAlertas } = useAlertas(
+    consultorFiltro !== 'todos' ? consultorFiltro : undefined
+  );
+  const { data: mrrHistorico, isLoading: loadingHistorico } = useMRRHistorico();
+  const { data: consultores } = useConsultores();
+
+  const isLoading = loadingClientes || loadingMRR || loadingRenovacao || loadingChurn;
+
+  const alertaIcon = {
+    contrato_vencendo: Clock,
+    reuniao_atrasada: CalendarX,
+    onboarding_pendente: BookOpen
   };
 
-  const getAlertaLabel = (tipo: string) => {
-    switch (tipo) {
-      case 'contrato_vencendo':
-        return 'Contrato vencendo';
-      case 'reuniao_atrasada':
-        return 'Reunião atrasada';
-      case 'onboarding_pendente':
-        return 'Onboarding pendente';
-      default:
-        return tipo;
-    }
+  const alertaLabel = {
+    contrato_vencendo: 'Contrato Vencendo',
+    reuniao_atrasada: 'Reunião Atrasada',
+    onboarding_pendente: 'Onboarding Pendente'
+  };
+
+  const alertaBadgeVariant = {
+    contrato_vencendo: 'warning' as const,
+    reuniao_atrasada: 'destructive' as const,
+    onboarding_pendente: 'secondary' as const
   };
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground">Visão geral do negócio</p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-muted-foreground">Visão geral do negócio</p>
+        </div>
+        <Select value={consultorFiltro} onValueChange={setConsultorFiltro}>
+          <SelectTrigger className="w-[200px] bg-input border-border">
+            <SelectValue placeholder="Filtrar por consultor" />
+          </SelectTrigger>
+          <SelectContent className="bg-popover border-border">
+            <SelectItem value="todos">Todos os consultores</SelectItem>
+            {consultores?.map(c => (
+              <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* KPI Cards */}
@@ -71,7 +86,11 @@ export default function Dashboard() {
             <Users className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-foreground">{mockKPIs.clientesAtivos}</div>
+            {isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <div className="text-3xl font-bold text-foreground">{clientesAtivos || 0}</div>
+            )}
           </CardContent>
         </Card>
 
@@ -83,9 +102,13 @@ export default function Dashboard() {
             <DollarSign className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-foreground">
-              {formatCurrency(mockKPIs.mrrTotal)}
-            </div>
+            {isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <div className="text-3xl font-bold text-primary">
+                {formatCurrency(mrrTotal || 0)}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -97,7 +120,13 @@ export default function Dashboard() {
             <Clock className="h-4 w-4 text-warning" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-warning">{mockKPIs.aguardandoRenovacao}</div>
+            {isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <div className="text-3xl font-bold text-warning">
+                {aguardandoRenovacao || 0}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -109,57 +138,120 @@ export default function Dashboard() {
             <TrendingDown className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-foreground">{mockKPIs.churnMes}%</div>
+            {isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <div className="text-3xl font-bold text-destructive">
+                {churnMes || 0}%
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Alertas */}
+      {/* Gráfico MRR */}
       <Card className="bg-card border-border">
         <CardHeader>
-          <CardTitle className="text-foreground">Alertas</CardTitle>
-          <CardDescription>Itens que precisam de atenção</CardDescription>
+          <CardTitle className="text-foreground">Evolução do MRR (últimos 12 meses)</CardTitle>
         </CardHeader>
         <CardContent>
-          {mockAlertas.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">
-              Nenhum alerta no momento 🎉
-            </p>
+          {loadingHistorico ? (
+            <div className="h-[300px] flex items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
           ) : (
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={mrrHistorico || []}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis 
+                  dataKey="mes" 
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={12}
+                />
+                <YAxis 
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={12}
+                  tickFormatter={(value) => formatCurrency(value)}
+                />
+                <Tooltip 
+                  formatter={(value: number) => [formatCurrency(value), 'MRR']}
+                  contentStyle={{
+                    backgroundColor: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px'
+                  }}
+                  labelStyle={{ color: 'hsl(var(--foreground))' }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="mrr" 
+                  stroke="hsl(var(--primary))" 
+                  strokeWidth={2}
+                  dot={{ fill: 'hsl(var(--primary))' }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Tabela de Alertas */}
+      <Card className="bg-card border-border">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-foreground">
+            <AlertTriangle className="h-5 w-5 text-warning" />
+            Alertas
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loadingAlertas ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          ) : alertas && alertas.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
                   <TableHead className="text-muted-foreground">Tipo</TableHead>
                   <TableHead className="text-muted-foreground">Cliente</TableHead>
                   <TableHead className="text-muted-foreground">Detalhe</TableHead>
-                  <TableHead className="text-muted-foreground text-right">Ação</TableHead>
+                  <TableHead className="w-[100px] text-muted-foreground">Ação</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mockAlertas.map((alerta, index) => (
-                  <TableRow key={index} className="border-border">
-                    <TableCell className="text-foreground">
-                      <div className="flex items-center gap-2">
-                        {getAlertaIcon(alerta.tipo)}
-                        {getAlertaLabel(alerta.tipo)}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-foreground">{alerta.cliente_nome}</TableCell>
-                    <TableCell className="text-muted-foreground">{alerta.detalhe}</TableCell>
-                    <TableCell className="text-right">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => navigate(`/clientes/${alerta.cliente_id}`)}
-                        className="border-border text-foreground hover:bg-primary hover:text-primary-foreground"
-                      >
-                        Ver
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {alertas.map((alerta, index) => {
+                  const Icon = alertaIcon[alerta.tipo];
+                  return (
+                    <TableRow key={`${alerta.cliente_id}-${alerta.tipo}-${index}`} className="border-border">
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Icon className="h-4 w-4" />
+                          <Badge variant={alertaBadgeVariant[alerta.tipo]}>
+                            {alertaLabel[alerta.tipo]}
+                          </Badge>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-medium text-foreground">{alerta.cliente_nome}</TableCell>
+                      <TableCell className="text-muted-foreground">{alerta.detalhe}</TableCell>
+                      <TableCell>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          className="border-border"
+                          onClick={() => navigate(`/clientes/${alerta.cliente_id}`)}
+                        >
+                          Ver
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              Nenhum alerta no momento 🎉
+            </div>
           )}
         </CardContent>
       </Card>
