@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { FileText, Search, Eye, X, ExternalLink, Calendar, DollarSign, User, Building, Pencil, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { FileText, Search, Eye, X, ExternalLink, Calendar, DollarSign, User, Building, Pencil, ArrowUpDown, ArrowUp, ArrowDown, XCircle } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -35,7 +35,7 @@ import { Separator } from '@/components/ui/separator';
 import { useAllContratos, AllContratosFilters, ContratoComCliente } from '@/hooks/useContratos';
 import { useConsultores } from '@/hooks/useConsultores';
 import { useTiposConsultoria } from '@/hooks/useDadosAuxiliares';
-import { ContratoFormDialog } from '@/components/cliente/ClienteDialogs';
+import { ContratoFormDialog, EncerrarContratoDialog } from '@/components/cliente/ClienteDialogs';
 import { cn } from '@/lib/utils';
 
 function formatCurrency(value: number) {
@@ -79,6 +79,8 @@ export default function Contratos() {
   const [selectedContrato, setSelectedContrato] = useState<ContratoComCliente | null>(null);
   const [showEditForm, setShowEditForm] = useState(false);
   const [editingContrato, setEditingContrato] = useState<ContratoComCliente | null>(null);
+  const [showEncerrar, setShowEncerrar] = useState(false);
+  const [encerrandoContrato, setEncerrandoContrato] = useState<ContratoComCliente | null>(null);
   const [sortField, setSortField] = useState<ContratoSortField>('data_fim');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
@@ -614,6 +616,20 @@ export default function Contratos() {
                     <Pencil className="h-4 w-4 mr-2" />
                     Editar
                   </Button>
+                  {selectedContrato.ativo && (
+                    <Button 
+                      variant="destructive" 
+                      size="sm"
+                      onClick={() => {
+                        setEncerrandoContrato(selectedContrato);
+                        setSelectedContrato(null);
+                        setShowEncerrar(true);
+                      }}
+                    >
+                      <XCircle className="h-4 w-4 mr-2" />
+                      Encerrar
+                    </Button>
+                  )}
                   {selectedContrato.link_contrato && (
                     <Button variant="outline" size="sm" asChild>
                       <a href={selectedContrato.link_contrato} target="_blank" rel="noopener noreferrer">
@@ -625,8 +641,9 @@ export default function Contratos() {
                   <Button 
                     size="sm"
                     onClick={() => {
+                      const clienteId = selectedContrato.cliente_id;
                       setSelectedContrato(null);
-                      navigate(`/clientes/${selectedContrato.cliente_id}`);
+                      navigate(`/clientes/${clienteId}`);
                     }}
                   >
                     <User className="h-4 w-4 mr-2" />
@@ -649,6 +666,20 @@ export default function Contratos() {
           }}
           clienteId={editingContrato.cliente_id}
           contrato={editingContrato}
+        />
+      )}
+
+      {/* Dialog de Encerramento */}
+      {encerrandoContrato && (
+        <EncerrarContratoDialog
+          open={showEncerrar}
+          onOpenChange={(open) => {
+            setShowEncerrar(open);
+            if (!open) setEncerrandoContrato(null);
+          }}
+          clienteId={encerrandoContrato.cliente_id}
+          contrato={encerrandoContrato}
+          onSuccess={() => setEncerrandoContrato(null)}
         />
       )}
     </div>

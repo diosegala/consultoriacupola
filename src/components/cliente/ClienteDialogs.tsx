@@ -458,14 +458,132 @@ export function ContratoFormDialog({ open, onOpenChange, clienteId, contrato }: 
   );
 }
 
-export function EncerrarContratoDialog({ open, onOpenChange, clienteId, contrato }: any) {
+interface EncerrarContratoDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  clienteId: string;
+  contrato: ContratoComTipo;
+  onSuccess?: () => void;
+}
+
+const encerrarSchema = z.object({
+  classificacao: z.enum(['churn', 'fim_contrato'], { required_error: 'Selecione a classificação' }),
+  justificativa: z.string().optional(),
+});
+
+type EncerrarFormValues = z.infer<typeof encerrarSchema>;
+
+export function EncerrarContratoDialog({ open, onOpenChange, clienteId, contrato, onSuccess }: EncerrarContratoDialogProps) {
+  const { useEncerrarContrato } = require('@/hooks/useEncerramentos');
+  const encerrarContrato = useEncerrarContrato();
+
+  const form = useForm<EncerrarFormValues>({
+    resolver: zodResolver(encerrarSchema),
+    defaultValues: {
+      classificacao: undefined,
+      justificativa: '',
+    },
+  });
+
+  useEffect(() => {
+    if (open) {
+      form.reset({
+        classificacao: undefined,
+        justificativa: '',
+      });
+    }
+  }, [open, form]);
+
+  async function onSubmit(values: EncerrarFormValues) {
+    try {
+      await encerrarContrato.mutateAsync({
+        clienteId,
+        contratoId: contrato.id,
+        classificacao: values.classificacao,
+        justificativa: values.justificativa || undefined,
+        mrrPerdido: Number(contrato.remuneracao_mensal),
+      });
+
+      toast({ title: 'Contrato encerrado com sucesso!' });
+      onOpenChange(false);
+      onSuccess?.();
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao encerrar contrato',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-card border-border">
         <DialogHeader>
-          <DialogTitle>Encerrar Contrato</DialogTitle>
+          <DialogTitle className="text-foreground">Encerrar Contrato</DialogTitle>
         </DialogHeader>
-        <p className="text-muted-foreground">Formulário em desenvolvimento</p>
+
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <div className="p-4 rounded-lg bg-muted/50 border border-border">
+              <p className="text-sm text-muted-foreground">MRR que será perdido:</p>
+              <p className="text-xl font-bold text-destructive">
+                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(contrato.remuneracao_mensal))}
+              </p>
+            </div>
+
+            <FormField
+              control={form.control}
+              name="classificacao"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Classificação</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger className="bg-background border-input">
+                        <SelectValue placeholder="Selecione o motivo..." />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent className="bg-popover border-border">
+                      <SelectItem value="churn">Churn (cancelamento)</SelectItem>
+                      <SelectItem value="fim_contrato">Fim de Contrato</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="justificativa"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Justificativa (opcional)</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Descreva os motivos do encerramento..."
+                      className="bg-background border-input resize-none"
+                      rows={3}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" variant="destructive" disabled={encerrarContrato.isPending}>
+                {encerrarContrato.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Encerrar Contrato
+              </Button>
+            </div>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );

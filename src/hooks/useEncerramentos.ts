@@ -76,13 +76,25 @@ export function useEncerrarContrato() {
 
       if (contratoError) throw contratoError;
 
-      // Alterar status do cliente para encerrado
-      const { error: clienteError } = await supabase
-        .from('clientes')
-        .update({ status: 'encerrado' })
-        .eq('id', clienteId);
+      // Verificar se há outros contratos ativos do cliente
+      const { data: outrosContratosAtivos, error: checkError } = await supabase
+        .from('contratos')
+        .select('id')
+        .eq('cliente_id', clienteId)
+        .eq('ativo', true)
+        .neq('id', contratoId);
 
-      if (clienteError) throw clienteError;
+      if (checkError) throw checkError;
+
+      // Só alterar status do cliente para encerrado se não houver outros contratos ativos
+      if (!outrosContratosAtivos || outrosContratosAtivos.length === 0) {
+        const { error: clienteError } = await supabase
+          .from('clientes')
+          .update({ status: 'encerrado' })
+          .eq('id', clienteId);
+
+        if (clienteError) throw clienteError;
+      }
 
       return { clienteId };
     },
@@ -90,6 +102,7 @@ export function useEncerrarContrato() {
       queryClient.invalidateQueries({ queryKey: ['clientes'] });
       queryClient.invalidateQueries({ queryKey: ['cliente', data.clienteId] });
       queryClient.invalidateQueries({ queryKey: ['contratos', data.clienteId] });
+      queryClient.invalidateQueries({ queryKey: ['all-contratos'] });
       queryClient.invalidateQueries({ queryKey: ['encerramentos'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     }
