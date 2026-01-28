@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { FileText, Search, Eye, Filter, X } from 'lucide-react';
+import { FileText, Search, Eye, X, ExternalLink, Calendar, DollarSign, User, Building } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -22,8 +22,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Separator } from '@/components/ui/separator';
 
 import { useAllContratos, AllContratosFilters, ContratoComCliente } from '@/hooks/useContratos';
 import { useConsultores } from '@/hooks/useConsultores';
@@ -65,6 +72,7 @@ export default function Contratos() {
     vencimento: 'all',
   });
   const [searchInput, setSearchInput] = useState('');
+  const [selectedContrato, setSelectedContrato] = useState<ContratoComCliente | null>(null);
 
   const { data: contratos, isLoading } = useAllContratos({
     ...filters,
@@ -301,14 +309,15 @@ export default function Contratos() {
                   contratos?.map((contrato) => {
                     const statusInfo = getContratoStatusInfo(contrato);
                     return (
-                      <TableRow key={contrato.id}>
+                      <TableRow 
+                        key={contrato.id} 
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => setSelectedContrato(contrato)}
+                      >
                         <TableCell>
-                          <button
-                            onClick={() => navigate(`/clientes/${contrato.cliente_id}`)}
-                            className="font-medium hover:text-primary transition-colors text-left"
-                          >
+                          <span className="font-medium">
                             {contrato.cliente?.nome || 'Cliente não encontrado'}
-                          </button>
+                          </span>
                           {contrato.cliente?.consultor && (
                             <p className="text-xs text-muted-foreground">
                               {contrato.cliente.consultor.nome}
@@ -336,7 +345,10 @@ export default function Contratos() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => navigate(`/clientes/${contrato.cliente_id}`)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedContrato(contrato);
+                            }}
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
@@ -350,6 +362,170 @@ export default function Contratos() {
           )}
         </CardContent>
       </Card>
+
+      {/* Modal de Detalhes do Contrato */}
+      <Dialog open={!!selectedContrato} onOpenChange={(open) => !open && setSelectedContrato(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" />
+              Detalhes do Contrato
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedContrato && (() => {
+            const statusInfo = getContratoStatusInfo(selectedContrato);
+            const diasRestantes = differenceInDays(
+              new Date(selectedContrato.data_fim),
+              new Date()
+            );
+            
+            return (
+              <div className="space-y-6">
+                {/* Cliente e Status */}
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Building className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-semibold text-lg">{selectedContrato.cliente?.nome}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span>{selectedContrato.cliente?.cidade}, {selectedContrato.cliente?.uf}</span>
+                    </div>
+                  </div>
+                  <Badge className={cn('border', statusInfo.color)}>
+                    {statusInfo.label}
+                  </Badge>
+                </div>
+
+                <Separator />
+
+                {/* Informações do Contrato */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Tipo de Consultoria</p>
+                    <p className="font-medium">{selectedContrato.tipo_consultoria?.nome || '-'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Consultor</p>
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      <p className="font-medium">{selectedContrato.cliente?.consultor?.nome || '-'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Datas */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Data Início</p>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <p className="font-medium">
+                        {format(parseISO(selectedContrato.data_inicio), 'dd/MM/yyyy', { locale: ptBR })}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Data Fim</p>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <p className="font-medium">
+                        {format(parseISO(selectedContrato.data_fim), 'dd/MM/yyyy', { locale: ptBR })}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Prazo</p>
+                    <p className="font-medium">{selectedContrato.prazo_meses} meses</p>
+                    {selectedContrato.ativo && (
+                      <p className={cn(
+                        "text-xs",
+                        diasRestantes < 0 ? "text-destructive" : 
+                        diasRestantes <= 30 ? "text-yellow-400" : "text-muted-foreground"
+                      )}>
+                        {diasRestantes < 0 
+                          ? `Vencido há ${Math.abs(diasRestantes)} dias`
+                          : `${diasRestantes} dias restantes`}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Valores */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Valor Total</p>
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <p className="font-medium">{formatCurrency(Number(selectedContrato.remuneracao_total))}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">MRR</p>
+                    <p className="font-medium text-primary">{formatCurrency(Number(selectedContrato.remuneracao_mensal))}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Parcelas</p>
+                    <p className="font-medium">{selectedContrato.parcelas}x</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Vencimento</p>
+                    <p className="font-medium capitalize">{selectedContrato.tipo_vencimento}</p>
+                  </div>
+                </div>
+
+                {/* Momento */}
+                {selectedContrato.momento && (
+                  <>
+                    <Separator />
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">Momento</p>
+                      <p className="font-medium">{selectedContrato.momento}</p>
+                    </div>
+                  </>
+                )}
+
+                {/* Particularidades */}
+                {selectedContrato.particularidades && (
+                  <>
+                    <Separator />
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">Particularidades</p>
+                      <p className="text-sm whitespace-pre-wrap">{selectedContrato.particularidades}</p>
+                    </div>
+                  </>
+                )}
+
+                {/* Ações */}
+                <Separator />
+                <div className="flex gap-2 justify-end">
+                  {selectedContrato.link_contrato && (
+                    <Button variant="outline" size="sm" asChild>
+                      <a href={selectedContrato.link_contrato} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Ver Contrato
+                      </a>
+                    </Button>
+                  )}
+                  <Button 
+                    size="sm"
+                    onClick={() => {
+                      setSelectedContrato(null);
+                      navigate(`/clientes/${selectedContrato.cliente_id}`);
+                    }}
+                  >
+                    <User className="h-4 w-4 mr-2" />
+                    Ver Cliente
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
