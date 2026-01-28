@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { FileText, Search, Eye, X, ExternalLink, Calendar, DollarSign, User, Building } from 'lucide-react';
+import { FileText, Search, Eye, X, ExternalLink, Calendar, DollarSign, User, Building, Pencil } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -35,6 +35,7 @@ import { Separator } from '@/components/ui/separator';
 import { useAllContratos, AllContratosFilters, ContratoComCliente } from '@/hooks/useContratos';
 import { useConsultores } from '@/hooks/useConsultores';
 import { useTiposConsultoria } from '@/hooks/useDadosAuxiliares';
+import { ContratoFormDialog } from '@/components/cliente/ClienteDialogs';
 import { cn } from '@/lib/utils';
 
 function formatCurrency(value: number) {
@@ -73,6 +74,8 @@ export default function Contratos() {
   });
   const [searchInput, setSearchInput] = useState('');
   const [selectedContrato, setSelectedContrato] = useState<ContratoComCliente | null>(null);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [editingContrato, setEditingContrato] = useState<ContratoComCliente | null>(null);
 
   const { data: contratos, isLoading } = useAllContratos({
     ...filters,
@@ -502,11 +505,23 @@ export default function Contratos() {
                 {/* Ações */}
                 <Separator />
                 <div className="flex gap-2 justify-end">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => {
+                      setEditingContrato(selectedContrato);
+                      setSelectedContrato(null);
+                      setShowEditForm(true);
+                    }}
+                  >
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Editar
+                  </Button>
                   {selectedContrato.link_contrato && (
                     <Button variant="outline" size="sm" asChild>
                       <a href={selectedContrato.link_contrato} target="_blank" rel="noopener noreferrer">
                         <ExternalLink className="h-4 w-4 mr-2" />
-                        Ver Contrato
+                        Ver Documento
                       </a>
                     </Button>
                   )}
@@ -526,6 +541,19 @@ export default function Contratos() {
           })()}
         </DialogContent>
       </Dialog>
+
+      {/* Dialog de Edição */}
+      {editingContrato && (
+        <ContratoFormDialog
+          open={showEditForm}
+          onOpenChange={(open) => {
+            setShowEditForm(open);
+            if (!open) setEditingContrato(null);
+          }}
+          clienteId={editingContrato.cliente_id}
+          contrato={editingContrato}
+        />
+      )}
     </div>
   );
 }

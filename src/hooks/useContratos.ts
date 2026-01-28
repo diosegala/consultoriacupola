@@ -72,6 +72,7 @@ export function useCreateContrato() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['contratos', variables.cliente_id] });
       queryClient.invalidateQueries({ queryKey: ['contrato-ativo', variables.cliente_id] });
+      queryClient.invalidateQueries({ queryKey: ['all-contratos'] });
       queryClient.invalidateQueries({ queryKey: ['clientes'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     }
@@ -96,6 +97,7 @@ export function useUpdateContrato() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['contratos', data.cliente_id] });
       queryClient.invalidateQueries({ queryKey: ['contrato-ativo', data.cliente_id] });
+      queryClient.invalidateQueries({ queryKey: ['all-contratos'] });
       queryClient.invalidateQueries({ queryKey: ['clientes'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     }
