@@ -137,6 +137,91 @@ export function useRenovarContrato() {
   });
 }
 
+export interface ContratoComCliente extends ContratoComTipo {
+  cliente?: Tables<'clientes'> & {
+    consultor?: Tables<'consultores'> | null;
+  } | null;
+}
+
+export interface AllContratosFilters {
+  ativo?: boolean | 'all';
+  consultor_id?: string;
+  tipo_consultoria_id?: string;
+  search?: string;
+  vencimento?: 'all' | '30' | '60' | '90' | 'vencidos';
+}
+
+export function useAllContratos(filters?: AllContratosFilters) {
+  return useQuery({
+    queryKey: ['all-contratos', filters],
+    queryFn: async () => {
+      let query = supabase
+        .from('contratos')
+        .select(`
+          *,
+          tipo_consultoria:tipos_consultoria(*),
+          cliente:clientes!contratos_cliente_id_fkey(
+            id, nome, cidade, uf, status,
+            consultor:consultores(id, nome)
+          )
+        `)
+        .order('data_fim', { ascending: true });
+
+      // Filtro de status
+      if (filters?.ativo !== undefined && filters.ativo !== 'all') {
+        query = query.eq('ativo', filters.ativo);
+      }
+
+      // Filtro por tipo de consultoria
+      if (filters?.tipo_consultoria_id) {
+        query = query.eq('tipo_consultoria_id', filters.tipo_consultoria_id);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      let result = data as ContratoComCliente[];
+
+      // Filtro por consultor (via cliente)
+      if (filters?.consultor_id) {
+        result = result.filter(c => c.cliente?.consultor?.id === filters.consultor_id);
+      }
+
+      // Filtro por busca de cliente
+      if (filters?.search) {
+        const searchLower = filters.search.toLowerCase();
+        result = result.filter(c => 
+          c.cliente?.nome?.toLowerCase().includes(searchLower)
+        );
+      }
+
+      // Filtro por vencimento
+      if (filters?.vencimento && filters.vencimento !== 'all') {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        if (filters.vencimento === 'vencidos') {
+          result = result.filter(c => {
+            const dataFim = new Date(c.data_fim);
+            return dataFim < today && c.ativo;
+          });
+        } else {
+          const days = parseInt(filters.vencimento);
+          const futureDate = new Date(today);
+          futureDate.setDate(futureDate.getDate() + days);
+
+          result = result.filter(c => {
+            const dataFim = new Date(c.data_fim);
+            return dataFim >= today && dataFim <= futureDate && c.ativo;
+          });
+        }
+      }
+
+      return result;
+    }
+  });
+}
+
 export function useMRRTotal() {
   return useQuery({
     queryKey: ['dashboard', 'mrr-total'],
