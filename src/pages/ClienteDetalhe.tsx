@@ -1,20 +1,23 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { Loader2, ArrowLeft, FileText, Users, Calendar, Wrench } from 'lucide-react';
+import { Loader2, ArrowLeft, FileText, Users, Calendar, Wrench, Pencil } from 'lucide-react';
 import { useCliente } from '@/hooks/useClientes';
 import { ContratoTab } from '@/components/cliente/ContratoTab';
 import { OnboardingTab } from '@/components/cliente/OnboardingTab';
 import { AtendimentoTab } from '@/components/cliente/AtendimentoTab';
 import { FerramentasTab } from '@/components/cliente/FerramentasTab';
+import { ClienteFormDialog } from '@/components/cliente/ClienteFormDialog';
 
 export default function ClienteDetalhe() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { data: cliente, isLoading, error } = useCliente(id);
+  const { data: cliente, isLoading, error, refetch } = useCliente(id);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -51,6 +54,14 @@ export default function ClienteDetalhe() {
             </Button>
             <h1 className="text-2xl font-bold text-foreground">{cliente.nome}</h1>
             <StatusBadge status={cliente.status} />
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => setEditDialogOpen(true)}
+              title="Editar dados do cliente"
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
           </div>
           <p className="text-muted-foreground ml-10">
             {cliente.cidade}/{cliente.uf} • Consultor: {cliente.consultor?.nome || 'Não atribuído'}
@@ -101,6 +112,14 @@ export default function ClienteDetalhe() {
           <FerramentasTab clienteId={cliente.id} />
         </TabsContent>
       </Tabs>
+
+      {/* Edit Dialog */}
+      <ClienteFormDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        cliente={cliente}
+        onSuccess={() => refetch()}
+      />
     </div>
   );
 }
