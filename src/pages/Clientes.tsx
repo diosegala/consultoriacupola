@@ -6,10 +6,21 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { Search, Plus, Loader2 } from 'lucide-react';
-import { useClientes } from '@/hooks/useClientes';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Search, Plus, Trash2, Loader2 } from 'lucide-react';
+import { useClientes, useDeleteCliente, ClienteComDetalhes } from '@/hooks/useClientes';
 import { useConsultores } from '@/hooks/useConsultores';
 import { useTiposConsultoria } from '@/hooks/useDadosAuxiliares';
+import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
 
 function formatCurrency(value: number): string {
@@ -23,10 +34,14 @@ function formatCurrency(value: number): string {
 
 export default function Clientes() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
   const [consultorFilter, setConsultorFilter] = useState('todos');
   const [tipoFilter, setTipoFilter] = useState('todos');
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [clienteToDelete, setClienteToDelete] = useState<ClienteComDetalhes | null>(null);
 
   const { data: clientes, isLoading } = useClientes({
     search: search || undefined,
@@ -36,12 +51,39 @@ export default function Clientes() {
 
   const { data: consultores } = useConsultores();
   const { data: tiposConsultoria } = useTiposConsultoria();
+  const deleteCliente = useDeleteCliente();
 
   // Filtro adicional por tipo de consultoria (client-side já que é um join)
   const clientesFiltrados = clientes?.filter(cliente => {
     if (tipoFilter === 'todos') return true;
     return cliente.contrato_ativo?.tipo_consultoria_id === tipoFilter;
   });
+
+  const openDeleteDialog = (cliente: ClienteComDetalhes, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setClienteToDelete(cliente);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!clienteToDelete) return;
+
+    try {
+      await deleteCliente.mutateAsync(clienteToDelete.id);
+      toast({
+        title: 'Sucesso',
+        description: 'Cliente excluído com sucesso'
+      });
+      setDeleteDialogOpen(false);
+      setClienteToDelete(null);
+    } catch (error: any) {
+      toast({
+        title: 'Erro',
+        description: error.message || 'Erro ao excluir cliente',
+        variant: 'destructive'
+      });
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -133,7 +175,7 @@ export default function Clientes() {
                   <TableHead className="text-muted-foreground">MRR</TableHead>
                   <TableHead className="text-muted-foreground">Status</TableHead>
                   <TableHead className="text-muted-foreground">Fim Contrato</TableHead>
-                  <TableHead className="w-[100px] text-muted-foreground">Ações</TableHead>
+                  <TableHead className="w-[120px] text-muted-foreground">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -172,17 +214,27 @@ export default function Clientes() {
                         }
                       </TableCell>
                       <TableCell>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          className="border-border"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/clientes/${cliente.id}`);
-                          }}
-                        >
-                          Ver
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            className="border-border"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/clientes/${cliente.id}`);
+                            }}
+                          >
+                            Ver
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={(e) => openDeleteDialog(cliente, e)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -192,6 +244,31 @@ export default function Clientes() {
           )}
         </CardContent>
       </Card>
+
+      {/* Dialog de Confirmação de Exclusão */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-foreground">Excluir Cliente</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o cliente <strong>{clienteToDelete?.nome}</strong>?
+              Esta ação irá remover também todos os contratos, atendimentos e dados relacionados.
+              <span className="block mt-2 text-destructive font-medium">Esta ação não pode ser desfeita.</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-border">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleteCliente.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteCliente.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

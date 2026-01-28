@@ -164,3 +164,55 @@ export function useClientesAguardandoRenovacao() {
     }
   });
 }
+
+export function useDeleteCliente() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      // Excluir em cascata: atendimentos, ferramentas_cliente, onboarding, encerramentos, contratos
+      // As foreign keys com ON DELETE CASCADE cuidam disso, mas vamos verificar se existem contratos
+      const { error: atendError } = await supabase
+        .from('atendimentos')
+        .delete()
+        .eq('cliente_id', id);
+      if (atendError) throw atendError;
+
+      const { error: ferrError } = await supabase
+        .from('ferramentas_cliente')
+        .delete()
+        .eq('cliente_id', id);
+      if (ferrError) throw ferrError;
+
+      const { error: onbError } = await supabase
+        .from('onboarding')
+        .delete()
+        .eq('cliente_id', id);
+      if (onbError) throw onbError;
+
+      const { error: encError } = await supabase
+        .from('encerramentos')
+        .delete()
+        .eq('cliente_id', id);
+      if (encError) throw encError;
+
+      const { error: contError } = await supabase
+        .from('contratos')
+        .delete()
+        .eq('cliente_id', id);
+      if (contError) throw contError;
+
+      const { error } = await supabase
+        .from('clientes')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clientes'] });
+      queryClient.invalidateQueries({ queryKey: ['contratos'] });
+      queryClient.invalidateQueries({ queryKey: ['all-contratos'] });
+    }
+  });
+}

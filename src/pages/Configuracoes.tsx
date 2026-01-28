@@ -13,14 +13,26 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Plus, Pencil, Loader2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
 import { 
   useTiposConsultoria, 
   useCreateTipoConsultoria, 
   useUpdateTipoConsultoria,
+  useDeleteTipoConsultoria,
   useCRMs,
   useCreateCRM,
   useUpdateCRM,
+  useDeleteCRM,
   TipoConsultoria,
   CRM
 } from '@/hooks/useDadosAuxiliares';
@@ -33,20 +45,26 @@ export default function Configuracoes() {
   const { data: tiposConsultoria, isLoading: loadingTipos } = useTiposConsultoria(false);
   const createTipo = useCreateTipoConsultoria();
   const updateTipo = useUpdateTipoConsultoria();
+  const deleteTipo = useDeleteTipoConsultoria();
   
   // CRMs
   const { data: crms, isLoading: loadingCRMs } = useCRMs(false);
   const createCRM = useCreateCRM();
   const updateCRM = useUpdateCRM();
+  const deleteCRM = useDeleteCRM();
 
   // Dialog states
   const [tipoDialogOpen, setTipoDialogOpen] = useState(false);
   const [editingTipo, setEditingTipo] = useState<TipoConsultoria | null>(null);
   const [tipoNome, setTipoNome] = useState('');
+  const [deleteTipoDialogOpen, setDeleteTipoDialogOpen] = useState(false);
+  const [tipoToDelete, setTipoToDelete] = useState<TipoConsultoria | null>(null);
 
   const [crmDialogOpen, setCRMDialogOpen] = useState(false);
   const [editingCRM, setEditingCRM] = useState<CRM | null>(null);
   const [crmNome, setCRMNome] = useState('');
+  const [deleteCRMDialogOpen, setDeleteCRMDialogOpen] = useState(false);
+  const [crmToDelete, setCRMToDelete] = useState<CRM | null>(null);
 
   // Tipo handlers
   const openNewTipoDialog = () => {
@@ -59,6 +77,11 @@ export default function Configuracoes() {
     setEditingTipo(tipo);
     setTipoNome(tipo.nome);
     setTipoDialogOpen(true);
+  };
+
+  const openDeleteTipoDialog = (tipo: TipoConsultoria) => {
+    setTipoToDelete(tipo);
+    setDeleteTipoDialogOpen(true);
   };
 
   const handleTipoSubmit = async () => {
@@ -76,6 +99,19 @@ export default function Configuracoes() {
         toast({ title: 'Sucesso', description: 'Tipo criado com sucesso' });
       }
       setTipoDialogOpen(false);
+    } catch (error: any) {
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteTipo = async () => {
+    if (!tipoToDelete) return;
+
+    try {
+      await deleteTipo.mutateAsync(tipoToDelete.id);
+      toast({ title: 'Sucesso', description: 'Tipo excluído com sucesso' });
+      setDeleteTipoDialogOpen(false);
+      setTipoToDelete(null);
     } catch (error: any) {
       toast({ title: 'Erro', description: error.message, variant: 'destructive' });
     }
@@ -103,6 +139,11 @@ export default function Configuracoes() {
     setCRMDialogOpen(true);
   };
 
+  const openDeleteCRMDialog = (crm: CRM) => {
+    setCRMToDelete(crm);
+    setDeleteCRMDialogOpen(true);
+  };
+
   const handleCRMSubmit = async () => {
     if (!crmNome.trim()) {
       toast({ title: 'Erro', description: 'Nome é obrigatório', variant: 'destructive' });
@@ -118,6 +159,19 @@ export default function Configuracoes() {
         toast({ title: 'Sucesso', description: 'CRM criado com sucesso' });
       }
       setCRMDialogOpen(false);
+    } catch (error: any) {
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteCRM = async () => {
+    if (!crmToDelete) return;
+
+    try {
+      await deleteCRM.mutateAsync(crmToDelete.id);
+      toast({ title: 'Sucesso', description: 'CRM excluído com sucesso' });
+      setDeleteCRMDialogOpen(false);
+      setCRMToDelete(null);
     } catch (error: any) {
       toast({ title: 'Erro', description: error.message, variant: 'destructive' });
     }
@@ -166,7 +220,7 @@ export default function Configuracoes() {
                     <TableRow className="border-border hover:bg-transparent">
                       <TableHead className="text-muted-foreground">Nome</TableHead>
                       <TableHead className="text-muted-foreground">Status</TableHead>
-                      <TableHead className="text-muted-foreground text-right w-[150px]">Ações</TableHead>
+                      <TableHead className="text-muted-foreground text-right w-[200px]">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -192,6 +246,14 @@ export default function Configuracoes() {
                               onClick={() => openEditTipoDialog(tipo)}
                             >
                               <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => openDeleteTipoDialog(tipo)}
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                             <Button 
                               variant={tipo.ativo ? 'secondary' : 'default'}
@@ -232,7 +294,7 @@ export default function Configuracoes() {
                     <TableRow className="border-border hover:bg-transparent">
                       <TableHead className="text-muted-foreground">Nome</TableHead>
                       <TableHead className="text-muted-foreground">Status</TableHead>
-                      <TableHead className="text-muted-foreground text-right w-[150px]">Ações</TableHead>
+                      <TableHead className="text-muted-foreground text-right w-[200px]">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -258,6 +320,14 @@ export default function Configuracoes() {
                               onClick={() => openEditCRMDialog(crm)}
                             >
                               <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => openDeleteCRMDialog(crm)}
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                             <Button 
                               variant={crm.ativo ? 'secondary' : 'default'}
@@ -316,6 +386,30 @@ export default function Configuracoes() {
         </DialogContent>
       </Dialog>
 
+      {/* Dialog Excluir Tipo */}
+      <AlertDialog open={deleteTipoDialogOpen} onOpenChange={setDeleteTipoDialogOpen}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-foreground">Excluir Tipo de Consultoria</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o tipo <strong>{tipoToDelete?.nome}</strong>?
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-border">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteTipo}
+              disabled={deleteTipo.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteTipo.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Dialog CRM */}
       <Dialog open={crmDialogOpen} onOpenChange={setCRMDialogOpen}>
         <DialogContent className="bg-card border-border">
@@ -353,6 +447,30 @@ export default function Configuracoes() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog Excluir CRM */}
+      <AlertDialog open={deleteCRMDialogOpen} onOpenChange={setDeleteCRMDialogOpen}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-foreground">Excluir CRM</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o CRM <strong>{crmToDelete?.nome}</strong>?
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-border">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteCRM}
+              disabled={deleteCRM.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteCRM.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
