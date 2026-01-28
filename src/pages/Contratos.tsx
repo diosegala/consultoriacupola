@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { FileText, Search, Eye, X, ExternalLink, Calendar, DollarSign, User, Building, Pencil, ArrowUpDown, ArrowUp, ArrowDown, XCircle } from 'lucide-react';
+import { FileText, Search, Eye, X, ExternalLink, Calendar, DollarSign, User, Building, Pencil, ArrowUpDown, ArrowUp, ArrowDown, XCircle, RefreshCw } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -35,7 +35,7 @@ import { Separator } from '@/components/ui/separator';
 import { useAllContratos, AllContratosFilters, ContratoComCliente } from '@/hooks/useContratos';
 import { useConsultores } from '@/hooks/useConsultores';
 import { useTiposConsultoria } from '@/hooks/useDadosAuxiliares';
-import { ContratoFormDialog, EncerrarContratoDialog } from '@/components/cliente/ClienteDialogs';
+import { ContratoFormDialog, EncerrarContratoDialog, RenovarContratoDialog } from '@/components/cliente/ClienteDialogs';
 import { cn } from '@/lib/utils';
 
 function formatCurrency(value: number) {
@@ -81,6 +81,8 @@ export default function Contratos() {
   const [editingContrato, setEditingContrato] = useState<ContratoComCliente | null>(null);
   const [showEncerrar, setShowEncerrar] = useState(false);
   const [encerrandoContrato, setEncerrandoContrato] = useState<ContratoComCliente | null>(null);
+  const [showRenovar, setShowRenovar] = useState(false);
+  const [renovandoContrato, setRenovandoContrato] = useState<ContratoComCliente | null>(null);
   const [sortField, setSortField] = useState<ContratoSortField>('data_fim');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
@@ -617,18 +619,32 @@ export default function Contratos() {
                     Editar
                   </Button>
                   {selectedContrato.ativo && (
-                    <Button 
-                      variant="destructive" 
-                      size="sm"
-                      onClick={() => {
-                        setEncerrandoContrato(selectedContrato);
-                        setSelectedContrato(null);
-                        setShowEncerrar(true);
-                      }}
-                    >
-                      <XCircle className="h-4 w-4 mr-2" />
-                      Encerrar
-                    </Button>
+                    <>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          setRenovandoContrato(selectedContrato);
+                          setSelectedContrato(null);
+                          setShowRenovar(true);
+                        }}
+                      >
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Renovar
+                      </Button>
+                      <Button 
+                        variant="destructive" 
+                        size="sm"
+                        onClick={() => {
+                          setEncerrandoContrato(selectedContrato);
+                          setSelectedContrato(null);
+                          setShowEncerrar(true);
+                        }}
+                      >
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Encerrar
+                      </Button>
+                    </>
                   )}
                   {selectedContrato.link_contrato && (
                     <Button variant="outline" size="sm" asChild>
@@ -680,6 +696,20 @@ export default function Contratos() {
           clienteId={encerrandoContrato.cliente_id}
           contrato={encerrandoContrato}
           onSuccess={() => setEncerrandoContrato(null)}
+        />
+      )}
+
+      {/* Dialog de Renovação */}
+      {renovandoContrato && (
+        <RenovarContratoDialog
+          open={showRenovar}
+          onOpenChange={(open) => {
+            setShowRenovar(open);
+            if (!open) setRenovandoContrato(null);
+          }}
+          clienteId={renovandoContrato.cliente_id}
+          contratoAtual={renovandoContrato}
+          onSuccess={() => setRenovandoContrato(null)}
         />
       )}
     </div>

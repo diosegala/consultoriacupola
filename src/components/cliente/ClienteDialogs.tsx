@@ -597,6 +597,7 @@ interface RenovarContratoDialogProps {
   onOpenChange: (open: boolean) => void;
   clienteId: string;
   contratoAtual: ContratoComTipo;
+  onSuccess?: () => void;
 }
 
 const renovarSchema = z.object({
@@ -615,7 +616,7 @@ const renovarSchema = z.object({
 
 type RenovarFormValues = z.infer<typeof renovarSchema>;
 
-export function RenovarContratoDialog({ open, onOpenChange, clienteId, contratoAtual }: RenovarContratoDialogProps) {
+export function RenovarContratoDialog({ open, onOpenChange, clienteId, contratoAtual, onSuccess }: RenovarContratoDialogProps) {
   const { data: tiposConsultoria } = useTiposConsultoria();
   const renovarContrato = useRenovarContrato();
 
@@ -706,6 +707,7 @@ export function RenovarContratoDialog({ open, onOpenChange, clienteId, contratoA
 
       toast({ title: 'Contrato renovado com sucesso!' });
       onOpenChange(false);
+      onSuccess?.();
     } catch (error: any) {
       toast({
         title: 'Erro ao renovar contrato',
