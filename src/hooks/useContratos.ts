@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
-export type Contrato = Tables<'contratos'>;
+export type Contrato = Tables<'contratos'> & { pausado?: boolean };
 export type ContratoInsert = TablesInsert<'contratos'>;
 export type ContratoUpdate = TablesUpdate<'contratos'>;
 

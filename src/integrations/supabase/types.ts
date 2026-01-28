@@ -147,6 +147,7 @@ export type Database = {
           momento: string | null
           parcelas: number
           particularidades: string | null
+          pausado: boolean
           prazo_meses: number
           remuneracao_mensal: number
           remuneracao_total: number
@@ -164,6 +165,7 @@ export type Database = {
           momento?: string | null
           parcelas: number
           particularidades?: string | null
+          pausado?: boolean
           prazo_meses: number
           remuneracao_mensal: number
           remuneracao_total: number
@@ -181,6 +183,7 @@ export type Database = {
           momento?: string | null
           parcelas?: number
           particularidades?: string | null
+          pausado?: boolean
           prazo_meses?: number
           remuneracao_mensal?: number
           remuneracao_total?: number
@@ -377,6 +380,60 @@ export type Database = {
           },
           {
             foreignKeyName: "onboarding_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pausas_contrato: {
+        Row: {
+          cliente_id: string
+          contrato_id: string
+          created_at: string
+          data_fim: string | null
+          data_inicio: string
+          dias_pausados: number | null
+          id: string
+          motivo: string | null
+          prorrogacao_aplicada: boolean
+          updated_at: string
+        }
+        Insert: {
+          cliente_id: string
+          contrato_id: string
+          created_at?: string
+          data_fim?: string | null
+          data_inicio: string
+          dias_pausados?: number | null
+          id?: string
+          motivo?: string | null
+          prorrogacao_aplicada?: boolean
+          updated_at?: string
+        }
+        Update: {
+          cliente_id?: string
+          contrato_id?: string
+          created_at?: string
+          data_fim?: string | null
+          data_inicio?: string
+          dias_pausados?: number | null
+          id?: string
+          motivo?: string | null
+          prorrogacao_aplicada?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pausas_contrato_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pausas_contrato_contrato_id_fkey"
             columns: ["contrato_id"]
             isOneToOne: false
             referencedRelation: "contratos"
