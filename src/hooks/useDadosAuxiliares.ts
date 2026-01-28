@@ -7,6 +7,10 @@ export type TipoConsultoria = Tables<'tipos_consultoria'>;
 export type TipoConsultoriaInsert = TablesInsert<'tipos_consultoria'>;
 export type TipoConsultoriaUpdate = TablesUpdate<'tipos_consultoria'>;
 
+export type TipoConsultoriaComContratos = TipoConsultoria & {
+  total_contratos: number;
+};
+
 export function useTiposConsultoria(apenasAtivos = true) {
   return useQuery({
     queryKey: ['tipos-consultoria', { apenasAtivos }],
@@ -27,6 +31,50 @@ export function useTiposConsultoria(apenasAtivos = true) {
   });
 }
 
+export function useTiposConsultoriaComContratos(apenasAtivos = false) {
+  return useQuery({
+    queryKey: ['tipos-consultoria-com-contratos', { apenasAtivos }],
+    queryFn: async () => {
+      // Buscar tipos de consultoria
+      let tiposQuery = supabase
+        .from('tipos_consultoria')
+        .select('*')
+        .order('nome');
+
+      if (apenasAtivos) {
+        tiposQuery = tiposQuery.eq('ativo', true);
+      }
+
+      const { data: tipos, error: tiposError } = await tiposQuery;
+      if (tiposError) throw tiposError;
+
+      // Buscar contagem de contratos por tipo
+      const { data: contratos, error: contratosError } = await supabase
+        .from('contratos')
+        .select('tipo_consultoria_id');
+      
+      if (contratosError) throw contratosError;
+
+      // Contar contratos por tipo
+      const contagemPorTipo = contratos.reduce((acc, contrato) => {
+        const tipoId = contrato.tipo_consultoria_id;
+        if (tipoId) {
+          acc[tipoId] = (acc[tipoId] || 0) + 1;
+        }
+        return acc;
+      }, {} as Record<string, number>);
+
+      // Combinar dados
+      const tiposComContratos: TipoConsultoriaComContratos[] = tipos.map(tipo => ({
+        ...tipo,
+        total_contratos: contagemPorTipo[tipo.id] || 0
+      }));
+
+      return tiposComContratos;
+    }
+  });
+}
+
 export function useCreateTipoConsultoria() {
   const queryClient = useQueryClient();
 
@@ -43,6 +91,7 @@ export function useCreateTipoConsultoria() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tipos-consultoria'] });
+      queryClient.invalidateQueries({ queryKey: ['tipos-consultoria-com-contratos'] });
     }
   });
 }
@@ -64,6 +113,7 @@ export function useUpdateTipoConsultoria() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tipos-consultoria'] });
+      queryClient.invalidateQueries({ queryKey: ['tipos-consultoria-com-contratos'] });
     }
   });
 }
@@ -159,6 +209,7 @@ export function useDeleteTipoConsultoria() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tipos-consultoria'] });
+      queryClient.invalidateQueries({ queryKey: ['tipos-consultoria-com-contratos'] });
     }
   });
 }
