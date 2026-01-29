@@ -5,19 +5,33 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { Loader2, ArrowLeft, FileText, Users, Calendar, Wrench, Pencil } from 'lucide-react';
-import { useCliente } from '@/hooks/useClientes';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Loader2, ArrowLeft, FileText, Users, Calendar, Wrench, Pencil, Trash2 } from 'lucide-react';
+import { useCliente, useDeleteCliente } from '@/hooks/useClientes';
 import { ContratoTab } from '@/components/cliente/ContratoTab';
 import { OnboardingTab } from '@/components/cliente/OnboardingTab';
 import { AtendimentoTab } from '@/components/cliente/AtendimentoTab';
 import { FerramentasTab } from '@/components/cliente/FerramentasTab';
 import { ClienteFormDialog } from '@/components/cliente/ClienteFormDialog';
+import { toast } from 'sonner';
 
 export default function ClienteDetalhe() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: cliente, isLoading, error, refetch } = useCliente(id);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  
+  const deleteCliente = useDeleteCliente();
 
   if (isLoading) {
     return (
@@ -61,6 +75,15 @@ export default function ClienteDetalhe() {
               title="Editar dados do cliente"
             >
               <Pencil className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon"
+              className="text-destructive hover:text-destructive"
+              onClick={() => setShowDeleteConfirm(true)}
+              title="Excluir cliente"
+            >
+              <Trash2 className="h-4 w-4" />
             </Button>
           </div>
           <p className="text-muted-foreground ml-10">
@@ -120,6 +143,49 @@ export default function ClienteDetalhe() {
         cliente={cliente}
         onSuccess={() => refetch()}
       />
+
+      {/* Dialog de Confirmação de Exclusão */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir cliente</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir <strong>{cliente.nome}</strong>?
+              <br /><br />
+              Esta ação irá remover permanentemente:
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>Todos os contratos do cliente</li>
+                <li>Atendimentos registrados</li>
+                <li>Dados de onboarding</li>
+                <li>Ferramentas configuradas</li>
+                <li>Encerramentos e pausas</li>
+              </ul>
+              <br />
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                deleteCliente.mutate(cliente.id, {
+                  onSuccess: () => {
+                    toast.success('Cliente excluído com sucesso');
+                    navigate('/clientes');
+                  },
+                  onError: (error) => {
+                    toast.error('Erro ao excluir cliente: ' + error.message);
+                  }
+                });
+              }}
+              disabled={deleteCliente.isPending}
+            >
+              {deleteCliente.isPending ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
