@@ -170,8 +170,23 @@ export function useDeleteCliente() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      // Excluir em cascata: atendimentos, ferramentas_cliente, onboarding, encerramentos, contratos
-      // As foreign keys com ON DELETE CASCADE cuidam disso, mas vamos verificar se existem contratos
+      // Excluir em cascata: pausas_contrato, atendimentos, ferramentas_cliente, onboarding, encerramentos, contratos, webhook_logs
+      
+      // Primeiro excluir pausas dos contratos
+      const { data: contratos } = await supabase
+        .from('contratos')
+        .select('id')
+        .eq('cliente_id', id);
+      
+      if (contratos && contratos.length > 0) {
+        const contratoIds = contratos.map(c => c.id);
+        const { error: pausasError } = await supabase
+          .from('pausas_contrato')
+          .delete()
+          .in('contrato_id', contratoIds);
+        if (pausasError) throw pausasError;
+      }
+
       const { error: atendError } = await supabase
         .from('atendimentos')
         .delete()
@@ -201,6 +216,13 @@ export function useDeleteCliente() {
         .delete()
         .eq('cliente_id', id);
       if (contError) throw contError;
+
+      // Excluir webhook_logs associados ao cliente
+      const { error: webhookError } = await supabase
+        .from('webhook_logs')
+        .delete()
+        .eq('cliente_id', id);
+      if (webhookError) throw webhookError;
 
       const { error } = await supabase
         .from('clientes')
