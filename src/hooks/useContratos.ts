@@ -257,3 +257,51 @@ export function useMRRTotal() {
     }
   });
 }
+
+export function useDeleteContrato() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ contratoId, clienteId }: { contratoId: string; clienteId: string }) => {
+      // Excluir registros dependentes em ordem
+      
+      // 1. Excluir pausas do contrato
+      const { error: pausasError } = await supabase
+        .from('pausas_contrato')
+        .delete()
+        .eq('contrato_id', contratoId);
+      if (pausasError) throw pausasError;
+
+      // 2. Excluir encerramentos do contrato
+      const { error: encError } = await supabase
+        .from('encerramentos')
+        .delete()
+        .eq('contrato_id', contratoId);
+      if (encError) throw encError;
+
+      // 3. Excluir onboarding vinculado ao contrato
+      const { error: onbError } = await supabase
+        .from('onboarding')
+        .delete()
+        .eq('contrato_id', contratoId);
+      if (onbError) throw onbError;
+
+      // 4. Excluir o contrato
+      const { error: contratoError } = await supabase
+        .from('contratos')
+        .delete()
+        .eq('id', contratoId);
+      if (contratoError) throw contratoError;
+
+      return { clienteId };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['contratos', data.clienteId] });
+      queryClient.invalidateQueries({ queryKey: ['contrato-ativo', data.clienteId] });
+      queryClient.invalidateQueries({ queryKey: ['all-contratos'] });
+      queryClient.invalidateQueries({ queryKey: ['clientes'] });
+      queryClient.invalidateQueries({ queryKey: ['cliente', data.clienteId] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    }
+  });
+}

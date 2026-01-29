@@ -3,10 +3,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, Pencil, RefreshCw } from 'lucide-react';
-import { useContratos, useContratoAtivo, ContratoComTipo } from '@/hooks/useContratos';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Loader2, Plus, Pencil, RefreshCw, Trash2 } from 'lucide-react';
+import { useContratos, useContratoAtivo, ContratoComTipo, useDeleteContrato } from '@/hooks/useContratos';
 import { format, parseISO } from 'date-fns';
 import { ContratoFormDialog, RenovarContratoDialog } from './ClienteDialogs';
+import { toast } from 'sonner';
 
 interface ContratoTabProps {
   clienteId: string;
@@ -27,6 +38,10 @@ export function ContratoTab({ clienteId, clienteStatus }: ContratoTabProps) {
   const [showForm, setShowForm] = useState(false);
   const [editingContrato, setEditingContrato] = useState<ContratoComTipo | null>(null);
   const [showRenovar, setShowRenovar] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletingContrato, setDeletingContrato] = useState<ContratoComTipo | null>(null);
+  
+  const deleteContrato = useDeleteContrato();
 
   const handleEdit = (contrato: ContratoComTipo) => {
     setEditingContrato(contrato);
@@ -67,6 +82,18 @@ export function ContratoTab({ clienteId, clienteStatus }: ContratoTabProps) {
               <Button variant="outline" size="sm" onClick={() => setShowRenovar(true)}>
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Renovar
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="text-destructive hover:text-destructive"
+                onClick={() => {
+                  setDeletingContrato(contratoAtivo);
+                  setShowDeleteConfirm(true);
+                }}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Excluir
               </Button>
             </div>
           </CardHeader>
@@ -161,6 +188,7 @@ export function ContratoTab({ clienteId, clienteStatus }: ContratoTabProps) {
                   <TableHead className="text-muted-foreground">Valor Total</TableHead>
                   <TableHead className="text-muted-foreground">MRR</TableHead>
                   <TableHead className="text-muted-foreground">Status</TableHead>
+                  <TableHead className="text-muted-foreground w-[60px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -181,6 +209,19 @@ export function ContratoTab({ clienteId, clienteStatus }: ContratoTabProps) {
                     </TableCell>
                     <TableCell>
                       <Badge variant="secondary">Encerrado</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => {
+                          setDeletingContrato(contrato);
+                          setShowDeleteConfirm(true);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -206,6 +247,53 @@ export function ContratoTab({ clienteId, clienteStatus }: ContratoTabProps) {
           contratoAtual={contratoAtivo}
         />
       )}
+
+      {/* Dialog de Confirmação de Exclusão */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir contrato</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este contrato?
+              <br /><br />
+              Esta ação irá remover permanentemente:
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>O contrato selecionado</li>
+                <li>Pausas associadas ao contrato</li>
+                <li>Encerramentos associados</li>
+                <li>Onboarding vinculado (se houver)</li>
+              </ul>
+              <br />
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (deletingContrato) {
+                  deleteContrato.mutate(
+                    { contratoId: deletingContrato.id, clienteId },
+                    {
+                      onSuccess: () => {
+                        toast.success('Contrato excluído com sucesso');
+                        setDeletingContrato(null);
+                      },
+                      onError: (error) => {
+                        toast.error('Erro ao excluir contrato: ' + error.message);
+                      }
+                    }
+                  );
+                }
+              }}
+              disabled={deleteContrato.isPending}
+            >
+              {deleteContrato.isPending ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

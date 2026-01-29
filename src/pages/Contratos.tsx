@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { FileText, Search, Eye, X, ExternalLink, Calendar, DollarSign, User, Building, Pencil, ArrowUpDown, ArrowUp, ArrowDown, XCircle, RefreshCw, Pause, Play, CalendarPlus } from 'lucide-react';
+import { FileText, Search, Eye, X, ExternalLink, Calendar, DollarSign, User, Building, Pencil, ArrowUpDown, ArrowUp, ArrowDown, XCircle, RefreshCw, Pause, Play, CalendarPlus, Trash2 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -28,11 +28,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
+import { toast } from 'sonner';
 
-import { useAllContratos, AllContratosFilters, ContratoComCliente } from '@/hooks/useContratos';
+import { useAllContratos, AllContratosFilters, ContratoComCliente, useDeleteContrato } from '@/hooks/useContratos';
 import { useConsultores } from '@/hooks/useConsultores';
 import { useTiposConsultoria } from '@/hooks/useDadosAuxiliares';
 import { usePausaAtiva } from '@/hooks/usePausasContrato';
@@ -97,6 +108,8 @@ export default function Contratos() {
   const [retomandoContrato, setRetomandoContrato] = useState<ContratoComCliente | null>(null);
   const [showProrrogar, setShowProrrogar] = useState(false);
   const [prorrogandoContrato, setProrrogandoContrato] = useState<ContratoComCliente | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletingContrato, setDeletingContrato] = useState<ContratoComCliente | null>(null);
   const [sortField, setSortField] = useState<ContratoSortField>('cliente');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
@@ -106,6 +119,7 @@ export default function Contratos() {
   });
   const { data: consultores } = useConsultores();
   const { data: tiposConsultoria } = useTiposConsultoria();
+  const deleteContrato = useDeleteContrato();
 
   // Ordenar contratos
   const contratos = useMemo(() => {
@@ -718,6 +732,19 @@ export default function Contratos() {
                     <User className="h-4 w-4 mr-2" />
                     Ver Cliente
                   </Button>
+                  <Button 
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => {
+                      setDeletingContrato(selectedContrato);
+                      setSelectedContrato(null);
+                      setShowDeleteConfirm(true);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Excluir
+                  </Button>
                 </div>
               </div>
             );
@@ -804,6 +831,54 @@ export default function Contratos() {
           onSuccess={() => setProrrogandoContrato(null)}
         />
       )}
+
+      {/* Dialog de Confirmação de Exclusão */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir contrato</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este contrato de{' '}
+              <strong>{deletingContrato?.cliente?.nome}</strong>?
+              <br /><br />
+              Esta ação irá remover permanentemente:
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>O contrato selecionado</li>
+                <li>Pausas associadas ao contrato</li>
+                <li>Encerramentos associados</li>
+                <li>Onboarding vinculado (se houver)</li>
+              </ul>
+              <br />
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (deletingContrato) {
+                  deleteContrato.mutate(
+                    { contratoId: deletingContrato.id, clienteId: deletingContrato.cliente_id },
+                    {
+                      onSuccess: () => {
+                        toast.success('Contrato excluído com sucesso');
+                        setDeletingContrato(null);
+                      },
+                      onError: (error) => {
+                        toast.error('Erro ao excluir contrato: ' + error.message);
+                      }
+                    }
+                  );
+                }
+              }}
+              disabled={deleteContrato.isPending}
+            >
+              {deleteContrato.isPending ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
