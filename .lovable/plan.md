@@ -1,209 +1,129 @@
 
-# Plano: Integração Completa com Pipedrive
+# Plano: Funcionalidade de Exclusão de Cliente e Contrato
 
-## Objetivo
-Automatizar a criação de clientes no sistema Cupola quando um deal é marcado como "ganho" no Pipedrive, via webhook.
+## Situação Atual
 
----
+### Exclusão de Cliente
+A funcionalidade de excluir cliente **já está implementada**:
+- Hook `useDeleteCliente()` em `src/hooks/useClientes.ts` (linhas 168-217)
+- Botão de lixeira na listagem de clientes (`/clientes`)
+- Modal de confirmação com `AlertDialog`
+- Exclusão em cascata de todos os dados relacionados (atendimentos, ferramentas, onboarding, encerramentos, contratos)
 
-## Arquitetura da Solução
-
-```text
-+----------------+       HTTP POST        +---------------------+
-|   Pipedrive    | ---------------------->| Edge Function       |
-|   Webhook      |   (deal.won event)     | pipedrive-webhook   |
-+----------------+                        +---------------------+
-                                                   |
-                                                   v
-                                          +---------------+
-                                          |   Validação   |
-                                          | - Assinatura  |
-                                          | - Evento      |
-                                          | - Duplicidade |
-                                          +---------------+
-                                                   |
-                                                   v
-                        +--------------------------+--------------------------+
-                        |                          |                          |
-                        v                          v                          v
-                 +-------------+           +--------------+          +--------------+
-                 |  clientes   |           |  contratos   |          | webhook_logs |
-                 | (status:    |           | (ativo:true) |          | (registro)   |
-                 |  'novo')    |           |              |          |              |
-                 +-------------+           +--------------+          +--------------+
-```
+### Exclusão de Contrato
+Essa funcionalidade **não existe** e precisa ser implementada:
+- Não há hook `useDeleteContrato`
+- Não há opção de excluir contrato individual na interface
+- Atualmente, para remover um contrato, é preciso excluir o cliente inteiro
 
 ---
 
-## Componentes a Implementar
+## Implementação Necessária
 
-### 1. Edge Function: `pipedrive-webhook`
+### 1. Criar Hook `useDeleteContrato`
 
-Uma nova função para receber e processar webhooks do Pipedrive:
+Adicionar ao arquivo `src/hooks/useContratos.ts`:
+- Função para excluir contrato individual
+- Antes de excluir, remover registros dependentes:
+  - `pausas_contrato` (pausas associadas ao contrato)
+  - `encerramentos` (encerramentos associados ao contrato)
+  - `onboarding` (se vinculado ao contrato específico)
 
-**Responsabilidades:**
-- Receber payload do webhook (evento `deal.won` ou `updated` com status="won")
-- Validar assinatura do webhook (se configurada)
-- Verificar duplicidade via `pipedrive_deal_id`
-- Criar cliente com status `novo`
-- Criar contrato inicial baseado nos dados do deal
-- Registrar log na tabela `webhook_logs`
+### 2. Adicionar Botão de Exclusão no Modal de Detalhes do Contrato
 
-**Mapeamento de campos Pipedrive → Cupola:**
-| Pipedrive | Cupola |
-|-----------|--------|
-| `deal.id` | `clientes.pipedrive_deal_id` |
-| `deal.title` ou `organization.name` | `clientes.nome` |
-| `deal.value` | `contratos.remuneracao_total` |
-| Campo customizado (cidade/UF) | `clientes.cidade`, `clientes.uf` |
-| Campo customizado (prazo) | `contratos.prazo_meses` |
+No arquivo `src/pages/Contratos.tsx`:
+- Adicionar botão "Excluir" no rodapé do modal de detalhes
+- Implementar `AlertDialog` de confirmação (padrão destrutivo)
+- Mostrar aviso sobre dados que serão removidos
 
-### 2. Configuração no Pipedrive
+### 3. Adicionar Exclusão na Aba Contrato do Cliente
 
-**Webhook a configurar:**
-- **URL**: `https://wmmnbonigciftewukvum.supabase.co/functions/v1/pipedrive-webhook`
-- **Eventos**: `deal.updated` (filtrar por `status = won`)
-- **Método**: POST
+No arquivo `src/components/cliente/ContratoTab.tsx`:
+- Adicionar botão de excluir no card do contrato ativo
+- Adicionar opção de excluir no histórico de contratos
+- Implementar confirmação antes da exclusão
 
-### 3. Campos Customizados Necessários
+### 4. Adicionar Exclusão na Página de Detalhe do Cliente
 
-Para extrair informações completas do deal, será preciso mapear campos customizados do Pipedrive:
-- Cidade/UF do cliente
-- Prazo do contrato (meses)
-- Tipo de consultoria
-- Remuneração mensal
+No arquivo `src/pages/ClienteDetalhe.tsx`:
+- Adicionar botão "Excluir Cliente" no header (ao lado do botão Editar)
+- Reutilizar o mesmo padrão de confirmação da página de listagem
+- Após exclusão, redirecionar para `/clientes`
 
 ---
 
 ## Detalhes Técnicos
 
-### Edge Function `pipedrive-webhook`
+### Hook `useDeleteContrato`
 
-```typescript
-// Estrutura principal
-Deno.serve(async (req) => {
-  // 1. CORS preflight
-  if (req.method === 'OPTIONS') return corsResponse();
-  
-  // 2. Validar método POST
-  if (req.method !== 'POST') return error(405);
-  
-  // 3. Parsear payload
-  const payload = await req.json();
-  
-  // 4. Registrar no webhook_logs (antes de processar)
-  const logId = await insertWebhookLog(payload);
-  
-  // 5. Validar evento (deal won)
-  if (!isDealWon(payload)) return success('Evento ignorado');
-  
-  // 6. Verificar duplicidade
-  const dealId = payload.current?.id || payload.meta?.id;
-  if (await clienteExiste(dealId)) return success('Já processado');
-  
-  // 7. Extrair dados e criar cliente + contrato
-  const cliente = await criarCliente(payload);
-  const contrato = await criarContrato(cliente.id, payload);
-  
-  // 8. Criar registros auxiliares
-  await criarAtendimento(cliente.id);
-  await criarOnboarding(cliente.id, contrato.id);
-  await criarFerramentasCliente(cliente.id);
-  
-  // 9. Atualizar log como processado
-  await updateWebhookLog(logId, cliente.id);
-  
-  return success({ cliente_id: cliente.id });
-});
+```text
+useDeleteContrato()
+├── Receber: contrato_id, cliente_id
+├── Excluir pausas_contrato WHERE contrato_id = ?
+├── Excluir encerramentos WHERE contrato_id = ?
+├── Excluir onboarding WHERE contrato_id = ?
+├── Excluir contrato WHERE id = ?
+└── Invalidar queries: contratos, all-contratos, cliente
 ```
 
-### Lógica de Extração de Dados
+### Lógica de Negócio
 
-O webhook do Pipedrive envia dados no formato:
-```json
-{
-  "meta": {
-    "action": "updated",
-    "object": "deal",
-    "id": 12345
-  },
-  "current": {
-    "id": 12345,
-    "title": "Nome do Cliente",
-    "status": "won",
-    "value": 50000,
-    "org_id": { "name": "Empresa XPTO" },
-    "person_id": { "name": "João Silva" },
-    "custom_fields": { ... }
-  },
-  "previous": { ... }
-}
-```
-
-### Tratamento de Erros
-
-- **Payload inválido**: Registrar erro no log, retornar 400
-- **Deal duplicado**: Ignorar silenciosamente, retornar 200
-- **Erro ao criar cliente**: Registrar no log, retornar 500
-- **Campos obrigatórios faltando**: Usar valores default
+Ao excluir um contrato:
+1. Se for o único contrato do cliente e estiver ativo: perguntar se deseja excluir o cliente também
+2. Se houver outros contratos: apenas excluir o contrato selecionado
+3. Se for o contrato ativo: atualizar status do cliente conforme contratos restantes
 
 ---
 
-## Configuração Necessária
+## Arquivos a Modificar
 
-### 1. Secrets do Supabase
+| Arquivo | Modificação |
+|---------|-------------|
+| `src/hooks/useContratos.ts` | Adicionar `useDeleteContrato()` |
+| `src/pages/Contratos.tsx` | Adicionar botão e modal de exclusão de contrato |
+| `src/components/cliente/ContratoTab.tsx` | Adicionar opção de excluir contrato |
+| `src/pages/ClienteDetalhe.tsx` | Adicionar botão de excluir cliente |
 
-| Secret | Descrição |
-|--------|-----------|
-| `PIPEDRIVE_WEBHOOK_SECRET` | (Opcional) Para validar assinatura do webhook |
+---
 
-### 2. Atualização do `supabase/config.toml`
+## Fluxo de Exclusão
 
-```toml
-[functions.pipedrive-webhook]
-verify_jwt = false
+```text
+Usuário clica "Excluir"
+         |
+         v
+   +------------------+
+   | AlertDialog com  |
+   | confirmação      |
+   +------------------+
+         |
+    [Confirmar]
+         |
+         v
+   +------------------+
+   | Excluir dados    |
+   | dependentes      |
+   +------------------+
+         |
+         v
+   +------------------+
+   | Excluir registro |
+   | principal        |
+   +------------------+
+         |
+         v
+   +------------------+
+   | Toast de sucesso |
+   | Atualizar UI     |
+   +------------------+
 ```
 
 ---
 
-## Interface Administrativa (Opcional - Fase 2)
+## Resumo das Ações
 
-Criar página `/configuracoes/pipedrive` para:
-- Visualizar logs de webhooks processados
-- Reprocessar webhooks com erro
-- Mapear campos customizados do Pipedrive
-- Testar conexão
-
----
-
-## Fluxo Completo
-
-1. Vendedor marca deal como "Ganho" no Pipedrive
-2. Pipedrive dispara webhook para a Edge Function
-3. Edge Function valida e extrai dados do payload
-4. Sistema cria automaticamente:
-   - Cliente (status: `novo`)
-   - Contrato (ativo: `true`)
-   - Atendimento (periodicidade padrão: `quinzenal`)
-   - Onboarding (etapa: `pre_onboarding`)
-   - Ferramentas do cliente (vazias)
-5. Log é registrado na tabela `webhook_logs`
-6. Cliente aparece na lista com status "Novo" pronto para onboarding
-
----
-
-## Arquivos a Criar/Modificar
-
-| Arquivo | Ação |
-|---------|------|
-| `supabase/functions/pipedrive-webhook/index.ts` | Criar |
-| `supabase/config.toml` | Adicionar configuração da função |
-
----
-
-## Próximos Passos Após Implementação
-
-1. **Configurar webhook no Pipedrive**: Acessar Configurações → Webhooks → Adicionar
-2. **Mapear campos customizados**: Identificar os IDs dos campos do Pipedrive para cidade, prazo, etc.
-3. **Testar fluxo**: Criar deal de teste e marcar como ganho
-4. **Monitorar logs**: Verificar tabela `webhook_logs` para debugar
+1. Criar hook `useDeleteContrato` com exclusão em cascata
+2. Adicionar botão de exclusão no modal de detalhes de contrato na página `/contratos`
+3. Adicionar botão de exclusão na aba Contrato da página de detalhe do cliente
+4. Adicionar botão de exclusão de cliente na página de detalhe do cliente
+5. Implementar modais de confirmação com texto explicativo sobre consequências
