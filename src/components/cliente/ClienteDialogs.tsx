@@ -15,6 +15,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { useCreateContrato, useUpdateContrato, useRenovarContrato, ContratoComTipo } from '@/hooks/useContratos';
 import { useTiposConsultoria } from '@/hooks/useDadosAuxiliares';
+import { useEncerrarContrato } from '@/hooks/useEncerramentos';
 import { toast } from '@/hooks/use-toast';
 
 const contratoSchema = z.object({
@@ -477,7 +478,6 @@ const encerrarSchema = z.object({
 type EncerrarFormValues = z.infer<typeof encerrarSchema>;
 
 export function EncerrarContratoDialog({ open, onOpenChange, clienteId, contrato, onSuccess }: EncerrarContratoDialogProps) {
-  const { useEncerrarContrato } = require('@/hooks/useEncerramentos');
   const encerrarContrato = useEncerrarContrato();
 
   const form = useForm<EncerrarFormValues>({
