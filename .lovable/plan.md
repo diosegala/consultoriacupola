@@ -1,147 +1,194 @@
 
-# Plano: Nova Página de Contratos
+# Plano: Integração Completa com Pipedrive
 
-## Contexto
+## Objetivo
+Automatizar a criação de clientes no sistema Cupola quando um deal é marcado como "ganho" no Pipedrive, via webhook.
 
-Você está correto! A estrutura atual mostra contratos apenas dentro da página de cada cliente, mas uma visão consolidada de todos os contratos facilita:
+---
 
-- Ver todos os contratos que vencem em breve (independente do cliente)
-- Filtrar por status (ativos/inativos)
-- Analisar histórico completo de renovações
-- Identificar rapidamente contratos que precisam de ação
-
-## Arquitetura Proposta
+## Arquitetura da Solução
 
 ```text
-+------------------+       +-------------------+
-|   /clientes      |       |    /contratos     |
-|------------------|       |-------------------|
-| Lista de         |       | Lista de TODOS    |
-| CLIENTES com     |       | CONTRATOS com     |
-| contrato ativo   |       | filtros por:      |
-| resumido         |       | - Status (ativo/  |
-|                  |       |   inativo)        |
-| Click -> Detalhe |       | - Cliente         |
-+------------------+       | - Consultor       |
-                           | - Vencimento      |
-                           |                   |
-                           | Click -> Detalhe  |
-                           | do Cliente        |
-                           +-------------------+
++----------------+       HTTP POST        +---------------------+
+|   Pipedrive    | ---------------------->| Edge Function       |
+|   Webhook      |   (deal.won event)     | pipedrive-webhook   |
++----------------+                        +---------------------+
+                                                   |
+                                                   v
+                                          +---------------+
+                                          |   Validação   |
+                                          | - Assinatura  |
+                                          | - Evento      |
+                                          | - Duplicidade |
+                                          +---------------+
+                                                   |
+                                                   v
+                        +--------------------------+--------------------------+
+                        |                          |                          |
+                        v                          v                          v
+                 +-------------+           +--------------+          +--------------+
+                 |  clientes   |           |  contratos   |          | webhook_logs |
+                 | (status:    |           | (ativo:true) |          | (registro)   |
+                 |  'novo')    |           |              |          |              |
+                 +-------------+           +--------------+          +--------------+
 ```
 
 ---
 
-## Funcionalidades da Nova Página
+## Componentes a Implementar
 
-### Filtros Disponíveis
-- **Status**: Ativos, Inativos, Todos
-- **Cliente**: Busca por nome
-- **Consultor**: Dropdown
-- **Tipo de Consultoria**: Dropdown
-- **Vencimento**: Próximos 30/60/90 dias, Vencidos
+### 1. Edge Function: `pipedrive-webhook`
 
-### Colunas da Tabela
-| Cliente | Tipo | Início | Fim | MRR | Status | Ações |
-|---------|------|--------|-----|-----|--------|-------|
+Uma nova função para receber e processar webhooks do Pipedrive:
 
-### Ações por Contrato
-- **Ver Cliente**: Navega para `/clientes/:id`
-- **Editar**: Abre form de edição (apenas contratos ativos)
-- **Renovar**: Abre form de renovação (apenas contratos ativos)
-- **Encerrar**: Abre form de encerramento (apenas contratos ativos)
+**Responsabilidades:**
+- Receber payload do webhook (evento `deal.won` ou `updated` com status="won")
+- Validar assinatura do webhook (se configurada)
+- Verificar duplicidade via `pipedrive_deal_id`
+- Criar cliente com status `novo`
+- Criar contrato inicial baseado nos dados do deal
+- Registrar log na tabela `webhook_logs`
+
+**Mapeamento de campos Pipedrive → Cupola:**
+| Pipedrive | Cupola |
+|-----------|--------|
+| `deal.id` | `clientes.pipedrive_deal_id` |
+| `deal.title` ou `organization.name` | `clientes.nome` |
+| `deal.value` | `contratos.remuneracao_total` |
+| Campo customizado (cidade/UF) | `clientes.cidade`, `clientes.uf` |
+| Campo customizado (prazo) | `contratos.prazo_meses` |
+
+### 2. Configuração no Pipedrive
+
+**Webhook a configurar:**
+- **URL**: `https://wmmnbonigciftewukvum.supabase.co/functions/v1/pipedrive-webhook`
+- **Eventos**: `deal.updated` (filtrar por `status = won`)
+- **Método**: POST
+
+### 3. Campos Customizados Necessários
+
+Para extrair informações completas do deal, será preciso mapear campos customizados do Pipedrive:
+- Cidade/UF do cliente
+- Prazo do contrato (meses)
+- Tipo de consultoria
+- Remuneração mensal
 
 ---
 
-## Implementação Técnica
+## Detalhes Técnicos
 
-### Etapa 1: Novo Hook para Listar Todos os Contratos
-
-Criar `useAllContratos` em `src/hooks/useContratos.ts`:
+### Edge Function `pipedrive-webhook`
 
 ```typescript
-export function useAllContratos(filters?: {
-  ativo?: boolean;
-  consultor_id?: string;
-  tipo_consultoria_id?: string;
-  search?: string;
-}) {
-  return useQuery({
-    queryKey: ['all-contratos', filters],
-    queryFn: async () => {
-      let query = supabase
-        .from('contratos')
-        .select(`
-          *,
-          tipo_consultoria:tipos_consultoria(*),
-          cliente:clientes!contratos_cliente_id_fkey(
-            id, nome, cidade, uf, status,
-            consultor:consultores(id, nome)
-          )
-        `)
-        .order('data_fim', { ascending: true });
+// Estrutura principal
+Deno.serve(async (req) => {
+  // 1. CORS preflight
+  if (req.method === 'OPTIONS') return corsResponse();
+  
+  // 2. Validar método POST
+  if (req.method !== 'POST') return error(405);
+  
+  // 3. Parsear payload
+  const payload = await req.json();
+  
+  // 4. Registrar no webhook_logs (antes de processar)
+  const logId = await insertWebhookLog(payload);
+  
+  // 5. Validar evento (deal won)
+  if (!isDealWon(payload)) return success('Evento ignorado');
+  
+  // 6. Verificar duplicidade
+  const dealId = payload.current?.id || payload.meta?.id;
+  if (await clienteExiste(dealId)) return success('Já processado');
+  
+  // 7. Extrair dados e criar cliente + contrato
+  const cliente = await criarCliente(payload);
+  const contrato = await criarContrato(cliente.id, payload);
+  
+  // 8. Criar registros auxiliares
+  await criarAtendimento(cliente.id);
+  await criarOnboarding(cliente.id, contrato.id);
+  await criarFerramentasCliente(cliente.id);
+  
+  // 9. Atualizar log como processado
+  await updateWebhookLog(logId, cliente.id);
+  
+  return success({ cliente_id: cliente.id });
+});
+```
 
-      if (filters?.ativo !== undefined) {
-        query = query.eq('ativo', filters.ativo);
-      }
-      // ... outros filtros
+### Lógica de Extração de Dados
 
-      return data;
-    }
-  });
+O webhook do Pipedrive envia dados no formato:
+```json
+{
+  "meta": {
+    "action": "updated",
+    "object": "deal",
+    "id": 12345
+  },
+  "current": {
+    "id": 12345,
+    "title": "Nome do Cliente",
+    "status": "won",
+    "value": 50000,
+    "org_id": { "name": "Empresa XPTO" },
+    "person_id": { "name": "João Silva" },
+    "custom_fields": { ... }
+  },
+  "previous": { ... }
 }
 ```
 
-### Etapa 2: Nova Página de Contratos
+### Tratamento de Erros
 
-Criar `src/pages/Contratos.tsx` com:
-- Filtros por status, cliente, consultor, tipo, vencimento
-- Tabela com todos os contratos
-- Badges coloridos para status (Ativo = verde, Inativo = cinza)
-- Destaque para contratos vencendo em breve (amarelo)
-- Destaque para contratos vencidos (vermelho)
+- **Payload inválido**: Registrar erro no log, retornar 400
+- **Deal duplicado**: Ignorar silenciosamente, retornar 200
+- **Erro ao criar cliente**: Registrar no log, retornar 500
+- **Campos obrigatórios faltando**: Usar valores default
 
-### Etapa 3: Atualizar Navegação
+---
 
-Adicionar item no Sidebar (`src/components/layout/Sidebar.tsx`):
-```typescript
-{ to: '/contratos', icon: FileText, label: 'Contratos' },
-```
+## Configuração Necessária
 
-Adicionar rota em `src/App.tsx`:
-```typescript
-<Route path="/contratos" element={<Contratos />} />
+### 1. Secrets do Supabase
+
+| Secret | Descrição |
+|--------|-----------|
+| `PIPEDRIVE_WEBHOOK_SECRET` | (Opcional) Para validar assinatura do webhook |
+
+### 2. Atualização do `supabase/config.toml`
+
+```toml
+[functions.pipedrive-webhook]
+verify_jwt = false
 ```
 
 ---
 
-## Interface Visual
+## Interface Administrativa (Opcional - Fase 2)
 
-### Cards de Resumo (Topo)
-| Ativos | Vencendo (30d) | Vencidos | MRR Total |
-|--------|----------------|----------|-----------|
-| 28     | 1              | 3        | R$ 179k   |
-
-### Tabela Principal
-Exibe todos os contratos com:
-- Nome do cliente clicável (navega para detalhe)
-- Tipo de consultoria
-- Período (início - fim)
-- MRR
-- Badge de status com cores:
-  - **Ativo**: Verde
-  - **Vencendo**: Amarelo
-  - **Vencido**: Vermelho
-  - **Encerrado**: Cinza
+Criar página `/configuracoes/pipedrive` para:
+- Visualizar logs de webhooks processados
+- Reprocessar webhooks com erro
+- Mapear campos customizados do Pipedrive
+- Testar conexão
 
 ---
 
-## Benefícios
+## Fluxo Completo
 
-1. **Visão Consolidada**: Ver todos os contratos em um só lugar
-2. **Gestão Proativa**: Identificar contratos que precisam de atenção
-3. **Histórico Completo**: Ver renovações e encerramentos
-4. **Relatórios**: Facilita análise de churn e retenção
+1. Vendedor marca deal como "Ganho" no Pipedrive
+2. Pipedrive dispara webhook para a Edge Function
+3. Edge Function valida e extrai dados do payload
+4. Sistema cria automaticamente:
+   - Cliente (status: `novo`)
+   - Contrato (ativo: `true`)
+   - Atendimento (periodicidade padrão: `quinzenal`)
+   - Onboarding (etapa: `pre_onboarding`)
+   - Ferramentas do cliente (vazias)
+5. Log é registrado na tabela `webhook_logs`
+6. Cliente aparece na lista com status "Novo" pronto para onboarding
 
 ---
 
@@ -149,7 +196,14 @@ Exibe todos os contratos com:
 
 | Arquivo | Ação |
 |---------|------|
-| `src/pages/Contratos.tsx` | Criar |
-| `src/hooks/useContratos.ts` | Adicionar `useAllContratos` |
-| `src/components/layout/Sidebar.tsx` | Adicionar link |
-| `src/App.tsx` | Adicionar rota |
+| `supabase/functions/pipedrive-webhook/index.ts` | Criar |
+| `supabase/config.toml` | Adicionar configuração da função |
+
+---
+
+## Próximos Passos Após Implementação
+
+1. **Configurar webhook no Pipedrive**: Acessar Configurações → Webhooks → Adicionar
+2. **Mapear campos customizados**: Identificar os IDs dos campos do Pipedrive para cidade, prazo, etc.
+3. **Testar fluxo**: Criar deal de teste e marcar como ganho
+4. **Monitorar logs**: Verificar tabela `webhook_logs` para debugar
