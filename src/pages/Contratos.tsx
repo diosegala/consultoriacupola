@@ -40,6 +40,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 
 import { useAllContratos, AllContratosFilters, ContratoComCliente, useDeleteContrato } from '@/hooks/useContratos';
@@ -87,6 +88,7 @@ function getContratoStatusInfo(contrato: ContratoComCliente & { pausado?: boolea
 
 type ContratoSortField = 'cliente' | 'tipo' | 'data_inicio' | 'data_fim' | 'mrr' | 'status';
 type SortDirection = 'asc' | 'desc';
+type CardModalType = 'ativos' | 'vencendo' | 'vencidos' | null;
 
 export default function Contratos() {
   const navigate = useNavigate();
@@ -112,17 +114,24 @@ export default function Contratos() {
   const [deletingContrato, setDeletingContrato] = useState<ContratoComCliente | null>(null);
   const [sortField, setSortField] = useState<ContratoSortField>('cliente');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
-  const [activeCardFilter, setActiveCardFilter] = useState<'all' | 'ativos' | 'vencendo' | 'vencidos'>('all');
+  
+  // Modal para lista de contratos por status do KPI
+  const [cardModalType, setCardModalType] = useState<CardModalType>(null);
 
+  // Query para a lista principal (com filtros)
   const { data: contratosRaw, isLoading } = useAllContratos({
     ...filters,
     search: searchInput,
   });
+  
+  // Query separada para KPIs (sempre busca TODOS os contratos ativos, sem filtros)
+  const { data: todosContratosAtivos } = useAllContratos({ ativo: true });
+  
   const { data: consultores } = useConsultores();
   const { data: tiposConsultoria } = useTiposConsultoria();
   const deleteContrato = useDeleteContrato();
 
-  // Ordenar contratos
+  // Ordenar contratos da lista principal
   const contratos = useMemo(() => {
     if (!contratosRaw) return [];
     
@@ -172,9 +181,9 @@ export default function Contratos() {
       : <ArrowDown className="h-4 w-4 ml-1" />;
   };
 
-  // Calcular KPIs
+  // Calcular KPIs com base na query separada (sem filtros)
   const kpis = useMemo(() => {
-    if (!contratosRaw) return { ativos: 0, vencendo30: 0, vencidos: 0, mrrTotal: 0 };
+    if (!todosContratosAtivos) return { ativos: 0, vencendo30: 0, vencidos: 0, mrrTotal: 0 };
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -184,7 +193,7 @@ export default function Contratos() {
     let vencidos = 0;
     let mrrTotal = 0;
 
-    contratosRaw.forEach(c => {
+    todosContratosAtivos.forEach(c => {
       if (!c.ativo) return;
 
       const dataFim = new Date(c.data_fim);
@@ -201,33 +210,61 @@ export default function Contratos() {
     });
 
     return { ativos, vencendo30, vencidos, mrrTotal };
-  }, [contratosRaw]);
+  }, [todosContratosAtivos]);
+
+  // Contratos para exibir no modal (calculados a partir dos dados sem filtro)
+  const contratosModal = useMemo(() => {
+    if (!todosContratosAtivos || !cardModalType) return [];
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    switch (cardModalType) {
+      case 'ativos':
+        return todosContratosAtivos.filter(c => c.ativo);
+      case 'vencendo':
+        return todosContratosAtivos.filter(c => {
+          if (!c.ativo) return false;
+          const dataFim = new Date(c.data_fim);
+          const dias = differenceInDays(dataFim, today);
+          return dias >= 0 && dias <= 30;
+        });
+      case 'vencidos':
+        return todosContratosAtivos.filter(c => {
+          if (!c.ativo) return false;
+          const dataFim = new Date(c.data_fim);
+          return dataFim < today;
+        });
+      default:
+        return [];
+    }
+  }, [todosContratosAtivos, cardModalType]);
+
+  const getModalTitle = () => {
+    switch (cardModalType) {
+      case 'ativos':
+        return 'Contratos Ativos';
+      case 'vencendo':
+        return 'Contratos Vencendo (próximos 30 dias)';
+      case 'vencidos':
+        return 'Contratos Vencidos';
+      default:
+        return '';
+    }
+  };
 
   const handleClearFilters = () => {
     setFilters({ ativo: true, vencimento: 'all' });
     setSearchInput('');
-    setActiveCardFilter('all');
   };
 
   const handleCardClick = (cardType: 'ativos' | 'vencendo' | 'vencidos') => {
-    if (activeCardFilter === cardType) {
-      // Clicar no card já selecionado volta ao estado padrão
-      setFilters({ ativo: true, vencimento: 'all' });
-      setActiveCardFilter('all');
-    } else {
-      setActiveCardFilter(cardType);
-      switch (cardType) {
-        case 'ativos':
-          setFilters({ ativo: true, vencimento: 'all' });
-          break;
-        case 'vencendo':
-          setFilters({ ativo: true, vencimento: '30' });
-          break;
-        case 'vencidos':
-          setFilters({ ativo: true, vencimento: 'vencidos' });
-          break;
-      }
-    }
+    setCardModalType(cardType);
+  };
+
+  const handleContratoClickFromModal = (contrato: ContratoComCliente) => {
+    setCardModalType(null);
+    setSelectedContrato(contrato);
   };
 
   const hasActiveFilters = 
@@ -251,12 +288,7 @@ export default function Contratos() {
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card 
-          className={cn(
-            "cursor-pointer transition-all hover:scale-[1.02]",
-            activeCardFilter === 'ativos' 
-              ? "ring-2 ring-primary border-primary" 
-              : "hover:border-primary/50"
-          )}
+          className="cursor-pointer transition-all hover:scale-[1.02] hover:border-primary/50"
           onClick={() => handleCardClick('ativos')}
         >
           <CardHeader className="pb-2">
@@ -267,12 +299,7 @@ export default function Contratos() {
           </CardContent>
         </Card>
         <Card 
-          className={cn(
-            "cursor-pointer transition-all hover:scale-[1.02]",
-            activeCardFilter === 'vencendo' 
-              ? "ring-2 ring-yellow-500 border-yellow-500" 
-              : "hover:border-yellow-500/50"
-          )}
+          className="cursor-pointer transition-all hover:scale-[1.02] hover:border-yellow-500/50"
           onClick={() => handleCardClick('vencendo')}
         >
           <CardHeader className="pb-2">
@@ -283,12 +310,7 @@ export default function Contratos() {
           </CardContent>
         </Card>
         <Card 
-          className={cn(
-            "cursor-pointer transition-all hover:scale-[1.02]",
-            activeCardFilter === 'vencidos' 
-              ? "ring-2 ring-destructive border-destructive" 
-              : "hover:border-destructive/50"
-          )}
+          className="cursor-pointer transition-all hover:scale-[1.02] hover:border-destructive/50"
           onClick={() => handleCardClick('vencidos')}
         >
           <CardHeader className="pb-2">
@@ -541,6 +563,88 @@ export default function Contratos() {
           )}
         </CardContent>
       </Card>
+
+      {/* Modal de Lista de Contratos por Status do KPI */}
+      <Dialog open={!!cardModalType} onOpenChange={(open) => !open && setCardModalType(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" />
+              {getModalTitle()}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <ScrollArea className="max-h-[60vh] pr-4">
+            {contratosModal.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">
+                Nenhum contrato encontrado
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {contratosModal.map((contrato) => {
+                  const statusInfo = getContratoStatusInfo(contrato);
+                  const diasRestantes = differenceInDays(
+                    new Date(contrato.data_fim),
+                    new Date()
+                  );
+                  
+                  return (
+                    <Card 
+                      key={contrato.id} 
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => handleContratoClickFromModal(contrato)}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <Building className="h-4 w-4 text-muted-foreground shrink-0" />
+                              <span className="font-semibold truncate">
+                                {contrato.cliente?.nome || 'Cliente não encontrado'}
+                              </span>
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {contrato.tipo_consultoria?.nome || 'Sem tipo'}
+                              {contrato.cliente?.consultor && (
+                                <> • {contrato.cliente.consultor.nome}</>
+                              )}
+                            </p>
+                          </div>
+                          <Badge className={cn('border shrink-0', statusInfo.color)}>
+                            {statusInfo.label}
+                          </Badge>
+                        </div>
+                        
+                        <div className="flex items-center justify-between mt-3 pt-3 border-t">
+                          <div className="flex items-center gap-4 text-sm">
+                            <div className="flex items-center gap-1 text-muted-foreground">
+                              <Calendar className="h-3.5 w-3.5" />
+                              <span>Vence: {format(parseISO(contrato.data_fim), 'dd/MM/yyyy', { locale: ptBR })}</span>
+                            </div>
+                            <span className={cn(
+                              "text-xs",
+                              diasRestantes < 0 ? "text-destructive" : 
+                              diasRestantes <= 30 ? "text-yellow-400" : "text-muted-foreground"
+                            )}>
+                              {diasRestantes < 0 
+                                ? `(${Math.abs(diasRestantes)} dias atrás)`
+                                : `(${diasRestantes} dias)`}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 font-medium text-primary">
+                            <DollarSign className="h-4 w-4" />
+                            <span>{formatCurrency(Number(contrato.remuneracao_mensal))}</span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de Detalhes do Contrato */}
       <Dialog open={!!selectedContrato} onOpenChange={(open) => !open && setSelectedContrato(null)}>
@@ -893,43 +997,32 @@ export default function Contratos() {
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir contrato</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir este contrato de{' '}
-              <strong>{deletingContrato?.cliente?.nome}</strong>?
-              <br /><br />
-              Esta ação irá remover permanentemente:
-              <ul className="list-disc list-inside mt-2 space-y-1">
-                <li>O contrato selecionado</li>
-                <li>Pausas associadas ao contrato</li>
-                <li>Encerramentos associados</li>
-                <li>Onboarding vinculado (se houver)</li>
-              </ul>
-              <br />
-              Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir este contrato? Esta ação não pode ser desfeita.
+              Todos os dados relacionados (viagens, pausas, encerramentos e onboarding) também serão excluídos.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setDeletingContrato(null)}>
+              Cancelar
+            </AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => {
-                if (deletingContrato) {
-                  deleteContrato.mutate(
-                    { contratoId: deletingContrato.id, clienteId: deletingContrato.cliente_id },
-                    {
-                      onSuccess: () => {
-                        toast.success('Contrato excluído com sucesso');
-                        setDeletingContrato(null);
-                      },
-                      onError: (error) => {
-                        toast.error('Erro ao excluir contrato: ' + error.message);
-                      }
-                    }
-                  );
+              onClick={async () => {
+                if (!deletingContrato) return;
+                try {
+                  await deleteContrato.mutateAsync({
+                    contratoId: deletingContrato.id,
+                    clienteId: deletingContrato.cliente_id
+                  });
+                  toast.success('Contrato excluído com sucesso');
+                  setShowDeleteConfirm(false);
+                  setDeletingContrato(null);
+                } catch (error) {
+                  toast.error('Erro ao excluir contrato');
                 }
               }}
-              disabled={deleteContrato.isPending}
             >
-              {deleteContrato.isPending ? 'Excluindo...' : 'Excluir'}
+              Excluir
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -938,17 +1031,17 @@ export default function Contratos() {
   );
 }
 
-// Componente wrapper para buscar pausa ativa
+// Wrapper component para o RetomarContratoDialog
 function RetomarContratoWrapper({
   showRetomar,
   setShowRetomar,
   retomandoContrato,
-  setRetomandoContrato
+  setRetomandoContrato,
 }: {
   showRetomar: boolean;
-  setShowRetomar: (v: boolean) => void;
+  setShowRetomar: (show: boolean) => void;
   retomandoContrato: ContratoComCliente | null;
-  setRetomandoContrato: (v: ContratoComCliente | null) => void;
+  setRetomandoContrato: (contrato: ContratoComCliente | null) => void;
 }) {
   const { data: pausaAtiva } = usePausaAtiva(retomandoContrato?.id);
 
