@@ -265,28 +265,35 @@ export function useDeleteContrato() {
     mutationFn: async ({ contratoId, clienteId }: { contratoId: string; clienteId: string }) => {
       // Excluir registros dependentes em ordem
       
-      // 1. Excluir pausas do contrato
+      // 1. Excluir viagens do contrato
+      const { error: viagensError } = await supabase
+        .from('viagens_contrato')
+        .delete()
+        .eq('contrato_id', contratoId);
+      if (viagensError) throw viagensError;
+
+      // 2. Excluir pausas do contrato
       const { error: pausasError } = await supabase
         .from('pausas_contrato')
         .delete()
         .eq('contrato_id', contratoId);
       if (pausasError) throw pausasError;
 
-      // 2. Excluir encerramentos do contrato
+      // 3. Excluir encerramentos do contrato
       const { error: encError } = await supabase
         .from('encerramentos')
         .delete()
         .eq('contrato_id', contratoId);
       if (encError) throw encError;
 
-      // 3. Excluir onboarding vinculado ao contrato
+      // 4. Excluir onboarding vinculado ao contrato
       const { error: onbError } = await supabase
         .from('onboarding')
         .delete()
         .eq('contrato_id', contratoId);
       if (onbError) throw onbError;
 
-      // 4. Excluir o contrato
+      // 5. Excluir o contrato
       const { error: contratoError } = await supabase
         .from('contratos')
         .delete()

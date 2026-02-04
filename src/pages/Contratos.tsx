@@ -2,8 +2,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { FileText, Search, Eye, X, ExternalLink, Calendar, DollarSign, User, Building, Pencil, ArrowUpDown, ArrowUp, ArrowDown, XCircle, RefreshCw, Pause, Play, CalendarPlus, Trash2 } from 'lucide-react';
-
+import { FileText, Search, Eye, X, ExternalLink, Calendar, DollarSign, User, Building, Pencil, ArrowUpDown, ArrowUp, ArrowDown, XCircle, RefreshCw, Pause, Play, CalendarPlus, Trash2, Plane } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -51,6 +50,7 @@ import { ContratoFormDialog, EncerrarContratoDialog, RenovarContratoDialog } fro
 import { PausaContratoDialog } from '@/components/contrato/PausaContratoDialog';
 import { RetomarContratoDialog } from '@/components/contrato/RetomarContratoDialog';
 import { ProrrogarContratoDialog } from '@/components/contrato/ProrrogarContratoDialog';
+import { ViagensContrato } from '@/components/contrato/ViagensContrato';
 import { cn } from '@/lib/utils';
 
 function formatCurrency(value: number) {
@@ -630,6 +630,14 @@ export default function Contratos() {
                     </div>
                   </>
                 )}
+
+                {/* Viagens e Despesas */}
+                <Separator />
+                <ViagensContrato
+                  contratoId={selectedContrato.id}
+                  clienteId={selectedContrato.cliente_id}
+                  receitaTotal={Number(selectedContrato.remuneracao_total)}
+                />
 
                 {/* Ações */}
                 <Separator />

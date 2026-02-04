@@ -462,6 +462,54 @@ export type Database = {
         }
         Relationships: []
       }
+      viagens_contrato: {
+        Row: {
+          cliente_id: string
+          contrato_id: string
+          created_at: string
+          data_viagem: string
+          descricao: string | null
+          id: string
+          updated_at: string
+          valor: number
+        }
+        Insert: {
+          cliente_id: string
+          contrato_id: string
+          created_at?: string
+          data_viagem: string
+          descricao?: string | null
+          id?: string
+          updated_at?: string
+          valor?: number
+        }
+        Update: {
+          cliente_id?: string
+          contrato_id?: string
+          created_at?: string
+          data_viagem?: string
+          descricao?: string | null
+          id?: string
+          updated_at?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "viagens_contrato_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "viagens_contrato_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       webhook_logs: {
         Row: {
           cliente_id: string | null
