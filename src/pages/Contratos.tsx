@@ -112,6 +112,7 @@ export default function Contratos() {
   const [deletingContrato, setDeletingContrato] = useState<ContratoComCliente | null>(null);
   const [sortField, setSortField] = useState<ContratoSortField>('cliente');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [activeCardFilter, setActiveCardFilter] = useState<'all' | 'ativos' | 'vencendo' | 'vencidos'>('all');
 
   const { data: contratosRaw, isLoading } = useAllContratos({
     ...filters,
@@ -205,6 +206,28 @@ export default function Contratos() {
   const handleClearFilters = () => {
     setFilters({ ativo: true, vencimento: 'all' });
     setSearchInput('');
+    setActiveCardFilter('all');
+  };
+
+  const handleCardClick = (cardType: 'ativos' | 'vencendo' | 'vencidos') => {
+    if (activeCardFilter === cardType) {
+      // Clicar no card já selecionado volta ao estado padrão
+      setFilters({ ativo: true, vencimento: 'all' });
+      setActiveCardFilter('all');
+    } else {
+      setActiveCardFilter(cardType);
+      switch (cardType) {
+        case 'ativos':
+          setFilters({ ativo: true, vencimento: 'all' });
+          break;
+        case 'vencendo':
+          setFilters({ ativo: true, vencimento: '30' });
+          break;
+        case 'vencidos':
+          setFilters({ ativo: true, vencimento: 'vencidos' });
+          break;
+      }
+    }
   };
 
   const hasActiveFilters = 
@@ -227,15 +250,31 @@ export default function Contratos() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
+        <Card 
+          className={cn(
+            "cursor-pointer transition-all hover:scale-[1.02]",
+            activeCardFilter === 'ativos' 
+              ? "ring-2 ring-primary border-primary" 
+              : "hover:border-primary/50"
+          )}
+          onClick={() => handleCardClick('ativos')}
+        >
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Ativos</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-[#b0f90a]">{kpis.ativos}</p>
+            <p className="text-2xl font-bold text-primary">{kpis.ativos}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card 
+          className={cn(
+            "cursor-pointer transition-all hover:scale-[1.02]",
+            activeCardFilter === 'vencendo' 
+              ? "ring-2 ring-yellow-500 border-yellow-500" 
+              : "hover:border-yellow-500/50"
+          )}
+          onClick={() => handleCardClick('vencendo')}
+        >
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Vencendo (30d)</CardTitle>
           </CardHeader>
@@ -243,7 +282,15 @@ export default function Contratos() {
             <p className="text-2xl font-bold text-yellow-400">{kpis.vencendo30}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card 
+          className={cn(
+            "cursor-pointer transition-all hover:scale-[1.02]",
+            activeCardFilter === 'vencidos' 
+              ? "ring-2 ring-destructive border-destructive" 
+              : "hover:border-destructive/50"
+          )}
+          onClick={() => handleCardClick('vencidos')}
+        >
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Vencidos</CardTitle>
           </CardHeader>
