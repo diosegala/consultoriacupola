@@ -1,129 +1,92 @@
 
-# Plano: Funcionalidade de Exclusão de Cliente e Contrato
+# Plano: Cards de KPI Clicáveis na Página de Contratos
+
+## Objetivo
+Transformar os cards de resumo (Ativos, Vencendo 30d, Vencidos) em elementos clicáveis que, ao serem acionados, aplicam automaticamente o filtro correspondente na lista de contratos abaixo.
+
+---
 
 ## Situação Atual
 
-### Exclusão de Cliente
-A funcionalidade de excluir cliente **já está implementada**:
-- Hook `useDeleteCliente()` em `src/hooks/useClientes.ts` (linhas 168-217)
-- Botão de lixeira na listagem de clientes (`/clientes`)
-- Modal de confirmação com `AlertDialog`
-- Exclusão em cascata de todos os dados relacionados (atendimentos, ferramentas, onboarding, encerramentos, contratos)
+Os cards exibem as seguintes métricas:
+- **Ativos**: Total de contratos com status ativo
+- **Vencendo (30d)**: Contratos ativos que vencem nos próximos 30 dias
+- **Vencidos**: Contratos ativos com data de fim já ultrapassada
+- **MRR Total**: Soma da remuneração mensal (não será clicável)
 
-### Exclusão de Contrato
-Essa funcionalidade **não existe** e precisa ser implementada:
-- Não há hook `useDeleteContrato`
-- Não há opção de excluir contrato individual na interface
-- Atualmente, para remover um contrato, é preciso excluir o cliente inteiro
+Os filtros já existem na página e suportam:
+- Status (ativo/inativo)
+- Vencimento (30d, 60d, 90d, vencidos)
 
 ---
 
-## Implementação Necessária
+## Implementação
 
-### 1. Criar Hook `useDeleteContrato`
+### Modificações no arquivo `src/pages/Contratos.tsx`
 
-Adicionar ao arquivo `src/hooks/useContratos.ts`:
-- Função para excluir contrato individual
-- Antes de excluir, remover registros dependentes:
-  - `pausas_contrato` (pausas associadas ao contrato)
-  - `encerramentos` (encerramentos associados ao contrato)
-  - `onboarding` (se vinculado ao contrato específico)
+1. **Adicionar estado para rastrear card selecionado**
+   - Novo estado: `activeCardFilter` com valores possíveis: `'all' | 'ativos' | 'vencendo' | 'vencidos'`
 
-### 2. Adicionar Botão de Exclusão no Modal de Detalhes do Contrato
+2. **Criar função de clique para cada card**
+   - Ao clicar em "Ativos": aplica filtro `ativo: true, vencimento: 'all'`
+   - Ao clicar em "Vencendo (30d)": aplica filtro `ativo: true, vencimento: '30'`
+   - Ao clicar em "Vencidos": aplica filtro `ativo: true, vencimento: 'vencidos'`
+   - Clicar novamente no card ativo: remove o filtro (volta ao padrão)
 
-No arquivo `src/pages/Contratos.tsx`:
-- Adicionar botão "Excluir" no rodapé do modal de detalhes
-- Implementar `AlertDialog` de confirmação (padrão destrutivo)
-- Mostrar aviso sobre dados que serão removidos
+3. **Estilização visual dos cards**
+   - Card selecionado: borda destacada com cor correspondente
+   - Cursor pointer para indicar interatividade
+   - Transição suave ao passar o mouse
+   - Card MRR Total permanece sem interação (apenas informativo)
 
-### 3. Adicionar Exclusão na Aba Contrato do Cliente
-
-No arquivo `src/components/cliente/ContratoTab.tsx`:
-- Adicionar botão de excluir no card do contrato ativo
-- Adicionar opção de excluir no histórico de contratos
-- Implementar confirmação antes da exclusão
-
-### 4. Adicionar Exclusão na Página de Detalhe do Cliente
-
-No arquivo `src/pages/ClienteDetalhe.tsx`:
-- Adicionar botão "Excluir Cliente" no header (ao lado do botão Editar)
-- Reutilizar o mesmo padrão de confirmação da página de listagem
-- Após exclusão, redirecionar para `/clientes`
+4. **Sincronização com filtros existentes**
+   - Atualizar o `activeCardFilter` quando filtros manuais coincidirem
+   - Limpar seleção do card quando filtros forem alterados manualmente para valores diferentes
 
 ---
 
-## Detalhes Técnicos
+## Comportamento Esperado
 
-### Hook `useDeleteContrato`
+| Ação do Usuário | Resultado |
+|-----------------|-----------|
+| Clica em "Ativos" | Lista mostra apenas contratos ativos, card fica destacado |
+| Clica em "Vencendo (30d)" | Lista mostra contratos vencendo em 30 dias, card fica destacado |
+| Clica em "Vencidos" | Lista mostra contratos vencidos, card fica destacado |
+| Clica no card já selecionado | Remove o filtro, volta ao estado padrão |
+| Altera filtros manualmente | Card perde destaque se filtro não corresponder |
+| Clica em "Limpar filtros" | Remove seleção do card |
+
+---
+
+## Detalhes Visuais
 
 ```text
-useDeleteContrato()
-├── Receber: contrato_id, cliente_id
-├── Excluir pausas_contrato WHERE contrato_id = ?
-├── Excluir encerramentos WHERE contrato_id = ?
-├── Excluir onboarding WHERE contrato_id = ?
-├── Excluir contrato WHERE id = ?
-└── Invalidar queries: contratos, all-contratos, cliente
++------------------+  +------------------+  +------------------+  +------------------+
+|     Ativos       |  |  Vencendo (30d)  |  |     Vencidos     |  |    MRR Total     |
+|       12         |  |        3         |  |        2         |  |   R$ 45.000,00   |
+|  [clicável]      |  |   [clicável]     |  |   [clicável]     |  |  [informativo]   |
++------------------+  +------------------+  +------------------+  +------------------+
+        |                    |                     |
+        v                    v                     v
+   Borda verde          Borda amarela         Borda vermelha
+   quando ativo         quando ativo          quando ativo
 ```
-
-### Lógica de Negócio
-
-Ao excluir um contrato:
-1. Se for o único contrato do cliente e estiver ativo: perguntar se deseja excluir o cliente também
-2. Se houver outros contratos: apenas excluir o contrato selecionado
-3. Se for o contrato ativo: atualizar status do cliente conforme contratos restantes
 
 ---
 
-## Arquivos a Modificar
+## Arquivo a Modificar
 
 | Arquivo | Modificação |
 |---------|-------------|
-| `src/hooks/useContratos.ts` | Adicionar `useDeleteContrato()` |
-| `src/pages/Contratos.tsx` | Adicionar botão e modal de exclusão de contrato |
-| `src/components/cliente/ContratoTab.tsx` | Adicionar opção de excluir contrato |
-| `src/pages/ClienteDetalhe.tsx` | Adicionar botão de excluir cliente |
-
----
-
-## Fluxo de Exclusão
-
-```text
-Usuário clica "Excluir"
-         |
-         v
-   +------------------+
-   | AlertDialog com  |
-   | confirmação      |
-   +------------------+
-         |
-    [Confirmar]
-         |
-         v
-   +------------------+
-   | Excluir dados    |
-   | dependentes      |
-   +------------------+
-         |
-         v
-   +------------------+
-   | Excluir registro |
-   | principal        |
-   +------------------+
-         |
-         v
-   +------------------+
-   | Toast de sucesso |
-   | Atualizar UI     |
-   +------------------+
-```
+| `src/pages/Contratos.tsx` | Adicionar interatividade aos cards de KPI |
 
 ---
 
 ## Resumo das Ações
 
-1. Criar hook `useDeleteContrato` com exclusão em cascata
-2. Adicionar botão de exclusão no modal de detalhes de contrato na página `/contratos`
-3. Adicionar botão de exclusão na aba Contrato da página de detalhe do cliente
-4. Adicionar botão de exclusão de cliente na página de detalhe do cliente
-5. Implementar modais de confirmação com texto explicativo sobre consequências
+1. Adicionar estado `activeCardFilter` para rastrear qual card está selecionado
+2. Criar função `handleCardClick` que aplica os filtros correspondentes
+3. Tornar os cards de Ativos, Vencendo e Vencidos clicáveis com `onClick`
+4. Adicionar estilos visuais para indicar card selecionado (borda, hover, cursor)
+5. Sincronizar seleção do card com alterações manuais nos filtros
+6. Manter card MRR Total como apenas informativo (sem clique)
