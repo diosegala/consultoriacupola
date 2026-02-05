@@ -2,7 +2,7 @@ import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 interface PipedrivePayload {
@@ -10,6 +10,16 @@ interface PipedrivePayload {
     action?: string;
     object?: string;
     id?: number;
+    // Pipedrive-specific metadata
+    v?: number;
+    timestamp?: number;
+    company_id?: number;
+    user_id?: number;
+    host?: string;
+    webhook_id?: string;
+    trans_pending?: boolean;
+    permitted_user_ids?: number[];
+    is_bulk_update?: boolean;
   };
   current?: {
     id?: number;
@@ -25,6 +35,82 @@ interface PipedrivePayload {
     status?: string;
     [key: string]: unknown;
   };
+}
+
+// Validate that the payload looks like a legitimate Pipedrive webhook
+function isValidPipedrivePayload(payload: unknown): payload is PipedrivePayload {
+  if (!payload || typeof payload !== 'object') {
+    console.log('Payload inválido: não é um objeto');
+    return false;
+  }
+
+  const p = payload as Record<string, unknown>;
+
+  // Must have 'meta' object with expected Pipedrive fields
+  if (!p.meta || typeof p.meta !== 'object') {
+    console.log('Payload inválido: sem campo meta');
+    return false;
+  }
+
+  const meta = p.meta as Record<string, unknown>;
+
+  // Check for Pipedrive-specific meta fields
+  // Pipedrive webhooks always include these fields
+  if (typeof meta.action !== 'string') {
+    console.log('Payload inválido: meta.action não é string');
+    return false;
+  }
+
+  // Valid actions in Pipedrive: added, updated, deleted, merged
+  const validActions = ['added', 'updated', 'deleted', 'merged'];
+  if (!validActions.includes(meta.action)) {
+    console.log('Payload inválido: action não reconhecido:', meta.action);
+    return false;
+  }
+
+  // Must have 'object' field
+  if (typeof meta.object !== 'string') {
+    console.log('Payload inválido: meta.object não é string');
+    return false;
+  }
+
+  // For deal webhooks, object must be 'deal'
+  if (meta.object !== 'deal') {
+    console.log('Payload ignorado: object não é deal:', meta.object);
+    return false;
+  }
+
+  // Must have 'current' object for non-delete actions
+  if (meta.action !== 'deleted') {
+    if (!p.current || typeof p.current !== 'object') {
+      console.log('Payload inválido: sem campo current para action:', meta.action);
+      return false;
+    }
+
+    const current = p.current as Record<string, unknown>;
+
+    // current must have an id
+    if (typeof current.id !== 'number' || current.id <= 0) {
+      console.log('Payload inválido: current.id inválido');
+      return false;
+    }
+  }
+
+  // Additional Pipedrive-specific checks
+  // Pipedrive v2 webhooks include a version field
+  if (meta.v !== undefined && typeof meta.v !== 'number') {
+    console.log('Payload inválido: meta.v não é número');
+    return false;
+  }
+
+  // Check for company_id (present in all Pipedrive webhooks)
+  if (meta.company_id !== undefined && typeof meta.company_id !== 'number') {
+    console.log('Payload inválido: meta.company_id não é número');
+    return false;
+  }
+
+  console.log('Payload validado como Pipedrive webhook');
+  return true;
 }
 
 Deno.serve(async (req) => {
@@ -49,8 +135,24 @@ Deno.serve(async (req) => {
   let logId: string | null = null;
 
   try {
-    payload = await req.json();
+    const rawBody = await req.text();
+    
+    // Try to parse JSON
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      console.error('Falha ao parsear JSON do body');
+      return jsonResponse({ error: 'Body inválido - JSON malformado' }, 400);
+    }
+
     console.log('Webhook recebido:', JSON.stringify(payload, null, 2));
+
+    // ========== PAYLOAD VALIDATION ==========
+    // Validate that this looks like a legitimate Pipedrive webhook
+    if (!isValidPipedrivePayload(payload)) {
+      console.error('Payload rejeitado - não parece ser um webhook válido do Pipedrive');
+      return jsonResponse({ error: 'Payload inválido - estrutura não reconhecida' }, 400);
+    }
 
     // 1. Register webhook log immediately (before processing)
     const { data: logData, error: logError } = await supabase
