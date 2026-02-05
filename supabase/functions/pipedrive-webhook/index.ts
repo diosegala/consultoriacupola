@@ -60,38 +60,6 @@ const PipedrivePayloadSchema = z.object({
 
 type ValidatedPipedrivePayload = z.infer<typeof PipedrivePayloadSchema>;
 
-// ========== WEBHOOK SECRET VALIDATION ==========
-async function verifyWebhookSecret(req: Request): Promise<boolean> {
-  const webhookSecret = Deno.env.get('PIPEDRIVE_WEBHOOK_SECRET');
-  
-  // If no secret is configured, log warning but allow (for backwards compatibility)
-  // In production, you should always configure a secret
-  if (!webhookSecret) {
-    console.warn('⚠️ PIPEDRIVE_WEBHOOK_SECRET não configurado - validação de segredo ignorada');
-    return true;
-  }
-
-  // Check for secret in query parameter (Pipedrive supports this)
-  const url = new URL(req.url);
-  const querySecret = url.searchParams.get('secret');
-  
-  if (querySecret === webhookSecret) {
-    console.log('Webhook autenticado via query parameter');
-    return true;
-  }
-
-  // Check for secret in custom header
-  const headerSecret = req.headers.get('x-webhook-secret');
-  
-  if (headerSecret === webhookSecret) {
-    console.log('Webhook autenticado via header');
-    return true;
-  }
-
-  console.error('Falha na autenticação do webhook - segredo inválido ou ausente');
-  return false;
-}
-
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -113,12 +81,6 @@ Deno.serve(async (req) => {
   let logId: string | null = null;
 
   try {
-    // ========== WEBHOOK SECRET VERIFICATION ==========
-    const isAuthenticated = await verifyWebhookSecret(req);
-    if (!isAuthenticated) {
-      return jsonResponse({ error: 'Unauthorized - Segredo do webhook inválido' }, 401);
-    }
-
     const rawBody = await req.text();
     
     // Try to parse JSON
