@@ -1,116 +1,95 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-interface PipedrivePayload {
-  meta?: {
-    action?: string;
-    object?: string;
-    id?: number;
-    // Pipedrive-specific metadata
-    v?: number;
-    timestamp?: number;
-    company_id?: number;
-    user_id?: number;
-    host?: string;
-    webhook_id?: string;
-    trans_pending?: boolean;
-    permitted_user_ids?: number[];
-    is_bulk_update?: boolean;
-  };
-  current?: {
-    id?: number;
-    title?: string;
-    status?: string;
-    value?: number;
-    org_id?: { name?: string } | number | null;
-    person_id?: { name?: string } | number | null;
-    // Custom fields - keys are field IDs like "abc123_field_name"
-    [key: string]: unknown;
-  };
-  previous?: {
-    status?: string;
-    [key: string]: unknown;
-  };
-}
+// ========== ZOD VALIDATION SCHEMAS ==========
+const PipedriveMetaSchema = z.object({
+  action: z.enum(['added', 'updated', 'deleted', 'merged']),
+  object: z.literal('deal'),
+  id: z.number().int().positive().optional(),
+  v: z.number().optional(),
+  timestamp: z.number().optional(),
+  company_id: z.number().optional(),
+  user_id: z.number().optional(),
+  host: z.string().optional(),
+  webhook_id: z.string().optional(),
+  trans_pending: z.boolean().optional(),
+  permitted_user_ids: z.array(z.number()).optional(),
+  is_bulk_update: z.boolean().optional(),
+});
 
-// Validate that the payload looks like a legitimate Pipedrive webhook
-function isValidPipedrivePayload(payload: unknown): payload is PipedrivePayload {
-  if (!payload || typeof payload !== 'object') {
-    console.log('Payload inválido: não é um objeto');
-    return false;
-  }
+const PipedriveCurrentSchema = z.object({
+  id: z.number().int().positive(),
+  title: z.string().optional(),
+  status: z.string().optional(),
+  value: z.number().optional(),
+  org_id: z.union([
+    z.object({ name: z.string().optional() }),
+    z.number(),
+    z.null()
+  ]).optional(),
+  person_id: z.union([
+    z.object({ name: z.string().optional() }),
+    z.number(),
+    z.null()
+  ]).optional(),
+}).passthrough(); // Allow custom fields
 
-  const p = payload as Record<string, unknown>;
+const PipedrivePreviousSchema = z.object({
+  status: z.string().optional(),
+}).passthrough();
 
-  // Must have 'meta' object with expected Pipedrive fields
-  if (!p.meta || typeof p.meta !== 'object') {
-    console.log('Payload inválido: sem campo meta');
-    return false;
-  }
-
-  const meta = p.meta as Record<string, unknown>;
-
-  // Check for Pipedrive-specific meta fields
-  // Pipedrive webhooks always include these fields
-  if (typeof meta.action !== 'string') {
-    console.log('Payload inválido: meta.action não é string');
-    return false;
-  }
-
-  // Valid actions in Pipedrive: added, updated, deleted, merged
-  const validActions = ['added', 'updated', 'deleted', 'merged'];
-  if (!validActions.includes(meta.action)) {
-    console.log('Payload inválido: action não reconhecido:', meta.action);
-    return false;
-  }
-
-  // Must have 'object' field
-  if (typeof meta.object !== 'string') {
-    console.log('Payload inválido: meta.object não é string');
-    return false;
-  }
-
-  // For deal webhooks, object must be 'deal'
-  if (meta.object !== 'deal') {
-    console.log('Payload ignorado: object não é deal:', meta.object);
-    return false;
-  }
-
-  // Must have 'current' object for non-delete actions
-  if (meta.action !== 'deleted') {
-    if (!p.current || typeof p.current !== 'object') {
-      console.log('Payload inválido: sem campo current para action:', meta.action);
+const PipedrivePayloadSchema = z.object({
+  meta: PipedriveMetaSchema,
+  current: PipedriveCurrentSchema.optional(),
+  previous: PipedrivePreviousSchema.optional(),
+}).refine(
+  (data) => {
+    // For non-delete actions, current is required
+    if (data.meta.action !== 'deleted' && !data.current) {
       return false;
     }
+    return true;
+  },
+  { message: "Campo 'current' é obrigatório para ações que não são 'deleted'" }
+);
 
-    const current = p.current as Record<string, unknown>;
+type ValidatedPipedrivePayload = z.infer<typeof PipedrivePayloadSchema>;
 
-    // current must have an id
-    if (typeof current.id !== 'number' || current.id <= 0) {
-      console.log('Payload inválido: current.id inválido');
-      return false;
-    }
+// ========== WEBHOOK SECRET VALIDATION ==========
+async function verifyWebhookSecret(req: Request): Promise<boolean> {
+  const webhookSecret = Deno.env.get('PIPEDRIVE_WEBHOOK_SECRET');
+  
+  // If no secret is configured, log warning but allow (for backwards compatibility)
+  // In production, you should always configure a secret
+  if (!webhookSecret) {
+    console.warn('⚠️ PIPEDRIVE_WEBHOOK_SECRET não configurado - validação de segredo ignorada');
+    return true;
   }
 
-  // Additional Pipedrive-specific checks
-  // Pipedrive v2 webhooks include a version field
-  if (meta.v !== undefined && typeof meta.v !== 'number') {
-    console.log('Payload inválido: meta.v não é número');
-    return false;
+  // Check for secret in query parameter (Pipedrive supports this)
+  const url = new URL(req.url);
+  const querySecret = url.searchParams.get('secret');
+  
+  if (querySecret === webhookSecret) {
+    console.log('Webhook autenticado via query parameter');
+    return true;
   }
 
-  // Check for company_id (present in all Pipedrive webhooks)
-  if (meta.company_id !== undefined && typeof meta.company_id !== 'number') {
-    console.log('Payload inválido: meta.company_id não é número');
-    return false;
+  // Check for secret in custom header
+  const headerSecret = req.headers.get('x-webhook-secret');
+  
+  if (headerSecret === webhookSecret) {
+    console.log('Webhook autenticado via header');
+    return true;
   }
 
-  console.log('Payload validado como Pipedrive webhook');
-  return true;
+  console.error('Falha na autenticação do webhook - segredo inválido ou ausente');
+  return false;
 }
 
 Deno.serve(async (req) => {
@@ -131,34 +110,50 @@ Deno.serve(async (req) => {
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-  let payload: PipedrivePayload;
   let logId: string | null = null;
 
   try {
+    // ========== WEBHOOK SECRET VERIFICATION ==========
+    const isAuthenticated = await verifyWebhookSecret(req);
+    if (!isAuthenticated) {
+      return jsonResponse({ error: 'Unauthorized - Segredo do webhook inválido' }, 401);
+    }
+
     const rawBody = await req.text();
     
     // Try to parse JSON
+    let rawPayload: unknown;
     try {
-      payload = JSON.parse(rawBody);
+      rawPayload = JSON.parse(rawBody);
     } catch {
       console.error('Falha ao parsear JSON do body');
       return jsonResponse({ error: 'Body inválido - JSON malformado' }, 400);
     }
 
-    console.log('Webhook recebido:', JSON.stringify(payload, null, 2));
+    console.log('Webhook recebido:', JSON.stringify(rawPayload, null, 2));
 
-    // ========== PAYLOAD VALIDATION ==========
-    // Validate that this looks like a legitimate Pipedrive webhook
-    if (!isValidPipedrivePayload(payload)) {
-      console.error('Payload rejeitado - não parece ser um webhook válido do Pipedrive');
-      return jsonResponse({ error: 'Payload inválido - estrutura não reconhecida' }, 400);
+    // ========== PAYLOAD VALIDATION WITH ZOD ==========
+    const parseResult = PipedrivePayloadSchema.safeParse(rawPayload);
+    
+    if (!parseResult.success) {
+      console.error('Payload inválido:', parseResult.error.errors);
+      return jsonResponse({ 
+        error: 'Payload inválido - estrutura não reconhecida',
+        details: parseResult.error.errors.map(e => ({
+          path: e.path.join('.'),
+          message: e.message
+        }))
+      }, 400);
     }
+
+    const payload = parseResult.data;
+    console.log('Payload validado com sucesso');
 
     // 1. Register webhook log immediately (before processing)
     const { data: logData, error: logError } = await supabase
       .from('webhook_logs')
       .insert({ 
-        payload: payload as Record<string, unknown>,
+        payload: rawPayload as Record<string, unknown>,
         processado: false 
       })
       .select('id')
@@ -179,7 +174,7 @@ Deno.serve(async (req) => {
     }
 
     // 3. Extract deal ID
-    const dealId = String(payload.current?.id || payload.meta?.id);
+    const dealId = String(payload.current?.id || payload.meta.id);
     if (!dealId || dealId === 'undefined') {
       console.error('Deal ID não encontrado no payload');
       await updateLogError(supabase, logId, 'Deal ID não encontrado');
@@ -327,11 +322,11 @@ function jsonResponse(data: unknown, status: number) {
   );
 }
 
-function checkIfDealWon(payload: PipedrivePayload): boolean {
+function checkIfDealWon(payload: ValidatedPipedrivePayload): boolean {
   // Check if current status is 'won'
   if (payload.current?.status === 'won') {
     // For updates, check if it was just changed to won
-    if (payload.meta?.action === 'updated') {
+    if (payload.meta.action === 'updated') {
       // If previous status was also 'won', it's not a new win
       if (payload.previous?.status === 'won') {
         return false;
@@ -342,9 +337,13 @@ function checkIfDealWon(payload: PipedrivePayload): boolean {
   return false;
 }
 
-function extractClienteData(payload: PipedrivePayload): { nome: string; cidade: string; uf: string } {
-  const current = payload.current || {};
+function extractClienteData(payload: ValidatedPipedrivePayload): { nome: string; cidade: string; uf: string } {
+  const current = payload.current;
   
+  if (!current) {
+    return { nome: 'Cliente Pipedrive', cidade: 'Não informada', uf: 'SP' };
+  }
+
   // Try to get name from organization or deal title
   let nome = 'Cliente Pipedrive';
   if (typeof current.org_id === 'object' && current.org_id?.name) {
@@ -353,22 +352,25 @@ function extractClienteData(payload: PipedrivePayload): { nome: string; cidade: 
     nome = current.title;
   }
 
+  // Sanitize nome - remove potentially harmful characters
+  nome = nome.substring(0, 255).replace(/[<>'"]/g, '');
+
   // Default values for cidade/uf - these should be mapped from custom fields
-  // Custom fields in Pipedrive have keys like "abc123_cidade" or similar
   let cidade = 'Não informada';
   let uf = 'SP';
 
   // Try to find custom fields for cidade and UF
   // Look for common patterns in custom field keys
   for (const [key, value] of Object.entries(current)) {
-    if (typeof value === 'string') {
+    if (typeof value === 'string' && value.length <= 255) {
       const keyLower = key.toLowerCase();
       if (keyLower.includes('cidade') || keyLower.includes('city')) {
-        cidade = value;
+        cidade = value.replace(/[<>'"]/g, '');
       }
       if (keyLower.includes('estado') || keyLower.includes('uf') || keyLower.includes('state')) {
         // Handle UF - could be full state name or abbreviation
-        uf = value.length <= 2 ? value.toUpperCase() : value.substring(0, 2).toUpperCase();
+        const sanitizedValue = value.replace(/[^a-zA-Z\s]/g, '');
+        uf = sanitizedValue.length <= 2 ? sanitizedValue.toUpperCase() : sanitizedValue.substring(0, 2).toUpperCase();
       }
     }
   }
@@ -376,11 +378,18 @@ function extractClienteData(payload: PipedrivePayload): { nome: string; cidade: 
   return { nome, cidade, uf };
 }
 
-function extractContratoData(payload: PipedrivePayload): { prazoMeses: number; remuneracaoTotal: number } {
-  const current = payload.current || {};
+function extractContratoData(payload: ValidatedPipedrivePayload): { prazoMeses: number; remuneracaoTotal: number } {
+  const current = payload.current;
   
-  // Get value from deal
-  const remuneracaoTotal = typeof current.value === 'number' ? current.value : 0;
+  if (!current) {
+    return { prazoMeses: 12, remuneracaoTotal: 0 };
+  }
+
+  // Get value from deal - validate it's a reasonable number
+  let remuneracaoTotal = 0;
+  if (typeof current.value === 'number' && current.value >= 0 && current.value <= 100000000) {
+    remuneracaoTotal = current.value;
+  }
 
   // Default prazo - look for custom fields
   let prazoMeses = 12;
@@ -389,7 +398,8 @@ function extractContratoData(payload: PipedrivePayload): { prazoMeses: number; r
     const keyLower = key.toLowerCase();
     if (keyLower.includes('prazo') || keyLower.includes('meses') || keyLower.includes('duracao')) {
       const numValue = parseInt(String(value), 10);
-      if (!isNaN(numValue) && numValue > 0) {
+      // Validate prazo is within reasonable bounds
+      if (!isNaN(numValue) && numValue > 0 && numValue <= 120) {
         prazoMeses = numValue;
       }
     }
