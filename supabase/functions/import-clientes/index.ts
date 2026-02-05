@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 interface ClienteInput {
@@ -108,9 +108,70 @@ Deno.serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // ========== AUTHENTICATION CHECK ==========
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      console.error("Requisição sem token de autenticação");
+      return new Response(
+        JSON.stringify({ error: "Unauthorized - Token de autenticação ausente" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Create client with user's token for auth verification
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    // Verify the token and get user claims
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
     
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    if (claimsError || !claimsData?.claims) {
+      console.error("Token inválido:", claimsError);
+      return new Response(
+        JSON.stringify({ error: "Unauthorized - Token inválido" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const userId = claimsData.claims.sub;
+    console.log("Usuário autenticado:", userId);
+
+    // ========== AUTHORIZATION CHECK (Admin role required) ==========
+    // Use service role to check user_roles (since RLS might block this)
+    const adminClient = createClient(supabaseUrl, serviceRoleKey);
+    
+    const { data: userRole, error: roleError } = await adminClient
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (roleError) {
+      console.error("Erro ao verificar role:", roleError);
+      return new Response(
+        JSON.stringify({ error: "Erro ao verificar permissões" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!userRole || userRole.role !== "admin") {
+      console.error("Acesso negado - usuário não é admin:", userId);
+      return new Response(
+        JSON.stringify({ error: "Forbidden - Acesso restrito a administradores" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("Usuário autorizado como admin:", userId);
+
+    // ========== CONTINUE WITH IMPORT LOGIC ==========
+    // Now use service role for the actual import operations
+    const supabase = adminClient;
 
     const { clientes, encerramentos } = await req.json() as {
       clientes: ClienteInput[];
