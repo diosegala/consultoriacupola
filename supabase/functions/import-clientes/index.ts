@@ -1,36 +1,46 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-interface ClienteInput {
-  nome: string;
-  consultor: string;
-  cidadeUf: string;
-  tipoConsultoria: string;
-  prazoMeses: number;
-  dataInicio: string;
-  dataFim: string;
-  remuneracaoTotal: number;
-  parcelas: number;
-  tipoVencimento: string;
-  remuneracaoMensal: number;
-  momento: string;
-  linkContrato: string;
-  particularidades: string;
-  dataPreOnboarding: string;
-}
+// ========== ZOD VALIDATION SCHEMAS ==========
+const ClienteSchema = z.object({
+  nome: z.string().min(1, "Nome é obrigatório").max(255, "Nome muito longo"),
+  consultor: z.string().min(1, "Consultor é obrigatório"),
+  cidadeUf: z.string().min(1, "Cidade/UF é obrigatório"),
+  tipoConsultoria: z.string().min(1, "Tipo de consultoria é obrigatório"),
+  prazoMeses: z.number().int().min(1).max(120).default(12),
+  dataInicio: z.string().regex(/^(\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{4})$/, "Data de início inválida"),
+  dataFim: z.string().regex(/^(\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{4})$/, "Data de fim inválida"),
+  remuneracaoTotal: z.number().min(0, "Remuneração total deve ser positiva").default(0),
+  parcelas: z.number().int().min(1).default(12),
+  tipoVencimento: z.string().default("postecipado"),
+  remuneracaoMensal: z.number().min(0).default(0),
+  momento: z.string().optional().default(""),
+  linkContrato: z.string().optional().default(""),
+  particularidades: z.string().optional().default(""),
+  dataPreOnboarding: z.string().optional().default(""),
+});
 
-interface EncerramentoInput {
-  cliente: string;
-  mrrPerdido: number;
-  classificacao: string;
-  justificativa: string;
-  clientesAtivosMomento: number;
-  dataEncerramento: string;
-}
+const EncerramentoSchema = z.object({
+  cliente: z.string().min(1, "Nome do cliente é obrigatório"),
+  mrrPerdido: z.number().min(0, "MRR perdido deve ser positivo").default(0),
+  classificacao: z.string().min(1, "Classificação é obrigatória"),
+  justificativa: z.string().optional().default(""),
+  clientesAtivosMomento: z.number().int().optional().nullable(),
+  dataEncerramento: z.string().min(1, "Data de encerramento é obrigatória"),
+});
+
+const ImportRequestSchema = z.object({
+  clientes: z.array(ClienteSchema).default([]),
+  encerramentos: z.array(EncerramentoSchema).default([]),
+});
+
+type ValidatedCliente = z.infer<typeof ClienteSchema>;
+type ValidatedEncerramento = z.infer<typeof EncerramentoSchema>;
 
 // Normalizar nome do consultor (tratar typos)
 function normalizeConsultorName(name: string): string {
@@ -169,16 +179,41 @@ Deno.serve(async (req) => {
 
     console.log("Usuário autorizado como admin:", userId);
 
+    // ========== INPUT VALIDATION ==========
+    let rawData: unknown;
+    try {
+      rawData = await req.json();
+    } catch {
+      console.error("Erro ao parsear JSON do body");
+      return new Response(
+        JSON.stringify({ error: "Body inválido - JSON malformado" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const parseResult = ImportRequestSchema.safeParse(rawData);
+    
+    if (!parseResult.success) {
+      console.error("Erro de validação:", parseResult.error.errors);
+      return new Response(
+        JSON.stringify({ 
+          error: "Dados de entrada inválidos", 
+          details: parseResult.error.errors.map(e => ({
+            path: e.path.join('.'),
+            message: e.message
+          }))
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { clientes, encerramentos } = parseResult.data;
+
+    console.log(`Iniciando importação: ${clientes.length} clientes ativos, ${encerramentos.length} encerramentos`);
+
     // ========== CONTINUE WITH IMPORT LOGIC ==========
     // Now use service role for the actual import operations
     const supabase = adminClient;
-
-    const { clientes, encerramentos } = await req.json() as {
-      clientes: ClienteInput[];
-      encerramentos: EncerramentoInput[];
-    };
-
-    console.log(`Iniciando importação: ${clientes?.length || 0} clientes ativos, ${encerramentos?.length || 0} encerramentos`);
 
     // Buscar consultores existentes
     const { data: consultores, error: consultoresError } = await supabase
@@ -215,127 +250,9 @@ Deno.serve(async (req) => {
     };
 
     // Processar clientes ativos
-    for (const cliente of clientes || []) {
+    for (const cliente of clientes) {
       try {
-        // Encontrar consultor
-        const consultorNome = normalizeConsultorName(cliente.consultor);
-        let consultorId = consultorMap.get(consultorNome.toLowerCase());
-        
-        if (!consultorId) {
-          console.log(`Consultor não encontrado: ${cliente.consultor}`);
-          results.erros.push(`Consultor não encontrado: ${cliente.consultor}`);
-          continue;
-        }
-
-        // Encontrar ou criar tipo de consultoria
-        let tipoConsultoriaId = tipoConsultoriaMap.get(cliente.tipoConsultoria.toLowerCase());
-        
-        if (!tipoConsultoriaId && cliente.tipoConsultoria) {
-          const { data: novoTipo, error: tipoError } = await supabase
-            .from("tipos_consultoria")
-            .insert({ nome: cliente.tipoConsultoria })
-            .select("id")
-            .single();
-          
-          if (tipoError) {
-            console.log(`Erro ao criar tipo de consultoria: ${tipoError.message}`);
-          } else {
-            tipoConsultoriaId = novoTipo.id;
-            tipoConsultoriaMap.set(cliente.tipoConsultoria.toLowerCase(), novoTipo.id);
-            results.tiposConsultoriaCriados.push(cliente.tipoConsultoria);
-          }
-        }
-
-        // Separar cidade e UF
-        const { cidade, uf } = parseCidadeUf(cliente.cidadeUf);
-
-        // Inserir cliente
-        const { data: novoCliente, error: clienteError } = await supabase
-          .from("clientes")
-          .insert({
-            nome: cliente.nome,
-            consultor_id: consultorId,
-            cidade,
-            uf,
-            status: "ativo",
-          })
-          .select("id")
-          .single();
-
-        if (clienteError) {
-          results.erros.push(`Erro ao inserir cliente ${cliente.nome}: ${clienteError.message}`);
-          continue;
-        }
-
-        results.clientesInseridos++;
-
-        // Inserir contrato
-        const dataInicio = parseDate(cliente.dataInicio);
-        const dataFim = parseDate(cliente.dataFim);
-        
-        if (!dataInicio || !dataFim) {
-          results.erros.push(`Datas inválidas para cliente ${cliente.nome}`);
-          continue;
-        }
-
-        const { data: novoContrato, error: contratoError } = await supabase
-          .from("contratos")
-          .insert({
-            cliente_id: novoCliente.id,
-            tipo_consultoria_id: tipoConsultoriaId,
-            prazo_meses: cliente.prazoMeses || 12,
-            data_inicio: dataInicio,
-            data_fim: dataFim,
-            remuneracao_total: cliente.remuneracaoTotal || 0,
-            parcelas: cliente.parcelas || 12,
-            tipo_vencimento: normalizeTipoVencimento(cliente.tipoVencimento),
-            remuneracao_mensal: cliente.remuneracaoMensal || (cliente.remuneracaoTotal / (cliente.prazoMeses || 12)),
-            momento: cliente.momento || null,
-            link_contrato: cliente.linkContrato || null,
-            particularidades: cliente.particularidades || null,
-            ativo: true,
-          })
-          .select("id")
-          .single();
-
-        if (contratoError) {
-          results.erros.push(`Erro ao inserir contrato para ${cliente.nome}: ${contratoError.message}`);
-        } else {
-          results.contratosInseridos++;
-          
-          // Inserir onboarding
-          const dataPreOnboarding = parseDate(cliente.dataPreOnboarding);
-          
-          const { error: onboardingError } = await supabase
-            .from("onboarding")
-            .insert({
-              cliente_id: novoCliente.id,
-              contrato_id: novoContrato.id,
-              data_pre_onboarding: dataPreOnboarding,
-              etapa_atual: "concluido",
-            });
-
-          if (onboardingError) {
-            results.erros.push(`Erro ao inserir onboarding para ${cliente.nome}: ${onboardingError.message}`);
-          } else {
-            results.onboardingInseridos++;
-          }
-        }
-
-        // Inserir atendimento padrão
-        const { error: atendimentoError } = await supabase
-          .from("atendimentos")
-          .insert({
-            cliente_id: novoCliente.id,
-            periodicidade: "quinzenal",
-          });
-
-        if (atendimentoError) {
-          results.erros.push(`Erro ao inserir atendimento para ${cliente.nome}: ${atendimentoError.message}`);
-        } else {
-          results.atendimentosInseridos++;
-        }
-
+        await processCliente(supabase, cliente, consultorMap, tipoConsultoriaMap, results);
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
         results.erros.push(`Erro ao processar cliente ${cliente.nome}: ${message}`);
@@ -343,67 +260,9 @@ Deno.serve(async (req) => {
     }
 
     // Processar encerramentos
-    for (const encerramento of encerramentos || []) {
+    for (const encerramento of encerramentos) {
       try {
-        // Criar cliente com status encerrado
-        const { data: novoCliente, error: clienteError } = await supabase
-          .from("clientes")
-          .insert({
-            nome: encerramento.cliente,
-            cidade: "",
-            uf: "",
-            status: "encerrado",
-          })
-          .select("id")
-          .single();
-
-        if (clienteError) {
-          results.erros.push(`Erro ao inserir cliente encerrado ${encerramento.cliente}: ${clienteError.message}`);
-          continue;
-        }
-
-        // Criar contrato inativo
-        const dataEncerramento = parseDate(encerramento.dataEncerramento) || new Date().toISOString().split("T")[0];
-        
-        const { data: novoContrato, error: contratoError } = await supabase
-          .from("contratos")
-          .insert({
-            cliente_id: novoCliente.id,
-            prazo_meses: 12,
-            data_inicio: dataEncerramento,
-            data_fim: dataEncerramento,
-            remuneracao_total: encerramento.mrrPerdido * 12,
-            parcelas: 12,
-            remuneracao_mensal: encerramento.mrrPerdido,
-            ativo: false,
-          })
-          .select("id")
-          .single();
-
-        if (contratoError) {
-          results.erros.push(`Erro ao inserir contrato para encerrado ${encerramento.cliente}: ${contratoError.message}`);
-          continue;
-        }
-
-        // Criar registro de encerramento
-        const { error: encerramentoError } = await supabase
-          .from("encerramentos")
-          .insert({
-            cliente_id: novoCliente.id,
-            contrato_id: novoContrato.id,
-            data_encerramento: dataEncerramento,
-            classificacao: normalizeClassificacao(encerramento.classificacao),
-            justificativa: encerramento.justificativa || null,
-            mrr_perdido: encerramento.mrrPerdido || 0,
-            clientes_ativos_momento: encerramento.clientesAtivosMomento || null,
-          });
-
-        if (encerramentoError) {
-          results.erros.push(`Erro ao inserir encerramento para ${encerramento.cliente}: ${encerramentoError.message}`);
-        } else {
-          results.encerradosInseridos++;
-        }
-
+        await processEncerramento(supabase, encerramento, results);
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
         results.erros.push(`Erro ao processar encerramento ${encerramento.cliente}: ${message}`);
@@ -426,3 +285,209 @@ Deno.serve(async (req) => {
     });
   }
 });
+
+// ========== HELPER FUNCTIONS ==========
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function processCliente(
+  supabase: any,
+  cliente: ValidatedCliente,
+  consultorMap: Map<string, string>,
+  tipoConsultoriaMap: Map<string, string>,
+  results: { 
+    clientesInseridos: number;
+    contratosInseridos: number;
+    onboardingInseridos: number;
+    atendimentosInseridos: number;
+    tiposConsultoriaCriados: string[];
+    erros: string[];
+  }
+) {
+  // Encontrar consultor
+  const consultorNome = normalizeConsultorName(cliente.consultor);
+  const consultorId = consultorMap.get(consultorNome.toLowerCase());
+  
+  if (!consultorId) {
+    console.log(`Consultor não encontrado: ${cliente.consultor}`);
+    results.erros.push(`Consultor não encontrado: ${cliente.consultor}`);
+    return;
+  }
+
+  // Encontrar ou criar tipo de consultoria
+  let tipoConsultoriaId = tipoConsultoriaMap.get(cliente.tipoConsultoria.toLowerCase());
+  
+  if (!tipoConsultoriaId && cliente.tipoConsultoria) {
+    const { data: novoTipo, error: tipoError } = await supabase
+      .from("tipos_consultoria")
+      .insert({ nome: cliente.tipoConsultoria })
+      .select("id")
+      .single();
+    
+    if (tipoError) {
+      console.log(`Erro ao criar tipo de consultoria: ${tipoError.message}`);
+    } else {
+      tipoConsultoriaId = novoTipo.id;
+      tipoConsultoriaMap.set(cliente.tipoConsultoria.toLowerCase(), novoTipo.id);
+      results.tiposConsultoriaCriados.push(cliente.tipoConsultoria);
+    }
+  }
+
+  // Separar cidade e UF
+  const { cidade, uf } = parseCidadeUf(cliente.cidadeUf);
+
+  // Inserir cliente
+  const { data: novoCliente, error: clienteError } = await supabase
+    .from("clientes")
+    .insert({
+      nome: cliente.nome,
+      consultor_id: consultorId,
+      cidade,
+      uf,
+      status: "ativo",
+    })
+    .select("id")
+    .single();
+
+  if (clienteError) {
+    results.erros.push(`Erro ao inserir cliente ${cliente.nome}: ${clienteError.message}`);
+    return;
+  }
+
+  results.clientesInseridos++;
+
+  // Inserir contrato
+  const dataInicio = parseDate(cliente.dataInicio);
+  const dataFim = parseDate(cliente.dataFim);
+  
+  if (!dataInicio || !dataFim) {
+    results.erros.push(`Datas inválidas para cliente ${cliente.nome}`);
+    return;
+  }
+
+  const { data: novoContrato, error: contratoError } = await supabase
+    .from("contratos")
+    .insert({
+      cliente_id: novoCliente.id,
+      tipo_consultoria_id: tipoConsultoriaId,
+      prazo_meses: cliente.prazoMeses || 12,
+      data_inicio: dataInicio,
+      data_fim: dataFim,
+      remuneracao_total: cliente.remuneracaoTotal || 0,
+      parcelas: cliente.parcelas || 12,
+      tipo_vencimento: normalizeTipoVencimento(cliente.tipoVencimento),
+      remuneracao_mensal: cliente.remuneracaoMensal || (cliente.remuneracaoTotal / (cliente.prazoMeses || 12)),
+      momento: cliente.momento || null,
+      link_contrato: cliente.linkContrato || null,
+      particularidades: cliente.particularidades || null,
+      ativo: true,
+    })
+    .select("id")
+    .single();
+
+  if (contratoError) {
+    results.erros.push(`Erro ao inserir contrato para ${cliente.nome}: ${contratoError.message}`);
+  } else {
+    results.contratosInseridos++;
+    
+    // Inserir onboarding
+    const dataPreOnboarding = parseDate(cliente.dataPreOnboarding);
+    
+    const { error: onboardingError } = await supabase
+      .from("onboarding")
+      .insert({
+        cliente_id: novoCliente.id,
+        contrato_id: novoContrato.id,
+        data_pre_onboarding: dataPreOnboarding,
+        etapa_atual: "concluido",
+      });
+
+    if (onboardingError) {
+      results.erros.push(`Erro ao inserir onboarding para ${cliente.nome}: ${onboardingError.message}`);
+    } else {
+      results.onboardingInseridos++;
+    }
+  }
+
+  // Inserir atendimento padrão
+  const { error: atendimentoError } = await supabase
+    .from("atendimentos")
+    .insert({
+      cliente_id: novoCliente.id,
+      periodicidade: "quinzenal",
+    });
+
+  if (atendimentoError) {
+    results.erros.push(`Erro ao inserir atendimento para ${cliente.nome}: ${atendimentoError.message}`);
+  } else {
+    results.atendimentosInseridos++;
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function processEncerramento(
+  supabase: any,
+  encerramento: ValidatedEncerramento,
+  results: { 
+    encerradosInseridos: number;
+    erros: string[];
+  }
+) {
+  // Criar cliente com status encerrado
+  const { data: novoCliente, error: clienteError } = await supabase
+    .from("clientes")
+    .insert({
+      nome: encerramento.cliente,
+      cidade: "",
+      uf: "",
+      status: "encerrado",
+    })
+    .select("id")
+    .single();
+
+  if (clienteError) {
+    results.erros.push(`Erro ao inserir cliente encerrado ${encerramento.cliente}: ${clienteError.message}`);
+    return;
+  }
+
+  // Criar contrato inativo
+  const dataEncerramento = parseDate(encerramento.dataEncerramento) || new Date().toISOString().split("T")[0];
+  
+  const { data: novoContrato, error: contratoError } = await supabase
+    .from("contratos")
+    .insert({
+      cliente_id: novoCliente.id,
+      prazo_meses: 12,
+      data_inicio: dataEncerramento,
+      data_fim: dataEncerramento,
+      remuneracao_total: encerramento.mrrPerdido * 12,
+      parcelas: 12,
+      remuneracao_mensal: encerramento.mrrPerdido,
+      ativo: false,
+    })
+    .select("id")
+    .single();
+
+  if (contratoError) {
+    results.erros.push(`Erro ao inserir contrato para encerrado ${encerramento.cliente}: ${contratoError.message}`);
+    return;
+  }
+
+  // Criar registro de encerramento
+  const { error: encerramentoError } = await supabase
+    .from("encerramentos")
+    .insert({
+      cliente_id: novoCliente.id,
+      contrato_id: novoContrato.id,
+      data_encerramento: dataEncerramento,
+      classificacao: normalizeClassificacao(encerramento.classificacao),
+      justificativa: encerramento.justificativa || null,
+      mrr_perdido: encerramento.mrrPerdido || 0,
+      clientes_ativos_momento: encerramento.clientesAtivosMomento || null,
+    });
+
+  if (encerramentoError) {
+    results.erros.push(`Erro ao inserir encerramento para ${encerramento.cliente}: ${encerramentoError.message}`);
+  } else {
+    results.encerradosInseridos++;
+  }
+}
