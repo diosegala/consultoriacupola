@@ -67,6 +67,17 @@ export function useCreateContrato() {
         .single();
 
       if (error) throw error;
+
+      // Atualizar status do cliente para 'ativo' se o contrato for ativo
+      if (contrato.ativo !== false) {
+        const { error: clienteError } = await supabase
+          .from('clientes')
+          .update({ status: 'ativo' })
+          .eq('id', contrato.cliente_id);
+
+        if (clienteError) throw clienteError;
+      }
+
       return data;
     },
     onSuccess: (_, variables) => {
@@ -74,6 +85,7 @@ export function useCreateContrato() {
       queryClient.invalidateQueries({ queryKey: ['contrato-ativo', variables.cliente_id] });
       queryClient.invalidateQueries({ queryKey: ['all-contratos'] });
       queryClient.invalidateQueries({ queryKey: ['clientes'] });
+      queryClient.invalidateQueries({ queryKey: ['cliente', variables.cliente_id] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     }
   });
