@@ -1,62 +1,133 @@
 
-## Simplificar Segurança do Webhook Pipedrive
 
-### Contexto
-O webhook do Pipedrive será mantido **sem autenticação adicional** (sem secret). A validação estrutural do payload com Zod já é suficiente para o caso de uso.
+## Corrigir Atualização do Dashboard e Adicionar Gráfico de Contratos
 
-### Alterações
+### Problema Identificado
 
-Remover a função `verifyWebhookSecret` e todo código relacionado à verificação de secret do arquivo `supabase/functions/pipedrive-webhook/index.ts`:
+O dashboard não está sendo atualizado automaticamente após inclusão de novos clientes porque os hooks `useCreateCliente`, `useUpdateCliente`, `useCreateOnboarding` e `useUpdateOnboarding` **não invalidam as queries do dashboard**.
 
-1. **Remover linhas 63-93**: Função `verifyWebhookSecret` completa
-2. **Remover linhas 116-120**: Chamada da verificação no handler principal
-3. **Atualizar finding de segurança**: Marcar como ignorado com justificativa documentada
+Enquanto hooks como `useContratos` e `useEncerramentos` chamam:
+```typescript
+queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+```
 
-### Segurança Mantida
+Os hooks de clientes e onboarding não fazem isso, causando dados desatualizados.
 
-A proteção do endpoint continua garantida por:
+### Alterações Planejadas
 
-- **Validação Zod rigorosa**: Schemas `PipedriveMetaSchema`, `PipedriveCurrentSchema`, `PipedrivePayloadSchema`
-- **Verificação de estrutura**: Rejeita payloads que não tenham formato Pipedrive válido
-- **Sanitização de dados**: Campos extraídos são sanitizados antes de inserção
-- **Limites de valores**: Validação de ranges numéricos e comprimento de strings
+---
 
-### Justificativa Técnica
+#### 1. Corrigir invalidação de cache em `useClientes.ts`
 
-O endpoint webhooks do Pipedrive:
-- Não suporta HMAC signatures como outros serviços
-- A autenticação HTTP Basic é opcional e difícil de configurar
-- A validação estrutural é suficiente pois payloads maliciosos seriam rejeitados pelo schema Zod
+Adicionar invalidação do dashboard em:
+- `useCreateCliente` 
+- `useUpdateCliente`
+- `useDeleteCliente` (já invalidava, mas verificar consistência)
+
+Antes:
+```typescript
+onSuccess: () => {
+  queryClient.invalidateQueries({ queryKey: ['clientes'] });
+}
+```
+
+Depois:
+```typescript
+onSuccess: () => {
+  queryClient.invalidateQueries({ queryKey: ['clientes'] });
+  queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+}
+```
+
+---
+
+#### 2. Corrigir invalidação de cache em `useOnboarding.ts`
+
+Adicionar invalidação do dashboard em:
+- `useCreateOnboarding`
+- `useUpdateOnboarding`
+
+---
+
+#### 3. Criar novo hook `useContratosHistorico` em `useDashboard.ts`
+
+Novo hook para buscar dados dos contratos novos e encerrados nos últimos 12 meses:
+
+```typescript
+export function useContratosHistorico() {
+  return useQuery({
+    queryKey: ['dashboard', 'contratos-historico'],
+    queryFn: async () => {
+      // Buscar contratos (data_inicio para novos)
+      // Buscar encerramentos (data_encerramento para rescindidos)
+      // Agrupar por mês nos últimos 12 meses
+      // Retornar: { mes: string, novos: number, encerrados: number }[]
+    }
+  });
+}
+```
+
+---
+
+#### 4. Adicionar gráfico de barras em `Dashboard.tsx`
+
+Novo card abaixo do gráfico de MRR Histórico com:
+- Título: "Contratos Novos vs. Encerrados (últimos 12 meses)"
+- Gráfico de barras com duas séries:
+  - **Novos** (cor verde/primária)
+  - **Encerrados** (cor vermelha/destrutiva)
+- Usar `BarChart` do Recharts (já instalado)
+
+---
+
+### Arquivos a Editar
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/hooks/useClientes.ts` | Adicionar invalidação do dashboard em `useCreateCliente` e `useUpdateCliente` |
+| `src/hooks/useOnboarding.ts` | Adicionar invalidação do dashboard em `useCreateOnboarding` e `useUpdateOnboarding` |
+| `src/hooks/useDashboard.ts` | Adicionar novo hook `useContratosHistorico` |
+| `src/pages/Dashboard.tsx` | Adicionar gráfico de barras e importar o novo hook |
 
 ---
 
 ### Detalhes Técnicos
 
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│  ANTES                                                      │
-│  ┌──────────────┐    ┌────────────────┐    ┌─────────────┐ │
-│  │   Request    │───▶│ Secret Check   │───▶│ Zod Parse   │ │
-│  └──────────────┘    └────────────────┘    └─────────────┘ │
-│                            │                               │
-│                        ❌ Requer                           │
-│                        configuração                         │
-└─────────────────────────────────────────────────────────────┘
+FLUXO ATUAL (PROBLEMA)
+┌─────────────┐     ┌──────────────┐     ┌───────────────┐
+│ Criar       │────▶│ invalidate   │     │   Dashboard   │
+│ Cliente     │     │ ['clientes'] │     │   (stale)     │
+└─────────────┘     └──────────────┘     └───────────────┘
+                          │
+                          ▼
+                    Dashboard NÃO
+                    é atualizado
 
-┌─────────────────────────────────────────────────────────────┐
-│  DEPOIS                                                     │
-│  ┌──────────────┐    ┌─────────────┐                       │
-│  │   Request    │───▶│ Zod Parse   │                       │
-│  └──────────────┘    └─────────────┘                       │
-│                           │                                │
-│                   ✅ Valida estrutura                      │
-│                   ✅ Rejeita inválidos                     │
-│                   ✅ Sem configuração extra                │
-└─────────────────────────────────────────────────────────────┘
+FLUXO CORRIGIDO
+┌─────────────┐     ┌──────────────┐     ┌───────────────┐
+│ Criar       │────▶│ invalidate   │────▶│   Dashboard   │
+│ Cliente     │     │ ['clientes'] │     │   (refetch)   │
+└─────────────┘     │ ['dashboard']│     └───────────────┘
+                    └──────────────┘
 ```
 
-**Arquivo a editar:**
-- `supabase/functions/pipedrive-webhook/index.ts`
+**Estrutura do novo gráfico:**
 
-**Security finding a atualizar:**
-- `OPEN_ENDPOINTS` → marcar como ignorado com justificativa
+```text
+┌─────────────────────────────────────────────────────────┐
+│  Contratos Novos vs. Encerrados (últimos 12 meses)      │
+├─────────────────────────────────────────────────────────┤
+│                                                          │
+│   5 │    ██                                             │
+│   4 │    ██  ██      ██                                 │
+│   3 │ ██ ██  ██  ██  ██  ██      ██  ██                 │
+│   2 │ ██ ██  ██  ██  ██  ██  ▒▒  ██  ██  ██  ██        │
+│   1 │ ██ ▒▒  ██  ▒▒  ██  ▒▒  ▒▒  ██  ▒▒  ██  ▒▒  ██   │
+│   0 └────────────────────────────────────────────────   │
+│     jan fev mar abr mai jun jul ago set out nov dez    │
+│                                                          │
+│     ██ Novos    ▒▒ Encerrados                           │
+└─────────────────────────────────────────────────────────┘
+```
+
