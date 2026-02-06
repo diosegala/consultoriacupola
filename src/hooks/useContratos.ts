@@ -271,6 +271,34 @@ export function useMRRTotal(consultorId?: string) {
   });
 }
 
+export function useListaContratosMRR(consultorId?: string) {
+  return useQuery({
+    queryKey: ['dashboard', 'lista-contratos-mrr', consultorId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('contratos')
+        .select(`
+          id,
+          remuneracao_mensal,
+          data_fim,
+          tipo_consultoria:tipos_consultoria(nome),
+          cliente:clientes!contratos_cliente_id_fkey(
+            id, nome, cidade, uf, status, consultor_id,
+            consultor:consultores(id, nome)
+          )
+        `)
+        .eq('ativo', true)
+        .order('remuneracao_mensal', { ascending: false });
+
+      if (error) throw error;
+
+      return (data as any[])
+        .filter(c => c.cliente?.status === 'ativo')
+        .filter(c => !consultorId || c.cliente?.consultor_id === consultorId);
+    }
+  });
+}
+
 export function useDeleteContrato() {
   const queryClient = useQueryClient();
 
