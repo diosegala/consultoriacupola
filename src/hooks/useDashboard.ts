@@ -104,18 +104,26 @@ export function useAlertas(consultorId?: string) {
   });
 }
 
-export function useMRRHistorico() {
+export function useMRRHistorico(consultorId?: string) {
   return useQuery({
-    queryKey: ['dashboard', 'mrr-historico'],
+    queryKey: ['dashboard', 'mrr-historico', consultorId],
     queryFn: async () => {
       const resultado: { mes: string; mrr: number }[] = [];
       
-      // Buscar todos os contratos com datas
+      // Buscar todos os contratos com datas e consultor
       const { data: contratos, error } = await supabase
         .from('contratos')
-        .select('data_inicio, data_fim, remuneracao_mensal, ativo');
+        .select(`
+          data_inicio, data_fim, remuneracao_mensal, ativo,
+          cliente:clientes!contratos_cliente_id_fkey(consultor_id)
+        `);
 
       if (error) throw error;
+
+      // Filtrar por consultor se necessário
+      const contratosFiltrados = consultorId 
+        ? (contratos as any[])?.filter(c => c.cliente?.consultor_id === consultorId)
+        : contratos;
 
       // Calcular MRR para cada mês dos últimos 12 meses
       for (let i = 11; i >= 0; i--) {
@@ -124,7 +132,7 @@ export function useMRRHistorico() {
         const fimMes = endOfMonth(mesRef);
 
         // Contratos ativos naquele mês
-        const mrrMes = (contratos || [])
+        const mrrMes = (contratosFiltrados || [])
           .filter(c => {
             const inicio = parseISO(c.data_inicio);
             const fim = parseISO(c.data_fim);
@@ -144,25 +152,40 @@ export function useMRRHistorico() {
   });
 }
 
-export function useContratosHistorico() {
+export function useContratosHistorico(consultorId?: string) {
   return useQuery({
-    queryKey: ['dashboard', 'contratos-historico'],
+    queryKey: ['dashboard', 'contratos-historico', consultorId],
     queryFn: async () => {
       const resultado: { mes: string; novos: number; encerrados: number }[] = [];
 
-      // Buscar todos os contratos (data_inicio para novos)
+      // Buscar todos os contratos com consultor
       const { data: contratos, error: contratosError } = await supabase
         .from('contratos')
-        .select('data_inicio');
+        .select(`
+          data_inicio,
+          cliente:clientes!contratos_cliente_id_fkey(consultor_id)
+        `);
 
       if (contratosError) throw contratosError;
 
-      // Buscar todos os encerramentos (data_encerramento para encerrados)
+      // Buscar todos os encerramentos com consultor
       const { data: encerramentos, error: encError } = await supabase
         .from('encerramentos')
-        .select('data_encerramento');
+        .select(`
+          data_encerramento,
+          cliente:clientes!encerramentos_cliente_id_fkey(consultor_id)
+        `);
 
       if (encError) throw encError;
+
+      // Filtrar por consultor se necessário
+      const contratosFiltrados = consultorId 
+        ? (contratos as any[])?.filter(c => c.cliente?.consultor_id === consultorId)
+        : contratos;
+      
+      const encerramentosFiltrados = consultorId 
+        ? (encerramentos as any[])?.filter(e => e.cliente?.consultor_id === consultorId)
+        : encerramentos;
 
       // Calcular para cada mês dos últimos 12 meses
       for (let i = 11; i >= 0; i--) {
@@ -171,13 +194,13 @@ export function useContratosHistorico() {
         const fimMes = endOfMonth(mesRef);
 
         // Contratos que iniciaram naquele mês
-        const novosNoMes = (contratos || []).filter(c => {
+        const novosNoMes = (contratosFiltrados || []).filter(c => {
           const dataInicio = parseISO(c.data_inicio);
           return isWithinInterval(dataInicio, { start: inicioMes, end: fimMes });
         }).length;
 
         // Encerramentos naquele mês
-        const encerradosNoMes = (encerramentos || []).filter(e => {
+        const encerradosNoMes = (encerramentosFiltrados || []).filter(e => {
           const dataEnc = parseISO(e.data_encerramento);
           return isWithinInterval(dataEnc, { start: inicioMes, end: fimMes });
         }).length;

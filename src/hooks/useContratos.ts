@@ -235,15 +235,15 @@ export function useAllContratos(filters?: AllContratosFilters) {
   });
 }
 
-export function useMRRTotal() {
+export function useMRRTotal(consultorId?: string) {
   return useQuery({
-    queryKey: ['dashboard', 'mrr-total'],
+    queryKey: ['dashboard', 'mrr-total', consultorId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('contratos')
         .select(`
           remuneracao_mensal,
-          cliente:clientes!contratos_cliente_id_fkey(status)
+          cliente:clientes!contratos_cliente_id_fkey(status, consultor_id)
         `)
         .eq('ativo', true);
 
@@ -251,6 +251,7 @@ export function useMRRTotal() {
 
       const total = (data as any[])
         .filter(c => c.cliente?.status === 'ativo')
+        .filter(c => !consultorId || c.cliente?.consultor_id === consultorId)
         .reduce((sum, c) => sum + (Number(c.remuneracao_mensal) || 0), 0);
 
       return total;
