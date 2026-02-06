@@ -1,133 +1,56 @@
 
 
-## Corrigir Atualização do Dashboard e Adicionar Gráfico de Contratos
+## Alterar para Gráfico de Barras Empilhadas
 
-### Problema Identificado
+### Objetivo
+Transformar o gráfico de barras lado a lado em um gráfico de barras empilhadas, onde:
+- **Encerrados** ficam na base (parte de baixo)
+- **Novos** ficam empilhados em cima
 
-O dashboard não está sendo atualizado automaticamente após inclusão de novos clientes porque os hooks `useCreateCliente`, `useUpdateCliente`, `useCreateOnboarding` e `useUpdateOnboarding` **não invalidam as queries do dashboard**.
+### Alteração
 
-Enquanto hooks como `useContratos` e `useEncerramentos` chamam:
-```typescript
-queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+No arquivo `src/pages/Dashboard.tsx`, modificar o `BarChart` (linhas 211-244):
+
+**De (barras lado a lado):**
+```tsx
+<Bar dataKey="novos" name="Novos" fill="..." />
+<Bar dataKey="encerrados" name="Encerrados" fill="..." />
 ```
 
-Os hooks de clientes e onboarding não fazem isso, causando dados desatualizados.
-
-### Alterações Planejadas
-
----
-
-#### 1. Corrigir invalidação de cache em `useClientes.ts`
-
-Adicionar invalidação do dashboard em:
-- `useCreateCliente` 
-- `useUpdateCliente`
-- `useDeleteCliente` (já invalidava, mas verificar consistência)
-
-Antes:
-```typescript
-onSuccess: () => {
-  queryClient.invalidateQueries({ queryKey: ['clientes'] });
-}
+**Para (barras empilhadas):**
+```tsx
+<Bar dataKey="encerrados" name="Encerrados" fill="..." stackId="contratos" />
+<Bar dataKey="novos" name="Novos" fill="..." stackId="contratos" />
 ```
-
-Depois:
-```typescript
-onSuccess: () => {
-  queryClient.invalidateQueries({ queryKey: ['clientes'] });
-  queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-}
-```
-
----
-
-#### 2. Corrigir invalidação de cache em `useOnboarding.ts`
-
-Adicionar invalidação do dashboard em:
-- `useCreateOnboarding`
-- `useUpdateOnboarding`
-
----
-
-#### 3. Criar novo hook `useContratosHistorico` em `useDashboard.ts`
-
-Novo hook para buscar dados dos contratos novos e encerrados nos últimos 12 meses:
-
-```typescript
-export function useContratosHistorico() {
-  return useQuery({
-    queryKey: ['dashboard', 'contratos-historico'],
-    queryFn: async () => {
-      // Buscar contratos (data_inicio para novos)
-      // Buscar encerramentos (data_encerramento para rescindidos)
-      // Agrupar por mês nos últimos 12 meses
-      // Retornar: { mes: string, novos: number, encerrados: number }[]
-    }
-  });
-}
-```
-
----
-
-#### 4. Adicionar gráfico de barras em `Dashboard.tsx`
-
-Novo card abaixo do gráfico de MRR Histórico com:
-- Título: "Contratos Novos vs. Encerrados (últimos 12 meses)"
-- Gráfico de barras com duas séries:
-  - **Novos** (cor verde/primária)
-  - **Encerrados** (cor vermelha/destrutiva)
-- Usar `BarChart` do Recharts (já instalado)
-
----
-
-### Arquivos a Editar
-
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/hooks/useClientes.ts` | Adicionar invalidação do dashboard em `useCreateCliente` e `useUpdateCliente` |
-| `src/hooks/useOnboarding.ts` | Adicionar invalidação do dashboard em `useCreateOnboarding` e `useUpdateOnboarding` |
-| `src/hooks/useDashboard.ts` | Adicionar novo hook `useContratosHistorico` |
-| `src/pages/Dashboard.tsx` | Adicionar gráfico de barras e importar o novo hook |
-
----
 
 ### Detalhes Técnicos
 
-```text
-FLUXO ATUAL (PROBLEMA)
-┌─────────────┐     ┌──────────────┐     ┌───────────────┐
-│ Criar       │────▶│ invalidate   │     │   Dashboard   │
-│ Cliente     │     │ ['clientes'] │     │   (stale)     │
-└─────────────┘     └──────────────┘     └───────────────┘
-                          │
-                          ▼
-                    Dashboard NÃO
-                    é atualizado
-
-FLUXO CORRIGIDO
-┌─────────────┐     ┌──────────────┐     ┌───────────────┐
-│ Criar       │────▶│ invalidate   │────▶│   Dashboard   │
-│ Cliente     │     │ ['clientes'] │     │   (refetch)   │
-└─────────────┘     │ ['dashboard']│     └───────────────┘
-                    └──────────────┘
-```
-
-**Estrutura do novo gráfico:**
+A propriedade `stackId` do Recharts agrupa as barras com o mesmo ID em uma pilha. A ordem de renderização determina a posição visual:
+1. Primeiro `<Bar>` = base da pilha (encerrados)
+2. Segundo `<Bar>` = topo da pilha (novos)
 
 ```text
-┌─────────────────────────────────────────────────────────┐
-│  Contratos Novos vs. Encerrados (últimos 12 meses)      │
-├─────────────────────────────────────────────────────────┤
-│                                                          │
-│   5 │    ██                                             │
-│   4 │    ██  ██      ██                                 │
-│   3 │ ██ ██  ██  ██  ██  ██      ██  ██                 │
-│   2 │ ██ ██  ██  ██  ██  ██  ▒▒  ██  ██  ██  ██        │
-│   1 │ ██ ▒▒  ██  ▒▒  ██  ▒▒  ▒▒  ██  ▒▒  ██  ▒▒  ██   │
-│   0 └────────────────────────────────────────────────   │
-│     jan fev mar abr mai jun jul ago set out nov dez    │
-│                                                          │
-│     ██ Novos    ▒▒ Encerrados                           │
-└─────────────────────────────────────────────────────────┘
+ANTES (lado a lado)          DEPOIS (empilhadas)
+                             
+  ██  ▒▒   ██  ▒▒              ██       ██    
+  ██  ▒▒   ██  ▒▒              ██       ██    
+  ██  ▒▒   ██  ▒▒              ▒▒       ▒▒    
+  ────────────────             ────────────── 
+  jan     fev                  jan     fev    
+                             
+  ██ Novos  ▒▒ Encerrados      ██ Novos (topo)
+                               ▒▒ Encerrados (base)
 ```
+
+### Ajuste no Radius
+
+Como agora as barras são empilhadas:
+- Encerrados (base): `radius={[0, 0, 0, 0]}` - sem arredondamento
+- Novos (topo): `radius={[4, 4, 0, 0]}` - arredondamento apenas no topo
+
+### Arquivo a Editar
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/pages/Dashboard.tsx` | Adicionar `stackId` nas barras e ajustar ordem de renderização |
 
