@@ -1,10 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useNavigate } from 'react-router-dom';
-import { Users, DollarSign, Clock, TrendingDown, AlertTriangle, CalendarX, BookOpen, Loader2 } from 'lucide-react';
+import { Users, DollarSign, Clock, TrendingDown, AlertTriangle, CalendarX, BookOpen, Loader2, ChevronDown, X } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 import { useClientesAtivos, useClientesAguardandoRenovacao, useListaClientesAtivos, useListaClientesAguardandoRenovacao } from '@/hooks/useClientes';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -28,26 +29,26 @@ function formatCurrency(value: number): string {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [consultorFiltro, setConsultorFiltro] = useState<string>('todos');
+  const [consultoresSelecionados, setConsultoresSelecionados] = useState<string[]>([]);
   const [showClientesAtivos, setShowClientesAtivos] = useState(false);
   const [showMRR, setShowMRR] = useState(false);
   const [showAguardandoRenovacao, setShowAguardandoRenovacao] = useState(false);
   const [showChurn, setShowChurn] = useState(false);
 
-  const consultorIdFiltro = consultorFiltro !== 'todos' ? consultorFiltro : undefined;
+  const consultorIdsFiltro = consultoresSelecionados.length > 0 ? consultoresSelecionados : undefined;
 
-  const { data: clientesAtivos, isLoading: loadingClientes } = useClientesAtivos(consultorIdFiltro);
-  const { data: mrrTotal, isLoading: loadingMRR } = useMRRTotal(consultorIdFiltro);
-  const { data: aguardandoRenovacao, isLoading: loadingRenovacao } = useClientesAguardandoRenovacao(consultorIdFiltro);
-  const { data: churnMes, isLoading: loadingChurn } = useChurnDoMes(consultorIdFiltro);
-  const { data: alertas, isLoading: loadingAlertas } = useAlertas(consultorIdFiltro);
-  const { data: mrrHistorico, isLoading: loadingHistorico } = useMRRHistorico(consultorIdFiltro);
-  const { data: contratosHistorico, isLoading: loadingContratosHist } = useContratosHistorico(consultorIdFiltro);
+  const { data: clientesAtivos, isLoading: loadingClientes } = useClientesAtivos(consultorIdsFiltro);
+  const { data: mrrTotal, isLoading: loadingMRR } = useMRRTotal(consultorIdsFiltro);
+  const { data: aguardandoRenovacao, isLoading: loadingRenovacao } = useClientesAguardandoRenovacao(consultorIdsFiltro);
+  const { data: churnMes, isLoading: loadingChurn } = useChurnDoMes(consultorIdsFiltro);
+  const { data: alertas, isLoading: loadingAlertas } = useAlertas(consultorIdsFiltro);
+  const { data: mrrHistorico, isLoading: loadingHistorico } = useMRRHistorico(consultorIdsFiltro);
+  const { data: contratosHistorico, isLoading: loadingContratosHist } = useContratosHistorico(consultorIdsFiltro);
   const { data: consultores } = useConsultores();
-  const { data: listaClientesAtivos } = useListaClientesAtivos(consultorIdFiltro);
-  const { data: listaContratosMRR } = useListaContratosMRR(consultorIdFiltro);
-  const { data: listaAguardandoRenovacao } = useListaClientesAguardandoRenovacao(consultorIdFiltro);
-  const { data: listaChurnMes } = useListaChurnMes(consultorIdFiltro);
+  const { data: listaClientesAtivos } = useListaClientesAtivos(consultorIdsFiltro);
+  const { data: listaContratosMRR } = useListaContratosMRR(consultorIdsFiltro);
+  const { data: listaAguardandoRenovacao } = useListaClientesAguardandoRenovacao(consultorIdsFiltro);
+  const { data: listaChurnMes } = useListaChurnMes(consultorIdsFiltro);
 
   const isLoading = loadingClientes || loadingMRR || loadingRenovacao || loadingChurn;
 
@@ -69,6 +70,22 @@ export default function Dashboard() {
     onboarding_pendente: 'secondary' as const
   };
 
+  const toggleConsultor = (id: string) => {
+    setConsultoresSelecionados(prev => 
+      prev.includes(id) 
+        ? prev.filter(c => c !== id)
+        : [...prev, id]
+    );
+  };
+
+  const limparSelecao = () => {
+    setConsultoresSelecionados([]);
+  };
+
+  const consultoresSelecionadosNomes = consultores?.filter(c => 
+    consultoresSelecionados.includes(c.id)
+  ) || [];
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex justify-between items-center">
@@ -76,17 +93,68 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
           <p className="text-muted-foreground">Visão geral do negócio</p>
         </div>
-        <Select value={consultorFiltro} onValueChange={setConsultorFiltro}>
-          <SelectTrigger className="w-[200px] bg-input border-border">
-            <SelectValue placeholder="Filtrar por consultor" />
-          </SelectTrigger>
-          <SelectContent className="bg-popover border-border">
-            <SelectItem value="todos">Todos os consultores</SelectItem>
-            {consultores?.map(c => (
-              <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="min-w-[200px] justify-between bg-input border-border">
+              {consultoresSelecionados.length === 0 ? (
+                <span className="text-muted-foreground">Todos os consultores</span>
+              ) : (
+                <div className="flex items-center gap-1 flex-wrap max-w-[300px]">
+                  {consultoresSelecionadosNomes.slice(0, 2).map(c => (
+                    <Badge key={c.id} variant="secondary" className="text-xs">
+                      {c.nome}
+                    </Badge>
+                  ))}
+                  {consultoresSelecionadosNomes.length > 2 && (
+                    <Badge variant="secondary" className="text-xs">
+                      +{consultoresSelecionadosNomes.length - 2}
+                    </Badge>
+                  )}
+                </div>
+              )}
+              <div className="flex items-center gap-1 ml-2">
+                {consultoresSelecionados.length > 0 && (
+                  <X 
+                    className="h-4 w-4 hover:text-destructive cursor-pointer" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      limparSelecao();
+                    }}
+                  />
+                )}
+                <ChevronDown className="h-4 w-4 opacity-50" />
+              </div>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[250px] p-2 bg-popover border-border" align="end">
+            <div className="space-y-1">
+              <div
+                className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-muted cursor-pointer"
+                onClick={limparSelecao}
+              >
+                <Checkbox 
+                  checked={consultoresSelecionados.length === 0} 
+                  className="pointer-events-none"
+                />
+                <span className="text-sm">Todos os consultores</span>
+              </div>
+              <div className="border-t border-border my-2" />
+              {consultores?.map(consultor => (
+                <div
+                  key={consultor.id}
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-muted cursor-pointer"
+                  onClick={() => toggleConsultor(consultor.id)}
+                >
+                  <Checkbox 
+                    checked={consultoresSelecionados.includes(consultor.id)}
+                    className="pointer-events-none"
+                  />
+                  <span className="text-sm">{consultor.nome}</span>
+                </div>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
 
       {/* KPI Cards */}
@@ -340,9 +408,9 @@ export default function Dashboard() {
             <DialogTitle className="flex items-center gap-2">
               <Users className="h-5 w-5 text-primary" />
               Clientes Ativos
-              {consultorFiltro !== 'todos' && (
+              {consultoresSelecionados.length > 0 && (
                 <Badge variant="outline" className="ml-2">
-                  Filtrado por consultor
+                  {consultoresSelecionados.length} consultor(es)
                 </Badge>
               )}
             </DialogTitle>
@@ -395,9 +463,9 @@ export default function Dashboard() {
             <DialogTitle className="flex items-center gap-2">
               <DollarSign className="h-5 w-5 text-primary" />
               Contratos Ativos - MRR
-              {consultorFiltro !== 'todos' && (
+              {consultoresSelecionados.length > 0 && (
                 <Badge variant="outline" className="ml-2">
-                  Filtrado por consultor
+                  {consultoresSelecionados.length} consultor(es)
                 </Badge>
               )}
             </DialogTitle>
@@ -453,9 +521,9 @@ export default function Dashboard() {
             <DialogTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5 text-warning" />
               Clientes Aguardando Renovação
-              {consultorFiltro !== 'todos' && (
+              {consultoresSelecionados.length > 0 && (
                 <Badge variant="outline" className="ml-2">
-                  Filtrado por consultor
+                  {consultoresSelecionados.length} consultor(es)
                 </Badge>
               )}
             </DialogTitle>
@@ -508,9 +576,9 @@ export default function Dashboard() {
             <DialogTitle className="flex items-center gap-2">
               <TrendingDown className="h-5 w-5 text-destructive" />
               Churns do Mês
-              {consultorFiltro !== 'todos' && (
+              {consultoresSelecionados.length > 0 && (
                 <Badge variant="outline" className="ml-2">
-                  Filtrado por consultor
+                  {consultoresSelecionados.length} consultor(es)
                 </Badge>
               )}
             </DialogTitle>
