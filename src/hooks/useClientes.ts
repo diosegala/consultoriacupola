@@ -177,6 +177,38 @@ export function useClientesAguardandoRenovacao(consultorId?: string) {
   });
 }
 
+export function useListaClientesAtivos(consultorId?: string) {
+  return useQuery({
+    queryKey: ['dashboard', 'lista-clientes-ativos', consultorId],
+    queryFn: async () => {
+      let query = supabase
+        .from('clientes')
+        .select(`
+          *,
+          consultor:consultores(id, nome),
+          contrato_ativo:contratos!contratos_cliente_id_fkey(
+            id, remuneracao_mensal, data_fim, ativo,
+            tipo_consultoria:tipos_consultoria(nome)
+          )
+        `)
+        .eq('status', 'ativo')
+        .order('nome');
+
+      if (consultorId) {
+        query = query.eq('consultor_id', consultorId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      
+      return (data as any[]).map(cliente => ({
+        ...cliente,
+        contrato_ativo: cliente.contrato_ativo?.find((c: any) => c.ativo) || null
+      }));
+    }
+  });
+}
+
 export function useDeleteCliente() {
   const queryClient = useQueryClient();
 
