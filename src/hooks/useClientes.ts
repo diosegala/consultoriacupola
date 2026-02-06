@@ -109,6 +109,7 @@ export function useCreateCliente() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clientes'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     }
   });
 }
@@ -131,6 +132,7 @@ export function useUpdateCliente() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['clientes'] });
       queryClient.invalidateQueries({ queryKey: ['cliente', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     }
   });
 }
@@ -235,6 +237,7 @@ export function useDeleteCliente() {
       queryClient.invalidateQueries({ queryKey: ['clientes'] });
       queryClient.invalidateQueries({ queryKey: ['contratos'] });
       queryClient.invalidateQueries({ queryKey: ['all-contratos'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     }
   });
 }

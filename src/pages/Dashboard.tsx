@@ -5,11 +5,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { Users, DollarSign, Clock, TrendingDown, AlertTriangle, CalendarX, BookOpen, Loader2 } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 import { useClientesAtivos, useClientesAguardandoRenovacao } from '@/hooks/useClientes';
 import { useMRRTotal } from '@/hooks/useContratos';
 import { useChurnDoMes } from '@/hooks/useEncerramentos';
-import { useAlertas, useMRRHistorico } from '@/hooks/useDashboard';
+import { useAlertas, useMRRHistorico, useContratosHistorico } from '@/hooks/useDashboard';
 import { useConsultores } from '@/hooks/useConsultores';
 import { useState } from 'react';
 
@@ -34,6 +34,7 @@ export default function Dashboard() {
     consultorFiltro !== 'todos' ? consultorFiltro : undefined
   );
   const { data: mrrHistorico, isLoading: loadingHistorico } = useMRRHistorico();
+  const { data: contratosHistorico, isLoading: loadingContratosHist } = useContratosHistorico();
   const { data: consultores } = useConsultores();
 
   const isLoading = loadingClientes || loadingMRR || loadingRenovacao || loadingChurn;
@@ -190,6 +191,57 @@ export default function Dashboard() {
                   dot={{ fill: 'hsl(var(--primary))' }}
                 />
               </LineChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Gráfico Contratos Novos vs Encerrados */}
+      <Card className="bg-card border-border">
+        <CardHeader>
+          <CardTitle className="text-foreground">Contratos Novos vs. Encerrados (últimos 12 meses)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loadingContratosHist ? (
+            <div className="h-[300px] flex items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={contratosHistorico || []}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis 
+                  dataKey="mes" 
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={12}
+                />
+                <YAxis 
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={12}
+                  allowDecimals={false}
+                />
+                <Tooltip 
+                  contentStyle={{
+                    backgroundColor: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px'
+                  }}
+                  labelStyle={{ color: 'hsl(var(--foreground))' }}
+                />
+                <Legend />
+                <Bar 
+                  dataKey="novos" 
+                  name="Novos" 
+                  fill="hsl(var(--primary))" 
+                  radius={[4, 4, 0, 0]}
+                />
+                <Bar 
+                  dataKey="encerrados" 
+                  name="Encerrados" 
+                  fill="hsl(var(--destructive))" 
+                  radius={[4, 4, 0, 0]}
+                />
+              </BarChart>
             </ResponsiveContainer>
           )}
         </CardContent>
