@@ -109,33 +109,47 @@ export function useEncerrarContrato() {
   });
 }
 
-export function useChurnDoMes() {
+export function useChurnDoMes(consultorId?: string) {
   return useQuery({
-    queryKey: ['dashboard', 'churn-mes'],
+    queryKey: ['dashboard', 'churn-mes', consultorId],
     queryFn: async () => {
       const inicioMes = format(startOfMonth(new Date()), 'yyyy-MM-dd');
       const fimMes = format(endOfMonth(new Date()), 'yyyy-MM-dd');
 
-      // Buscar churns do mês
+      // Buscar churns do mês com dados do cliente
       const { data: churns, error: churnsError } = await supabase
         .from('encerramentos')
-        .select('classificacao')
+        .select(`
+          classificacao,
+          cliente:clientes!encerramentos_cliente_id_fkey(consultor_id)
+        `)
         .eq('classificacao', 'churn')
         .gte('data_encerramento', inicioMes)
         .lte('data_encerramento', fimMes);
 
       if (churnsError) throw churnsError;
 
+      // Filtrar por consultor se necessário
+      const churnsFiltered = consultorId 
+        ? (churns as any[])?.filter(c => c.cliente?.consultor_id === consultorId)
+        : churns;
+
       // Buscar clientes que estavam ativos no início do mês
-      const { count: clientesInicioMes } = await supabase
+      let clientesQuery = supabase
         .from('clientes')
         .select('*', { count: 'exact', head: true })
         .in('status', ['ativo', 'aguardando_renovacao', 'encerrado'])
         .lt('created_at', inicioMes);
 
+      if (consultorId) {
+        clientesQuery = clientesQuery.eq('consultor_id', consultorId);
+      }
+
+      const { count: clientesInicioMes } = await clientesQuery;
+
       if (!clientesInicioMes || clientesInicioMes === 0) return 0;
 
-      const percentualChurn = ((churns?.length || 0) / clientesInicioMes) * 100;
+      const percentualChurn = ((churnsFiltered?.length || 0) / clientesInicioMes) * 100;
       return Math.round(percentualChurn * 10) / 10; // Uma casa decimal
     }
   });

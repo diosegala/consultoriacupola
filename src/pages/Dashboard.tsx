@@ -26,15 +26,15 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [consultorFiltro, setConsultorFiltro] = useState<string>('todos');
 
-  const { data: clientesAtivos, isLoading: loadingClientes } = useClientesAtivos();
-  const { data: mrrTotal, isLoading: loadingMRR } = useMRRTotal();
-  const { data: aguardandoRenovacao, isLoading: loadingRenovacao } = useClientesAguardandoRenovacao();
-  const { data: churnMes, isLoading: loadingChurn } = useChurnDoMes();
-  const { data: alertas, isLoading: loadingAlertas } = useAlertas(
-    consultorFiltro !== 'todos' ? consultorFiltro : undefined
-  );
-  const { data: mrrHistorico, isLoading: loadingHistorico } = useMRRHistorico();
-  const { data: contratosHistorico, isLoading: loadingContratosHist } = useContratosHistorico();
+  const consultorIdFiltro = consultorFiltro !== 'todos' ? consultorFiltro : undefined;
+
+  const { data: clientesAtivos, isLoading: loadingClientes } = useClientesAtivos(consultorIdFiltro);
+  const { data: mrrTotal, isLoading: loadingMRR } = useMRRTotal(consultorIdFiltro);
+  const { data: aguardandoRenovacao, isLoading: loadingRenovacao } = useClientesAguardandoRenovacao(consultorIdFiltro);
+  const { data: churnMes, isLoading: loadingChurn } = useChurnDoMes(consultorIdFiltro);
+  const { data: alertas, isLoading: loadingAlertas } = useAlertas(consultorIdFiltro);
+  const { data: mrrHistorico, isLoading: loadingHistorico } = useMRRHistorico(consultorIdFiltro);
+  const { data: contratosHistorico, isLoading: loadingContratosHist } = useContratosHistorico(consultorIdFiltro);
   const { data: consultores } = useConsultores();
 
   const isLoading = loadingClientes || loadingMRR || loadingRenovacao || loadingChurn;

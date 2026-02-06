@@ -137,30 +137,40 @@ export function useUpdateCliente() {
   });
 }
 
-export function useClientesAtivos() {
+export function useClientesAtivos(consultorId?: string) {
   return useQuery({
-    queryKey: ['clientes', 'ativos-count'],
+    queryKey: ['dashboard', 'clientes-ativos', consultorId],
     queryFn: async () => {
-      const { count, error } = await supabase
+      let query = supabase
         .from('clientes')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'ativo');
 
+      if (consultorId) {
+        query = query.eq('consultor_id', consultorId);
+      }
+
+      const { count, error } = await query;
       if (error) throw error;
       return count || 0;
     }
   });
 }
 
-export function useClientesAguardandoRenovacao() {
+export function useClientesAguardandoRenovacao(consultorId?: string) {
   return useQuery({
-    queryKey: ['clientes', 'aguardando-renovacao-count'],
+    queryKey: ['dashboard', 'aguardando-renovacao', consultorId],
     queryFn: async () => {
-      const { count, error } = await supabase
+      let query = supabase
         .from('clientes')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'aguardando_renovacao');
 
+      if (consultorId) {
+        query = query.eq('consultor_id', consultorId);
+      }
+
+      const { count, error } = await query;
       if (error) throw error;
       return count || 0;
     }
