@@ -1,114 +1,150 @@
 
 
-## Corrigir Status de Clientes e Atualização Automática para 'Ativo'
+## Modal de Clientes Ativos no Dashboard
 
-### Problema Identificado
+### Objetivo
+Ao clicar no card "Clientes Ativos" no Dashboard, abrir um modal que lista os clientes ativos (respeitando o filtro de consultor se aplicado), similar ao comportamento dos KPIs na página de Contratos.
 
-Os clientes estão sendo cadastrados com status "novo" e permanecem assim mesmo após terem um contrato ativo criado. Isso causa divergência no dashboard:
-- O card "Clientes Ativos" conta apenas clientes com `status = 'ativo'`
-- Clientes com contrato ativo mas status "novo" não são contabilizados
-- O MRR também está sendo filtrado por clientes com status 'ativo', excluindo os "novos" com contrato
-
-**Causa raiz:**
-1. `ClienteNovo.tsx` (linha 57): cria cliente com `status: 'novo'`
-2. `ClienteFormDialog.tsx` (linha 65, 86): default é `status: 'novo'`
-3. `ContratoFormDialog`: ao criar contrato, não altera o status do cliente
-4. Apenas `useRenovarContrato` atualiza o status para 'ativo' (linha 133-136)
-
-### Solução
+### Alteracoes Necessarias
 
 ---
 
-#### 1. Correção de dados históricos (Migration SQL)
+#### 1. Novo Hook para Listar Clientes Ativos
 
-Executar uma migration para corrigir clientes que já têm contrato ativo mas estão com status errado:
-
-```sql
-UPDATE clientes 
-SET status = 'ativo', updated_at = now()
-WHERE status = 'novo'
-AND id IN (
-  SELECT DISTINCT cliente_id 
-  FROM contratos 
-  WHERE ativo = true
-);
-```
-
----
-
-#### 2. Automatizar status ao criar contrato
-
-Modificar o hook `useCreateContrato` em `src/hooks/useContratos.ts` para:
-- Após inserir o contrato, atualizar o status do cliente para 'ativo' se o contrato for ativo
+Criar uma funcao `useListaClientesAtivos` em `src/hooks/useClientes.ts` que retorna a lista completa de clientes ativos (nao apenas a contagem):
 
 ```typescript
-// Após criar contrato ativo, atualizar status do cliente
-if (contrato.ativo) {
-  await supabase
-    .from('clientes')
-    .update({ status: 'ativo' })
-    .eq('id', contrato.cliente_id);
+export function useListaClientesAtivos(consultorId?: string) {
+  return useQuery({
+    queryKey: ['dashboard', 'lista-clientes-ativos', consultorId],
+    queryFn: async () => {
+      let query = supabase
+        .from('clientes')
+        .select(`
+          *,
+          consultor:consultores(id, nome),
+          contrato_ativo:contratos!contratos_cliente_id_fkey(
+            id, remuneracao_mensal, data_fim, ativo,
+            tipo_consultoria:tipos_consultoria(nome)
+          )
+        `)
+        .eq('status', 'ativo')
+        .order('nome');
+
+      if (consultorId) {
+        query = query.eq('consultor_id', consultorId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      
+      return data.map(cliente => ({
+        ...cliente,
+        contrato_ativo: cliente.contrato_ativo?.find(c => c.ativo) || null
+      }));
+    }
+  });
 }
 ```
 
 ---
 
-#### 3. Ajustar hooks do Dashboard
+#### 2. Modal no Dashboard
 
-O dashboard está filtrando por `cliente.status = 'ativo'` para contar clientes e calcular MRR. Com a correção acima, isso passará a funcionar corretamente.
+Adicionar um estado e modal em `src/pages/Dashboard.tsx`:
 
-Mas também vamos garantir que:
-- `useClientesAtivos` use a query key consistente `['dashboard', ...]`
-- `useMRRTotal` considere apenas contratos ativos de clientes ativos
+**Estado:**
+```typescript
+const [showClientesAtivos, setShowClientesAtivos] = useState(false);
+```
+
+**Hook:**
+```typescript
+const { data: listaClientesAtivos } = useListaClientesAtivos(consultorIdFiltro);
+```
+
+**Card clicavel:**
+```tsx
+<Card 
+  className="bg-card border-border cursor-pointer transition-all hover:scale-[1.02] hover:border-primary/50"
+  onClick={() => setShowClientesAtivos(true)}
+>
+  ...
+</Card>
+```
+
+**Modal:**
+```tsx
+<Dialog open={showClientesAtivos} onOpenChange={setShowClientesAtivos}>
+  <DialogContent className="max-w-2xl max-h-[80vh]">
+    <DialogHeader>
+      <DialogTitle className="flex items-center gap-2">
+        <Users className="h-5 w-5 text-primary" />
+        Clientes Ativos
+        {consultorFiltro !== 'todos' && (
+          <Badge variant="outline" className="ml-2">
+            Filtrado por consultor
+          </Badge>
+        )}
+      </DialogTitle>
+    </DialogHeader>
+    
+    <ScrollArea className="max-h-[60vh] pr-4">
+      {listaClientesAtivos?.length === 0 ? (
+        <p className="text-center text-muted-foreground py-8">
+          Nenhum cliente ativo encontrado
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {listaClientesAtivos?.map((cliente) => (
+            <Card 
+              key={cliente.id} 
+              className="cursor-pointer hover:bg-muted/50"
+              onClick={() => {
+                setShowClientesAtivos(false);
+                navigate(`/clientes/${cliente.id}`);
+              }}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <span className="font-semibold">{cliente.nome}</span>
+                    <p className="text-sm text-muted-foreground">
+                      {cliente.cidade}, {cliente.uf}
+                      {cliente.consultor && ` • ${cliente.consultor.nome}`}
+                    </p>
+                  </div>
+                  {cliente.contrato_ativo && (
+                    <span className="text-primary font-medium">
+                      {formatCurrency(cliente.contrato_ativo.remuneracao_mensal)}
+                    </span>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </ScrollArea>
+  </DialogContent>
+</Dialog>
+```
 
 ---
 
 ### Arquivos a Modificar
 
-| Arquivo | Alteração |
+| Arquivo | Alteracao |
 |---------|-----------|
-| Migration SQL | Corrigir clientes existentes com status 'novo' que têm contrato ativo |
-| `src/hooks/useContratos.ts` | Modificar `useCreateContrato` para atualizar status do cliente para 'ativo' |
+| `src/hooks/useClientes.ts` | Adicionar `useListaClientesAtivos` que retorna lista completa |
+| `src/pages/Dashboard.tsx` | Adicionar estado, card clicavel, modal e importar componentes necessarios |
 
 ---
 
-### Fluxo Corrigido
+### Comportamento Esperado
 
-```text
-ANTES (problema)
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│ Criar       │────▶│ Cliente com  │────▶│ Criar       │
-│ Cliente     │     │ status='novo'│     │ Contrato    │
-└─────────────┘     └──────────────┘     └─────────────┘
-                           │                    │
-                           ▼                    ▼
-                    Cliente permanece    Dashboard NÃO conta
-                    com status='novo'    este cliente
-
-DEPOIS (corrigido)
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│ Criar       │────▶│ Cliente com  │────▶│ Criar       │
-│ Cliente     │     │ status='novo'│     │ Contrato    │
-└─────────────┘     └──────────────┘     └─────────────┘
-                                               │
-                                               ▼
-                                         ┌─────────────┐
-                                         │ Atualiza    │
-                                         │ status para │
-                                         │  'ativo'    │
-                                         └─────────────┘
-                                               │
-                                               ▼
-                                         Dashboard conta
-                                         corretamente
-```
-
----
-
-### Resultado Esperado
-
-Após as alterações:
-1. Os 35 contratos ativos aparecerão no card "Clientes Ativos"
-2. O MRR será calculado corretamente
-3. Novos clientes com contrato terão status automaticamente alterado para 'ativo'
+1. Usuario clica no card "Clientes Ativos"
+2. Modal abre com lista de clientes ativos
+3. Se filtro de consultor estiver ativo, modal mostra apenas clientes daquele consultor
+4. Ao clicar em um cliente, modal fecha e navega para pagina de detalhes do cliente
 
