@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { addDays, format, subMonths, startOfMonth, endOfMonth, parseISO, isBefore, startOfDay } from 'date-fns';
+import { addDays, format, subMonths, startOfMonth, endOfMonth, parseISO, isBefore, startOfDay, isWithinInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 export interface Alerta {
@@ -136,6 +136,56 @@ export function useMRRHistorico() {
         resultado.push({
           mes: format(mesRef, 'MMM/yy', { locale: ptBR }),
           mrr: mrrMes
+        });
+      }
+
+      return resultado;
+    }
+  });
+}
+
+export function useContratosHistorico() {
+  return useQuery({
+    queryKey: ['dashboard', 'contratos-historico'],
+    queryFn: async () => {
+      const resultado: { mes: string; novos: number; encerrados: number }[] = [];
+
+      // Buscar todos os contratos (data_inicio para novos)
+      const { data: contratos, error: contratosError } = await supabase
+        .from('contratos')
+        .select('data_inicio');
+
+      if (contratosError) throw contratosError;
+
+      // Buscar todos os encerramentos (data_encerramento para encerrados)
+      const { data: encerramentos, error: encError } = await supabase
+        .from('encerramentos')
+        .select('data_encerramento');
+
+      if (encError) throw encError;
+
+      // Calcular para cada mês dos últimos 12 meses
+      for (let i = 11; i >= 0; i--) {
+        const mesRef = subMonths(new Date(), i);
+        const inicioMes = startOfMonth(mesRef);
+        const fimMes = endOfMonth(mesRef);
+
+        // Contratos que iniciaram naquele mês
+        const novosNoMes = (contratos || []).filter(c => {
+          const dataInicio = parseISO(c.data_inicio);
+          return isWithinInterval(dataInicio, { start: inicioMes, end: fimMes });
+        }).length;
+
+        // Encerramentos naquele mês
+        const encerradosNoMes = (encerramentos || []).filter(e => {
+          const dataEnc = parseISO(e.data_encerramento);
+          return isWithinInterval(dataEnc, { start: inicioMes, end: fimMes });
+        }).length;
+
+        resultado.push({
+          mes: format(mesRef, 'MMM/yy', { locale: ptBR }),
+          novos: novosNoMes,
+          encerrados: encerradosNoMes
         });
       }
 

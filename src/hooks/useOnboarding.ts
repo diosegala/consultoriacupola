@@ -42,6 +42,7 @@ export function useCreateOnboarding() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['onboarding', variables.cliente_id] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     }
   });
 }
@@ -63,6 +64,7 @@ export function useUpdateOnboarding() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['onboarding', data.cliente_id] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     }
   });
 }
