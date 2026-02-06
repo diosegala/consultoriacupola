@@ -154,3 +154,40 @@ export function useChurnDoMes(consultorId?: string) {
     }
   });
 }
+
+export function useListaChurnMes(consultorId?: string) {
+  return useQuery({
+    queryKey: ['dashboard', 'lista-churn-mes', consultorId],
+    queryFn: async () => {
+      const inicioMes = format(startOfMonth(new Date()), 'yyyy-MM-dd');
+      const fimMes = format(endOfMonth(new Date()), 'yyyy-MM-dd');
+
+      const { data, error } = await supabase
+        .from('encerramentos')
+        .select(`
+          id,
+          data_encerramento,
+          classificacao,
+          justificativa,
+          mrr_perdido,
+          cliente:clientes!encerramentos_cliente_id_fkey(
+            id, nome, cidade, uf, consultor_id,
+            consultor:consultores(id, nome)
+          ),
+          contrato:contratos!encerramentos_contrato_id_fkey(
+            tipo_consultoria:tipos_consultoria(nome)
+          )
+        `)
+        .eq('classificacao', 'churn')
+        .gte('data_encerramento', inicioMes)
+        .lte('data_encerramento', fimMes)
+        .order('data_encerramento', { ascending: false });
+
+      if (error) throw error;
+
+      return (data as any[]).filter(c => 
+        !consultorId || c.cliente?.consultor_id === consultorId
+      );
+    }
+  });
+}

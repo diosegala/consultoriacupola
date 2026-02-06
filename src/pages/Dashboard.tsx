@@ -6,14 +6,16 @@ import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { Users, DollarSign, Clock, TrendingDown, AlertTriangle, CalendarX, BookOpen, Loader2 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
-import { useClientesAtivos, useClientesAguardandoRenovacao, useListaClientesAtivos } from '@/hooks/useClientes';
+import { useClientesAtivos, useClientesAguardandoRenovacao, useListaClientesAtivos, useListaClientesAguardandoRenovacao } from '@/hooks/useClientes';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useMRRTotal } from '@/hooks/useContratos';
-import { useChurnDoMes } from '@/hooks/useEncerramentos';
+import { useMRRTotal, useListaContratosMRR } from '@/hooks/useContratos';
+import { useChurnDoMes, useListaChurnMes } from '@/hooks/useEncerramentos';
 import { useAlertas, useMRRHistorico, useContratosHistorico } from '@/hooks/useDashboard';
 import { useConsultores } from '@/hooks/useConsultores';
 import { useState } from 'react';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('pt-BR', {
@@ -28,6 +30,9 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [consultorFiltro, setConsultorFiltro] = useState<string>('todos');
   const [showClientesAtivos, setShowClientesAtivos] = useState(false);
+  const [showMRR, setShowMRR] = useState(false);
+  const [showAguardandoRenovacao, setShowAguardandoRenovacao] = useState(false);
+  const [showChurn, setShowChurn] = useState(false);
 
   const consultorIdFiltro = consultorFiltro !== 'todos' ? consultorFiltro : undefined;
 
@@ -40,6 +45,9 @@ export default function Dashboard() {
   const { data: contratosHistorico, isLoading: loadingContratosHist } = useContratosHistorico(consultorIdFiltro);
   const { data: consultores } = useConsultores();
   const { data: listaClientesAtivos } = useListaClientesAtivos(consultorIdFiltro);
+  const { data: listaContratosMRR } = useListaContratosMRR(consultorIdFiltro);
+  const { data: listaAguardandoRenovacao } = useListaClientesAguardandoRenovacao(consultorIdFiltro);
+  const { data: listaChurnMes } = useListaChurnMes(consultorIdFiltro);
 
   const isLoading = loadingClientes || loadingMRR || loadingRenovacao || loadingChurn;
 
@@ -102,7 +110,10 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="bg-card border-border">
+        <Card 
+          className="bg-card border-border cursor-pointer transition-all hover:scale-[1.02] hover:border-primary/50"
+          onClick={() => setShowMRR(true)}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               MRR Total
@@ -120,7 +131,10 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="bg-card border-border">
+        <Card 
+          className="bg-card border-border cursor-pointer transition-all hover:scale-[1.02] hover:border-warning/50"
+          onClick={() => setShowAguardandoRenovacao(true)}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Aguardando Renovação
@@ -138,7 +152,10 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="bg-card border-border">
+        <Card 
+          className="bg-card border-border cursor-pointer transition-all hover:scale-[1.02] hover:border-destructive/50"
+          onClick={() => setShowChurn(true)}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Churn do Mês
@@ -361,6 +378,180 @@ export default function Dashboard() {
                             {formatCurrency(cliente.contrato_ativo.remuneracao_mensal)}
                           </span>
                         )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal MRR */}
+      <Dialog open={showMRR} onOpenChange={setShowMRR}>
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-primary" />
+              Contratos Ativos - MRR
+              {consultorFiltro !== 'todos' && (
+                <Badge variant="outline" className="ml-2">
+                  Filtrado por consultor
+                </Badge>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <ScrollArea className="max-h-[60vh] pr-4">
+            {listaContratosMRR?.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">
+                Nenhum contrato ativo encontrado
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {listaContratosMRR?.map((contrato: any) => (
+                  <Card 
+                    key={contrato.id} 
+                    className="cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => {
+                      setShowMRR(false);
+                      navigate(`/clientes/${contrato.cliente?.id}`);
+                    }}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <span className="font-semibold text-foreground">{contrato.cliente?.nome}</span>
+                          <p className="text-sm text-muted-foreground">
+                            {contrato.cliente?.cidade}, {contrato.cliente?.uf}
+                            {contrato.cliente?.consultor && ` • ${contrato.cliente.consultor.nome}`}
+                          </p>
+                          {contrato.tipo_consultoria && (
+                            <Badge variant="outline" className="mt-1">
+                              {contrato.tipo_consultoria.nome}
+                            </Badge>
+                          )}
+                        </div>
+                        <span className="text-primary font-medium text-lg">
+                          {formatCurrency(contrato.remuneracao_mensal)}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Aguardando Renovação */}
+      <Dialog open={showAguardandoRenovacao} onOpenChange={setShowAguardandoRenovacao}>
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-warning" />
+              Clientes Aguardando Renovação
+              {consultorFiltro !== 'todos' && (
+                <Badge variant="outline" className="ml-2">
+                  Filtrado por consultor
+                </Badge>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <ScrollArea className="max-h-[60vh] pr-4">
+            {listaAguardandoRenovacao?.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">
+                Nenhum cliente aguardando renovação
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {listaAguardandoRenovacao?.map((cliente: any) => (
+                  <Card 
+                    key={cliente.id} 
+                    className="cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => {
+                      setShowAguardandoRenovacao(false);
+                      navigate(`/clientes/${cliente.id}`);
+                    }}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <span className="font-semibold text-foreground">{cliente.nome}</span>
+                          <p className="text-sm text-muted-foreground">
+                            {cliente.cidade}, {cliente.uf}
+                            {cliente.consultor && ` • ${cliente.consultor.nome}`}
+                          </p>
+                        </div>
+                        {cliente.contrato_ativo && (
+                          <span className="text-warning font-medium">
+                            {formatCurrency(cliente.contrato_ativo.remuneracao_mensal)}
+                          </span>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Churn do Mês */}
+      <Dialog open={showChurn} onOpenChange={setShowChurn}>
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <TrendingDown className="h-5 w-5 text-destructive" />
+              Churns do Mês
+              {consultorFiltro !== 'todos' && (
+                <Badge variant="outline" className="ml-2">
+                  Filtrado por consultor
+                </Badge>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <ScrollArea className="max-h-[60vh] pr-4">
+            {listaChurnMes?.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">
+                Nenhum churn registrado neste mês 🎉
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {listaChurnMes?.map((encerramento: any) => (
+                  <Card 
+                    key={encerramento.id} 
+                    className="cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => {
+                      setShowChurn(false);
+                      navigate(`/clientes/${encerramento.cliente?.id}`);
+                    }}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <span className="font-semibold text-foreground">{encerramento.cliente?.nome}</span>
+                          <p className="text-sm text-muted-foreground">
+                            {encerramento.cliente?.cidade}, {encerramento.cliente?.uf}
+                            {encerramento.cliente?.consultor && ` • ${encerramento.cliente.consultor.nome}`}
+                          </p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Encerrado em {format(new Date(encerramento.data_encerramento), "dd/MM/yyyy", { locale: ptBR })}
+                          </p>
+                          {encerramento.justificativa && (
+                            <p className="text-sm text-muted-foreground italic mt-1">
+                              "{encerramento.justificativa}"
+                            </p>
+                          )}
+                        </div>
+                        <span className="text-destructive font-medium">
+                          -{formatCurrency(encerramento.mrr_perdido)}
+                        </span>
                       </div>
                     </CardContent>
                   </Card>
