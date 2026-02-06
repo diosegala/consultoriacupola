@@ -1023,14 +1023,209 @@ export function RenovarContratoDialog({ open, onOpenChange, clienteId, contratoA
   );
 }
 
-export function OnboardingFormDialog({ open, onOpenChange, onboarding, clienteId }: any) {
+import { useUpdateOnboarding, Onboarding } from '@/hooks/useOnboarding';
+
+const onboardingSchema = z.object({
+  etapa_atual: z.enum(['pre_onboarding', 'imersao_1', 'imersao_2', 'imersao_3', 'concluido']),
+  data_pre_onboarding: z.date().nullable().optional(),
+  data_imersao_1_inicio: z.date().nullable().optional(),
+  data_imersao_1_fim: z.date().nullable().optional(),
+  data_imersao_2: z.date().nullable().optional(),
+  data_imersao_3: z.date().nullable().optional(),
+  observacoes: z.string().nullable().optional(),
+});
+
+type OnboardingFormValues = z.infer<typeof onboardingSchema>;
+
+interface OnboardingFormDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onboarding: Onboarding;
+  clienteId: string;
+}
+
+export function OnboardingFormDialog({ open, onOpenChange, onboarding, clienteId }: OnboardingFormDialogProps) {
+  const updateOnboarding = useUpdateOnboarding();
+
+  const form = useForm<OnboardingFormValues>({
+    resolver: zodResolver(onboardingSchema),
+    defaultValues: {
+      etapa_atual: 'pre_onboarding',
+      data_pre_onboarding: null,
+      data_imersao_1_inicio: null,
+      data_imersao_1_fim: null,
+      data_imersao_2: null,
+      data_imersao_3: null,
+      observacoes: '',
+    },
+  });
+
+  useEffect(() => {
+    if (onboarding && open) {
+      form.reset({
+        etapa_atual: onboarding.etapa_atual,
+        data_pre_onboarding: onboarding.data_pre_onboarding ? parseISO(onboarding.data_pre_onboarding) : null,
+        data_imersao_1_inicio: onboarding.data_imersao_1_inicio ? parseISO(onboarding.data_imersao_1_inicio) : null,
+        data_imersao_1_fim: onboarding.data_imersao_1_fim ? parseISO(onboarding.data_imersao_1_fim) : null,
+        data_imersao_2: onboarding.data_imersao_2 ? parseISO(onboarding.data_imersao_2) : null,
+        data_imersao_3: onboarding.data_imersao_3 ? parseISO(onboarding.data_imersao_3) : null,
+        observacoes: onboarding.observacoes || '',
+      });
+    }
+  }, [onboarding, open, form]);
+
+  async function onSubmit(values: OnboardingFormValues) {
+    try {
+      await updateOnboarding.mutateAsync({
+        id: onboarding.id,
+        cliente_id: clienteId,
+        etapa_atual: values.etapa_atual,
+        data_pre_onboarding: values.data_pre_onboarding ? format(values.data_pre_onboarding, 'yyyy-MM-dd') : null,
+        data_imersao_1_inicio: values.data_imersao_1_inicio ? format(values.data_imersao_1_inicio, 'yyyy-MM-dd') : null,
+        data_imersao_1_fim: values.data_imersao_1_fim ? format(values.data_imersao_1_fim, 'yyyy-MM-dd') : null,
+        data_imersao_2: values.data_imersao_2 ? format(values.data_imersao_2, 'yyyy-MM-dd') : null,
+        data_imersao_3: values.data_imersao_3 ? format(values.data_imersao_3, 'yyyy-MM-dd') : null,
+        observacoes: values.observacoes || null,
+      });
+
+      toast({ title: 'Onboarding atualizado com sucesso!' });
+      onOpenChange(false);
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao atualizar onboarding',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  }
+
+  const etapasOptions = [
+    { value: 'pre_onboarding', label: 'Pré-Onboarding' },
+    { value: 'imersao_1', label: 'Imersão 1' },
+    { value: 'imersao_2', label: 'Imersão 2' },
+    { value: 'imersao_3', label: 'Imersão 3' },
+    { value: 'concluido', label: 'Concluído' },
+  ];
+
+  const renderDateField = (name: keyof OnboardingFormValues, label: string) => (
+    <FormField
+      control={form.control}
+      name={name}
+      render={({ field }) => (
+        <FormItem className="flex flex-col">
+          <FormLabel>{label}</FormLabel>
+          <Popover>
+            <PopoverTrigger asChild>
+              <FormControl>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    'w-full pl-3 text-left font-normal bg-background border-input',
+                    !field.value && 'text-muted-foreground'
+                  )}
+                >
+                  {field.value ? format(field.value as Date, 'dd/MM/yyyy') : 'Selecione...'}
+                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                </Button>
+              </FormControl>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0 bg-popover border-border" align="start">
+              <Calendar
+                mode="single"
+                selected={field.value as Date | undefined}
+                onSelect={field.onChange}
+                className="pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-card border-border">
+      <DialogContent className="bg-card border-border max-w-lg">
         <DialogHeader>
-          <DialogTitle>Editar Onboarding</DialogTitle>
+          <DialogTitle className="text-foreground">Editar Onboarding</DialogTitle>
         </DialogHeader>
-        <p className="text-muted-foreground">Formulário em desenvolvimento</p>
+
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {/* Etapa Atual */}
+            <FormField
+              control={form.control}
+              name="etapa_atual"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Etapa Atual</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger className="bg-background border-input">
+                        <SelectValue placeholder="Selecione a etapa..." />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent className="bg-popover border-border">
+                      {etapasOptions.map((etapa) => (
+                        <SelectItem key={etapa.value} value={etapa.value}>
+                          {etapa.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Datas */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-medium text-muted-foreground">Datas das Etapas</h4>
+              
+              {renderDateField('data_pre_onboarding', 'Pré-Onboarding')}
+              
+              <div className="grid grid-cols-2 gap-4">
+                {renderDateField('data_imersao_1_inicio', 'Imersão 1 - Início')}
+                {renderDateField('data_imersao_1_fim', 'Imersão 1 - Fim')}
+              </div>
+              
+              {renderDateField('data_imersao_2', 'Imersão 2')}
+              {renderDateField('data_imersao_3', 'Imersão 3')}
+            </div>
+
+            {/* Observações */}
+            <FormField
+              control={form.control}
+              name="observacoes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Observações</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Observações sobre o onboarding..."
+                      className="bg-background border-input resize-none"
+                      rows={3}
+                      {...field}
+                      value={field.value || ''}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={updateOnboarding.isPending}>
+                {updateOnboarding.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Salvar
+              </Button>
+            </div>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );
