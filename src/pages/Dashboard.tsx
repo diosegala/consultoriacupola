@@ -6,7 +6,9 @@ import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { Users, DollarSign, Clock, TrendingDown, AlertTriangle, CalendarX, BookOpen, Loader2 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
-import { useClientesAtivos, useClientesAguardandoRenovacao } from '@/hooks/useClientes';
+import { useClientesAtivos, useClientesAguardandoRenovacao, useListaClientesAtivos } from '@/hooks/useClientes';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useMRRTotal } from '@/hooks/useContratos';
 import { useChurnDoMes } from '@/hooks/useEncerramentos';
 import { useAlertas, useMRRHistorico, useContratosHistorico } from '@/hooks/useDashboard';
@@ -25,6 +27,7 @@ function formatCurrency(value: number): string {
 export default function Dashboard() {
   const navigate = useNavigate();
   const [consultorFiltro, setConsultorFiltro] = useState<string>('todos');
+  const [showClientesAtivos, setShowClientesAtivos] = useState(false);
 
   const consultorIdFiltro = consultorFiltro !== 'todos' ? consultorFiltro : undefined;
 
@@ -36,6 +39,7 @@ export default function Dashboard() {
   const { data: mrrHistorico, isLoading: loadingHistorico } = useMRRHistorico(consultorIdFiltro);
   const { data: contratosHistorico, isLoading: loadingContratosHist } = useContratosHistorico(consultorIdFiltro);
   const { data: consultores } = useConsultores();
+  const { data: listaClientesAtivos } = useListaClientesAtivos(consultorIdFiltro);
 
   const isLoading = loadingClientes || loadingMRR || loadingRenovacao || loadingChurn;
 
@@ -79,7 +83,10 @@ export default function Dashboard() {
 
       {/* KPI Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="bg-card border-border">
+        <Card 
+          className="bg-card border-border cursor-pointer transition-all hover:scale-[1.02] hover:border-primary/50"
+          onClick={() => setShowClientesAtivos(true)}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Clientes Ativos
@@ -309,6 +316,60 @@ export default function Dashboard() {
           )}
         </CardContent>
       </Card>
+      {/* Modal Clientes Ativos */}
+      <Dialog open={showClientesAtivos} onOpenChange={setShowClientesAtivos}>
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              Clientes Ativos
+              {consultorFiltro !== 'todos' && (
+                <Badge variant="outline" className="ml-2">
+                  Filtrado por consultor
+                </Badge>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <ScrollArea className="max-h-[60vh] pr-4">
+            {listaClientesAtivos?.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">
+                Nenhum cliente ativo encontrado
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {listaClientesAtivos?.map((cliente: any) => (
+                  <Card 
+                    key={cliente.id} 
+                    className="cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => {
+                      setShowClientesAtivos(false);
+                      navigate(`/clientes/${cliente.id}`);
+                    }}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <span className="font-semibold text-foreground">{cliente.nome}</span>
+                          <p className="text-sm text-muted-foreground">
+                            {cliente.cidade}, {cliente.uf}
+                            {cliente.consultor && ` • ${cliente.consultor.nome}`}
+                          </p>
+                        </div>
+                        {cliente.contrato_ativo && (
+                          <span className="text-primary font-medium">
+                            {formatCurrency(cliente.contrato_ativo.remuneracao_mensal)}
+                          </span>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
