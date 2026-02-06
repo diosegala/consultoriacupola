@@ -1,56 +1,114 @@
 
 
-## Alterar para Gráfico de Barras Empilhadas
+## Corrigir Status de Clientes e Atualização Automática para 'Ativo'
 
-### Objetivo
-Transformar o gráfico de barras lado a lado em um gráfico de barras empilhadas, onde:
-- **Encerrados** ficam na base (parte de baixo)
-- **Novos** ficam empilhados em cima
+### Problema Identificado
 
-### Alteração
+Os clientes estão sendo cadastrados com status "novo" e permanecem assim mesmo após terem um contrato ativo criado. Isso causa divergência no dashboard:
+- O card "Clientes Ativos" conta apenas clientes com `status = 'ativo'`
+- Clientes com contrato ativo mas status "novo" não são contabilizados
+- O MRR também está sendo filtrado por clientes com status 'ativo', excluindo os "novos" com contrato
 
-No arquivo `src/pages/Dashboard.tsx`, modificar o `BarChart` (linhas 211-244):
+**Causa raiz:**
+1. `ClienteNovo.tsx` (linha 57): cria cliente com `status: 'novo'`
+2. `ClienteFormDialog.tsx` (linha 65, 86): default é `status: 'novo'`
+3. `ContratoFormDialog`: ao criar contrato, não altera o status do cliente
+4. Apenas `useRenovarContrato` atualiza o status para 'ativo' (linha 133-136)
 
-**De (barras lado a lado):**
-```tsx
-<Bar dataKey="novos" name="Novos" fill="..." />
-<Bar dataKey="encerrados" name="Encerrados" fill="..." />
+### Solução
+
+---
+
+#### 1. Correção de dados históricos (Migration SQL)
+
+Executar uma migration para corrigir clientes que já têm contrato ativo mas estão com status errado:
+
+```sql
+UPDATE clientes 
+SET status = 'ativo', updated_at = now()
+WHERE status = 'novo'
+AND id IN (
+  SELECT DISTINCT cliente_id 
+  FROM contratos 
+  WHERE ativo = true
+);
 ```
 
-**Para (barras empilhadas):**
-```tsx
-<Bar dataKey="encerrados" name="Encerrados" fill="..." stackId="contratos" />
-<Bar dataKey="novos" name="Novos" fill="..." stackId="contratos" />
+---
+
+#### 2. Automatizar status ao criar contrato
+
+Modificar o hook `useCreateContrato` em `src/hooks/useContratos.ts` para:
+- Após inserir o contrato, atualizar o status do cliente para 'ativo' se o contrato for ativo
+
+```typescript
+// Após criar contrato ativo, atualizar status do cliente
+if (contrato.ativo) {
+  await supabase
+    .from('clientes')
+    .update({ status: 'ativo' })
+    .eq('id', contrato.cliente_id);
+}
 ```
 
-### Detalhes Técnicos
+---
 
-A propriedade `stackId` do Recharts agrupa as barras com o mesmo ID em uma pilha. A ordem de renderização determina a posição visual:
-1. Primeiro `<Bar>` = base da pilha (encerrados)
-2. Segundo `<Bar>` = topo da pilha (novos)
+#### 3. Ajustar hooks do Dashboard
 
-```text
-ANTES (lado a lado)          DEPOIS (empilhadas)
-                             
-  ██  ▒▒   ██  ▒▒              ██       ██    
-  ██  ▒▒   ██  ▒▒              ██       ██    
-  ██  ▒▒   ██  ▒▒              ▒▒       ▒▒    
-  ────────────────             ────────────── 
-  jan     fev                  jan     fev    
-                             
-  ██ Novos  ▒▒ Encerrados      ██ Novos (topo)
-                               ▒▒ Encerrados (base)
-```
+O dashboard está filtrando por `cliente.status = 'ativo'` para contar clientes e calcular MRR. Com a correção acima, isso passará a funcionar corretamente.
 
-### Ajuste no Radius
+Mas também vamos garantir que:
+- `useClientesAtivos` use a query key consistente `['dashboard', ...]`
+- `useMRRTotal` considere apenas contratos ativos de clientes ativos
 
-Como agora as barras são empilhadas:
-- Encerrados (base): `radius={[0, 0, 0, 0]}` - sem arredondamento
-- Novos (topo): `radius={[4, 4, 0, 0]}` - arredondamento apenas no topo
+---
 
-### Arquivo a Editar
+### Arquivos a Modificar
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/pages/Dashboard.tsx` | Adicionar `stackId` nas barras e ajustar ordem de renderização |
+| Migration SQL | Corrigir clientes existentes com status 'novo' que têm contrato ativo |
+| `src/hooks/useContratos.ts` | Modificar `useCreateContrato` para atualizar status do cliente para 'ativo' |
+
+---
+
+### Fluxo Corrigido
+
+```text
+ANTES (problema)
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐
+│ Criar       │────▶│ Cliente com  │────▶│ Criar       │
+│ Cliente     │     │ status='novo'│     │ Contrato    │
+└─────────────┘     └──────────────┘     └─────────────┘
+                           │                    │
+                           ▼                    ▼
+                    Cliente permanece    Dashboard NÃO conta
+                    com status='novo'    este cliente
+
+DEPOIS (corrigido)
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐
+│ Criar       │────▶│ Cliente com  │────▶│ Criar       │
+│ Cliente     │     │ status='novo'│     │ Contrato    │
+└─────────────┘     └──────────────┘     └─────────────┘
+                                               │
+                                               ▼
+                                         ┌─────────────┐
+                                         │ Atualiza    │
+                                         │ status para │
+                                         │  'ativo'    │
+                                         └─────────────┘
+                                               │
+                                               ▼
+                                         Dashboard conta
+                                         corretamente
+```
+
+---
+
+### Resultado Esperado
+
+Após as alterações:
+1. Os 35 contratos ativos aparecerão no card "Clientes Ativos"
+2. O MRR será calculado corretamente
+3. Novos clientes com contrato terão status automaticamente alterado para 'ativo'
 
