@@ -137,17 +137,17 @@ export function useUpdateCliente() {
   });
 }
 
-export function useClientesAtivos(consultorId?: string) {
+export function useClientesAtivos(consultorIds?: string[]) {
   return useQuery({
-    queryKey: ['dashboard', 'clientes-ativos', consultorId],
+    queryKey: ['dashboard', 'clientes-ativos', consultorIds],
     queryFn: async () => {
       let query = supabase
         .from('clientes')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'ativo');
 
-      if (consultorId) {
-        query = query.eq('consultor_id', consultorId);
+      if (consultorIds && consultorIds.length > 0) {
+        query = query.in('consultor_id', consultorIds);
       }
 
       const { count, error } = await query;
@@ -157,17 +157,17 @@ export function useClientesAtivos(consultorId?: string) {
   });
 }
 
-export function useClientesAguardandoRenovacao(consultorId?: string) {
+export function useClientesAguardandoRenovacao(consultorIds?: string[]) {
   return useQuery({
-    queryKey: ['dashboard', 'aguardando-renovacao', consultorId],
+    queryKey: ['dashboard', 'aguardando-renovacao', consultorIds],
     queryFn: async () => {
       let query = supabase
         .from('clientes')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'aguardando_renovacao');
 
-      if (consultorId) {
-        query = query.eq('consultor_id', consultorId);
+      if (consultorIds && consultorIds.length > 0) {
+        query = query.in('consultor_id', consultorIds);
       }
 
       const { count, error } = await query;
@@ -177,9 +177,9 @@ export function useClientesAguardandoRenovacao(consultorId?: string) {
   });
 }
 
-export function useListaClientesAguardandoRenovacao(consultorId?: string) {
+export function useListaClientesAguardandoRenovacao(consultorIds?: string[]) {
   return useQuery({
-    queryKey: ['dashboard', 'lista-aguardando-renovacao', consultorId],
+    queryKey: ['dashboard', 'lista-aguardando-renovacao', consultorIds],
     queryFn: async () => {
       let query = supabase
         .from('clientes')
@@ -194,8 +194,8 @@ export function useListaClientesAguardandoRenovacao(consultorId?: string) {
         .eq('status', 'aguardando_renovacao')
         .order('nome');
 
-      if (consultorId) {
-        query = query.eq('consultor_id', consultorId);
+      if (consultorIds && consultorIds.length > 0) {
+        query = query.in('consultor_id', consultorIds);
       }
 
       const { data, error } = await query;
@@ -209,9 +209,9 @@ export function useListaClientesAguardandoRenovacao(consultorId?: string) {
   });
 }
 
-export function useListaClientesAtivos(consultorId?: string) {
+export function useListaClientesAtivos(consultorIds?: string[]) {
   return useQuery({
-    queryKey: ['dashboard', 'lista-clientes-ativos', consultorId],
+    queryKey: ['dashboard', 'lista-clientes-ativos', consultorIds],
     queryFn: async () => {
       let query = supabase
         .from('clientes')
@@ -226,8 +226,8 @@ export function useListaClientesAtivos(consultorId?: string) {
         .eq('status', 'ativo')
         .order('nome');
 
-      if (consultorId) {
-        query = query.eq('consultor_id', consultorId);
+      if (consultorIds && consultorIds.length > 0) {
+        query = query.in('consultor_id', consultorIds);
       }
 
       const { data, error } = await query;

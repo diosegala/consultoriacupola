@@ -10,9 +10,9 @@ export interface Alerta {
   detalhe: string;
 }
 
-export function useAlertas(consultorId?: string) {
+export function useAlertas(consultorIds?: string[]) {
   return useQuery({
-    queryKey: ['dashboard', 'alertas', consultorId],
+    queryKey: ['dashboard', 'alertas', consultorIds],
     queryFn: async () => {
       const alertas: Alerta[] = [];
       const hoje = startOfDay(new Date());
@@ -33,7 +33,7 @@ export function useAlertas(consultorId?: string) {
 
       (contratos as any[])?.forEach(c => {
         if (c.cliente?.status === 'ativo') {
-          if (!consultorId || c.cliente?.consultor_id === consultorId) {
+          if (!consultorIds?.length || consultorIds.includes(c.cliente?.consultor_id)) {
             alertas.push({
               tipo: 'contrato_vencendo',
               cliente_id: c.cliente.id,
@@ -57,7 +57,7 @@ export function useAlertas(consultorId?: string) {
 
       (reunioes as any[])?.forEach(r => {
         if (r.cliente?.status === 'ativo') {
-          if (!consultorId || r.cliente?.consultor_id === consultorId) {
+          if (!consultorIds?.length || consultorIds.includes(r.cliente?.consultor_id)) {
             alertas.push({
               tipo: 'reuniao_atrasada',
               cliente_id: r.cliente.id,
@@ -88,7 +88,7 @@ export function useAlertas(consultorId?: string) {
 
       (onboardings as any[])?.forEach(o => {
         if (o.cliente?.status === 'ativo') {
-          if (!consultorId || o.cliente?.consultor_id === consultorId) {
+          if (!consultorIds?.length || consultorIds.includes(o.cliente?.consultor_id)) {
             alertas.push({
               tipo: 'onboarding_pendente',
               cliente_id: o.cliente.id,
@@ -104,9 +104,9 @@ export function useAlertas(consultorId?: string) {
   });
 }
 
-export function useMRRHistorico(consultorId?: string) {
+export function useMRRHistorico(consultorIds?: string[]) {
   return useQuery({
-    queryKey: ['dashboard', 'mrr-historico', consultorId],
+    queryKey: ['dashboard', 'mrr-historico', consultorIds],
     queryFn: async () => {
       const resultado: { mes: string; mrr: number }[] = [];
       
@@ -121,8 +121,8 @@ export function useMRRHistorico(consultorId?: string) {
       if (error) throw error;
 
       // Filtrar por consultor se necessário
-      const contratosFiltrados = consultorId 
-        ? (contratos as any[])?.filter(c => c.cliente?.consultor_id === consultorId)
+      const contratosFiltrados = consultorIds?.length 
+        ? (contratos as any[])?.filter(c => consultorIds.includes(c.cliente?.consultor_id))
         : contratos;
 
       // Calcular MRR para cada mês dos últimos 12 meses
@@ -152,9 +152,9 @@ export function useMRRHistorico(consultorId?: string) {
   });
 }
 
-export function useContratosHistorico(consultorId?: string) {
+export function useContratosHistorico(consultorIds?: string[]) {
   return useQuery({
-    queryKey: ['dashboard', 'contratos-historico', consultorId],
+    queryKey: ['dashboard', 'contratos-historico', consultorIds],
     queryFn: async () => {
       const resultado: { mes: string; novos: number; encerrados: number }[] = [];
 
@@ -179,12 +179,12 @@ export function useContratosHistorico(consultorId?: string) {
       if (encError) throw encError;
 
       // Filtrar por consultor se necessário
-      const contratosFiltrados = consultorId 
-        ? (contratos as any[])?.filter(c => c.cliente?.consultor_id === consultorId)
+      const contratosFiltrados = consultorIds?.length 
+        ? (contratos as any[])?.filter(c => consultorIds.includes(c.cliente?.consultor_id))
         : contratos;
       
-      const encerramentosFiltrados = consultorId 
-        ? (encerramentos as any[])?.filter(e => e.cliente?.consultor_id === consultorId)
+      const encerramentosFiltrados = consultorIds?.length 
+        ? (encerramentos as any[])?.filter(e => consultorIds.includes(e.cliente?.consultor_id))
         : encerramentos;
 
       // Calcular para cada mês dos últimos 12 meses

@@ -109,9 +109,9 @@ export function useEncerrarContrato() {
   });
 }
 
-export function useChurnDoMes(consultorId?: string) {
+export function useChurnDoMes(consultorIds?: string[]) {
   return useQuery({
-    queryKey: ['dashboard', 'churn-mes', consultorId],
+    queryKey: ['dashboard', 'churn-mes', consultorIds],
     queryFn: async () => {
       const inicioMes = format(startOfMonth(new Date()), 'yyyy-MM-dd');
       const fimMes = format(endOfMonth(new Date()), 'yyyy-MM-dd');
@@ -130,8 +130,8 @@ export function useChurnDoMes(consultorId?: string) {
       if (churnsError) throw churnsError;
 
       // Filtrar por consultor se necessário
-      const churnsFiltered = consultorId 
-        ? (churns as any[])?.filter(c => c.cliente?.consultor_id === consultorId)
+      const churnsFiltered = consultorIds?.length 
+        ? (churns as any[])?.filter(c => consultorIds.includes(c.cliente?.consultor_id))
         : churns;
 
       // Buscar clientes que estavam ativos no início do mês
@@ -141,8 +141,8 @@ export function useChurnDoMes(consultorId?: string) {
         .in('status', ['ativo', 'aguardando_renovacao', 'encerrado'])
         .lt('created_at', inicioMes);
 
-      if (consultorId) {
-        clientesQuery = clientesQuery.eq('consultor_id', consultorId);
+      if (consultorIds && consultorIds.length > 0) {
+        clientesQuery = clientesQuery.in('consultor_id', consultorIds);
       }
 
       const { count: clientesInicioMes } = await clientesQuery;
@@ -155,9 +155,9 @@ export function useChurnDoMes(consultorId?: string) {
   });
 }
 
-export function useListaChurnMes(consultorId?: string) {
+export function useListaChurnMes(consultorIds?: string[]) {
   return useQuery({
-    queryKey: ['dashboard', 'lista-churn-mes', consultorId],
+    queryKey: ['dashboard', 'lista-churn-mes', consultorIds],
     queryFn: async () => {
       const inicioMes = format(startOfMonth(new Date()), 'yyyy-MM-dd');
       const fimMes = format(endOfMonth(new Date()), 'yyyy-MM-dd');
@@ -186,7 +186,7 @@ export function useListaChurnMes(consultorId?: string) {
       if (error) throw error;
 
       return (data as any[]).filter(c => 
-        !consultorId || c.cliente?.consultor_id === consultorId
+        !consultorIds?.length || consultorIds.includes(c.cliente?.consultor_id)
       );
     }
   });

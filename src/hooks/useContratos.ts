@@ -247,9 +247,9 @@ export function useAllContratos(filters?: AllContratosFilters) {
   });
 }
 
-export function useMRRTotal(consultorId?: string) {
+export function useMRRTotal(consultorIds?: string[]) {
   return useQuery({
-    queryKey: ['dashboard', 'mrr-total', consultorId],
+    queryKey: ['dashboard', 'mrr-total', consultorIds],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('contratos')
@@ -263,7 +263,7 @@ export function useMRRTotal(consultorId?: string) {
 
       const total = (data as any[])
         .filter(c => c.cliente?.status === 'ativo')
-        .filter(c => !consultorId || c.cliente?.consultor_id === consultorId)
+        .filter(c => !consultorIds?.length || consultorIds.includes(c.cliente?.consultor_id))
         .reduce((sum, c) => sum + (Number(c.remuneracao_mensal) || 0), 0);
 
       return total;
@@ -271,9 +271,9 @@ export function useMRRTotal(consultorId?: string) {
   });
 }
 
-export function useListaContratosMRR(consultorId?: string) {
+export function useListaContratosMRR(consultorIds?: string[]) {
   return useQuery({
-    queryKey: ['dashboard', 'lista-contratos-mrr', consultorId],
+    queryKey: ['dashboard', 'lista-contratos-mrr', consultorIds],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('contratos')
@@ -294,7 +294,7 @@ export function useListaContratosMRR(consultorId?: string) {
 
       return (data as any[])
         .filter(c => c.cliente?.status === 'ativo')
-        .filter(c => !consultorId || c.cliente?.consultor_id === consultorId);
+        .filter(c => !consultorIds?.length || consultorIds.includes(c.cliente?.consultor_id));
     }
   });
 }
