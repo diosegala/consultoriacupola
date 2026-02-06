@@ -230,15 +230,17 @@ export default function Dashboard() {
                 />
                 <Legend />
                 <Bar 
-                  dataKey="novos" 
-                  name="Novos" 
-                  fill="hsl(var(--primary))" 
-                  radius={[4, 4, 0, 0]}
-                />
-                <Bar 
                   dataKey="encerrados" 
                   name="Encerrados" 
                   fill="hsl(var(--destructive))" 
+                  stackId="contratos"
+                  radius={[0, 0, 0, 0]}
+                />
+                <Bar 
+                  dataKey="novos" 
+                  name="Novos" 
+                  fill="hsl(var(--primary))" 
+                  stackId="contratos"
                   radius={[4, 4, 0, 0]}
                 />
               </BarChart>
