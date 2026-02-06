@@ -1,150 +1,164 @@
 
 
-## Modal de Clientes Ativos no Dashboard
+## Multi-seleção de Consultores no Dashboard
 
 ### Objetivo
-Ao clicar no card "Clientes Ativos" no Dashboard, abrir um modal que lista os clientes ativos (respeitando o filtro de consultor se aplicado), similar ao comportamento dos KPIs na página de Contratos.
+Substituir o seletor único de consultor por um componente que permite selecionar múltiplos consultores simultaneamente, mantendo a opção "Todos" e exibindo badges com os consultores selecionados.
 
-### Alteracoes Necessarias
+### Abordagem de UI
+
+A melhor experiência para este caso é usar um **Popover com checkboxes**, onde:
+- Cada consultor tem um checkbox
+- Os selecionados aparecem como badges no botão
+- O botão mostra "Todos os consultores" quando nenhum está selecionado
+
+```text
+┌─────────────────────────────────────────────┐
+│  [✓] João Silva  [✓] Maria Santos  [X]     │  <- Badges dos selecionados
+│  ▼                                          │
+└─────────────────────────────────────────────┘
+         │
+         ▼  (popover aberto)
+┌─────────────────────────────────────────────┐
+│  [ ] Todos os consultores                   │
+│  [✓] João Silva                             │
+│  [✓] Maria Santos                           │
+│  [ ] Pedro Oliveira                         │
+│  [ ] Ana Costa                              │
+└─────────────────────────────────────────────┘
+```
 
 ---
 
-#### 1. Novo Hook para Listar Clientes Ativos
+### Alterações Necessárias
 
-Criar uma funcao `useListaClientesAtivos` em `src/hooks/useClientes.ts` que retorna a lista completa de clientes ativos (nao apenas a contagem):
+#### 1. Dashboard - Estado e UI (src/pages/Dashboard.tsx)
+
+**Mudança de estado:**
+```typescript
+// DE:
+const [consultorFiltro, setConsultorFiltro] = useState<string>('todos');
+const consultorIdFiltro = consultorFiltro !== 'todos' ? consultorFiltro : undefined;
+
+// PARA:
+const [consultoresSelecionados, setConsultoresSelecionados] = useState<string[]>([]);
+const consultorIdsFiltro = consultoresSelecionados.length > 0 ? consultoresSelecionados : undefined;
+```
+
+**Substituir o Select por Popover com checkboxes:**
+- Importar `Popover`, `PopoverTrigger`, `PopoverContent`, `Checkbox`
+- Listar consultores com checkboxes
+- Mostrar badges dos selecionados no trigger
+- Opção para limpar seleção ("Todos")
+
+---
+
+#### 2. Hooks - Suporte a Array de IDs
+
+Todos os hooks do dashboard precisam ser atualizados para aceitar `consultorIds?: string[]` ao invés de `consultorId?: string`:
+
+| Hook | Arquivo |
+|------|---------|
+| `useClientesAtivos` | useClientes.ts |
+| `useClientesAguardandoRenovacao` | useClientes.ts |
+| `useListaClientesAtivos` | useClientes.ts |
+| `useListaClientesAguardandoRenovacao` | useClientes.ts |
+| `useMRRTotal` | useContratos.ts |
+| `useListaContratosMRR` | useContratos.ts |
+| `useChurnDoMes` | useEncerramentos.ts |
+| `useListaChurnMes` | useEncerramentos.ts |
+| `useAlertas` | useDashboard.ts |
+| `useMRRHistorico` | useDashboard.ts |
+| `useContratosHistorico` | useDashboard.ts |
+
+**Padrão de modificação:**
 
 ```typescript
-export function useListaClientesAtivos(consultorId?: string) {
-  return useQuery({
-    queryKey: ['dashboard', 'lista-clientes-ativos', consultorId],
-    queryFn: async () => {
-      let query = supabase
-        .from('clientes')
-        .select(`
-          *,
-          consultor:consultores(id, nome),
-          contrato_ativo:contratos!contratos_cliente_id_fkey(
-            id, remuneracao_mensal, data_fim, ativo,
-            tipo_consultoria:tipos_consultoria(nome)
-          )
-        `)
-        .eq('status', 'ativo')
-        .order('nome');
+// DE:
+export function useClientesAtivos(consultorId?: string) {
+  // ...
+  if (consultorId) {
+    query = query.eq('consultor_id', consultorId);
+  }
+}
 
-      if (consultorId) {
-        query = query.eq('consultor_id', consultorId);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      
-      return data.map(cliente => ({
-        ...cliente,
-        contrato_ativo: cliente.contrato_ativo?.find(c => c.ativo) || null
-      }));
-    }
-  });
+// PARA:
+export function useClientesAtivos(consultorIds?: string[]) {
+  // ...
+  if (consultorIds && consultorIds.length > 0) {
+    query = query.in('consultor_id', consultorIds);
+  }
 }
 ```
 
+Para hooks que filtram no JavaScript (após a query):
+```typescript
+// DE:
+.filter(c => !consultorId || c.cliente?.consultor_id === consultorId)
+
+// PARA:
+.filter(c => !consultorIds?.length || consultorIds.includes(c.cliente?.consultor_id))
+```
+
 ---
 
-#### 2. Modal no Dashboard
+#### 3. Modais - Atualizar indicador de filtro
 
-Adicionar um estado e modal em `src/pages/Dashboard.tsx`:
+Nos modais, onde antes aparecia "Filtrado por consultor", agora mostrará quantos consultores estão selecionados:
 
-**Estado:**
-```typescript
-const [showClientesAtivos, setShowClientesAtivos] = useState(false);
-```
-
-**Hook:**
-```typescript
-const { data: listaClientesAtivos } = useListaClientesAtivos(consultorIdFiltro);
-```
-
-**Card clicavel:**
 ```tsx
-<Card 
-  className="bg-card border-border cursor-pointer transition-all hover:scale-[1.02] hover:border-primary/50"
-  onClick={() => setShowClientesAtivos(true)}
->
-  ...
-</Card>
-```
+// DE:
+{consultorFiltro !== 'todos' && (
+  <Badge variant="outline">Filtrado por consultor</Badge>
+)}
 
-**Modal:**
-```tsx
-<Dialog open={showClientesAtivos} onOpenChange={setShowClientesAtivos}>
-  <DialogContent className="max-w-2xl max-h-[80vh]">
-    <DialogHeader>
-      <DialogTitle className="flex items-center gap-2">
-        <Users className="h-5 w-5 text-primary" />
-        Clientes Ativos
-        {consultorFiltro !== 'todos' && (
-          <Badge variant="outline" className="ml-2">
-            Filtrado por consultor
-          </Badge>
-        )}
-      </DialogTitle>
-    </DialogHeader>
-    
-    <ScrollArea className="max-h-[60vh] pr-4">
-      {listaClientesAtivos?.length === 0 ? (
-        <p className="text-center text-muted-foreground py-8">
-          Nenhum cliente ativo encontrado
-        </p>
-      ) : (
-        <div className="space-y-3">
-          {listaClientesAtivos?.map((cliente) => (
-            <Card 
-              key={cliente.id} 
-              className="cursor-pointer hover:bg-muted/50"
-              onClick={() => {
-                setShowClientesAtivos(false);
-                navigate(`/clientes/${cliente.id}`);
-              }}
-            >
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <span className="font-semibold">{cliente.nome}</span>
-                    <p className="text-sm text-muted-foreground">
-                      {cliente.cidade}, {cliente.uf}
-                      {cliente.consultor && ` • ${cliente.consultor.nome}`}
-                    </p>
-                  </div>
-                  {cliente.contrato_ativo && (
-                    <span className="text-primary font-medium">
-                      {formatCurrency(cliente.contrato_ativo.remuneracao_mensal)}
-                    </span>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-    </ScrollArea>
-  </DialogContent>
-</Dialog>
+// PARA:
+{consultoresSelecionados.length > 0 && (
+  <Badge variant="outline">
+    {consultoresSelecionados.length} consultor(es) selecionado(s)
+  </Badge>
+)}
 ```
 
 ---
 
 ### Arquivos a Modificar
 
-| Arquivo | Alteracao |
+| Arquivo | Alteração |
 |---------|-----------|
-| `src/hooks/useClientes.ts` | Adicionar `useListaClientesAtivos` que retorna lista completa |
-| `src/pages/Dashboard.tsx` | Adicionar estado, card clicavel, modal e importar componentes necessarios |
+| `src/pages/Dashboard.tsx` | Substituir Select por Popover multi-select, atualizar estado e chamadas dos hooks |
+| `src/hooks/useClientes.ts` | Atualizar 4 hooks para aceitar array de IDs |
+| `src/hooks/useContratos.ts` | Atualizar 2 hooks para aceitar array de IDs |
+| `src/hooks/useEncerramentos.ts` | Atualizar 2 hooks para aceitar array de IDs |
+| `src/hooks/useDashboard.ts` | Atualizar 3 hooks para aceitar array de IDs |
 
 ---
 
-### Comportamento Esperado
+### Fluxo de Uso
 
-1. Usuario clica no card "Clientes Ativos"
-2. Modal abre com lista de clientes ativos
-3. Se filtro de consultor estiver ativo, modal mostra apenas clientes daquele consultor
-4. Ao clicar em um cliente, modal fecha e navega para pagina de detalhes do cliente
+```text
+1. Usuário abre Dashboard
+   └── Seletor mostra "Todos os consultores"
+
+2. Clica no seletor
+   └── Popover abre com lista de checkboxes
+
+3. Marca "João Silva" e "Maria Santos"
+   └── Popover fecha
+   └── Botão mostra badges: [João Silva] [Maria Santos] [X]
+   └── Dashboard filtra dados para ambos consultores
+
+4. Clica no [X] ou seleciona "Todos"
+   └── Limpa seleção
+   └── Dashboard mostra dados de todos
+```
+
+---
+
+### Resultado Esperado
+
+- Usuario pode selecionar um, varios ou todos os consultores
+- Badges mostram quem está selecionado
+- Todos os KPIs, graficos e modais respeitam a multi-seleção
+- Performance mantida usando `.in()` do Supabase ao inves de multiplas queries
 
