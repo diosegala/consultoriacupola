@@ -1,164 +1,81 @@
 
 
-## Multi-seleção de Consultores no Dashboard
+## Gestão de Usuários Autorizados
 
-### Objetivo
-Substituir o seletor único de consultor por um componente que permite selecionar múltiplos consultores simultaneamente, mantendo a opção "Todos" e exibindo badges com os consultores selecionados.
+### Problema Atual
+A tabela `user_roles` só tem o usuário dioner.segala como `admin`. O novo usuário (renata.maciel) se cadastrou mas não tem role, então as políticas RLS bloqueiam todo o acesso.
 
-### Abordagem de UI
+### Solução
 
-A melhor experiência para este caso é usar um **Popover com checkboxes**, onde:
-- Cada consultor tem um checkbox
-- Os selecionados aparecem como badges no botão
-- O botão mostra "Todos os consultores" quando nenhum está selecionado
+#### 1. Ação Imediata - Adicionar a usuária existente
+Inserir a role `director` para renata.maciel na tabela `user_roles` via SQL.
 
-```text
-┌─────────────────────────────────────────────┐
-│  [✓] João Silva  [✓] Maria Santos  [X]     │  <- Badges dos selecionados
-│  ▼                                          │
-└─────────────────────────────────────────────┘
-         │
-         ▼  (popover aberto)
-┌─────────────────────────────────────────────┐
-│  [ ] Todos os consultores                   │
-│  [✓] João Silva                             │
-│  [✓] Maria Santos                           │
-│  [ ] Pedro Oliveira                         │
-│  [ ] Ana Costa                              │
-└─────────────────────────────────────────────┘
+#### 2. Adicionar role `director` ao enum
+Criar uma migration para adicionar o valor `director` ao enum `app_role`, já que atualmente só existem `admin` e `moderator`/`user` (se existirem).
+
+```sql
+ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'director';
 ```
 
----
+#### 3. Tela de Gestão de Usuários (apenas para admin)
+Criar uma página `/configuracoes` (ou usar a rota existente) com:
 
-### Alterações Necessárias
+- Lista de usuários autorizados (email + role)
+- Botão para adicionar novo usuário (somente admin)
+- O admin insere o email, e quando esse email se cadastrar, já terá acesso
+- Opção de remover acesso (somente admin)
 
-#### 1. Dashboard - Estado e UI (src/pages/Dashboard.tsx)
+**Regras de acesso:**
+- `admin`: pode ver todos os dados + gerenciar usuários
+- `director`: pode ver todos os dados, mas NÃO pode gerenciar usuários
 
-**Mudança de estado:**
-```typescript
-// DE:
-const [consultorFiltro, setConsultorFiltro] = useState<string>('todos');
-const consultorIdFiltro = consultorFiltro !== 'todos' ? consultorFiltro : undefined;
-
-// PARA:
-const [consultoresSelecionados, setConsultoresSelecionados] = useState<string[]>([]);
-const consultorIdsFiltro = consultoresSelecionados.length > 0 ? consultoresSelecionados : undefined;
-```
-
-**Substituir o Select por Popover com checkboxes:**
-- Importar `Popover`, `PopoverTrigger`, `PopoverContent`, `Checkbox`
-- Listar consultores com checkboxes
-- Mostrar badges dos selecionados no trigger
-- Opção para limpar seleção ("Todos")
-
----
-
-#### 2. Hooks - Suporte a Array de IDs
-
-Todos os hooks do dashboard precisam ser atualizados para aceitar `consultorIds?: string[]` ao invés de `consultorId?: string`:
-
-| Hook | Arquivo |
-|------|---------|
-| `useClientesAtivos` | useClientes.ts |
-| `useClientesAguardandoRenovacao` | useClientes.ts |
-| `useListaClientesAtivos` | useClientes.ts |
-| `useListaClientesAguardandoRenovacao` | useClientes.ts |
-| `useMRRTotal` | useContratos.ts |
-| `useListaContratosMRR` | useContratos.ts |
-| `useChurnDoMes` | useEncerramentos.ts |
-| `useListaChurnMes` | useEncerramentos.ts |
-| `useAlertas` | useDashboard.ts |
-| `useMRRHistorico` | useDashboard.ts |
-| `useContratosHistorico` | useDashboard.ts |
-
-**Padrão de modificação:**
-
-```typescript
-// DE:
-export function useClientesAtivos(consultorId?: string) {
-  // ...
-  if (consultorId) {
-    query = query.eq('consultor_id', consultorId);
-  }
-}
-
-// PARA:
-export function useClientesAtivos(consultorIds?: string[]) {
-  // ...
-  if (consultorIds && consultorIds.length > 0) {
-    query = query.in('consultor_id', consultorIds);
-  }
-}
-```
-
-Para hooks que filtram no JavaScript (após a query):
-```typescript
-// DE:
-.filter(c => !consultorId || c.cliente?.consultor_id === consultorId)
-
-// PARA:
-.filter(c => !consultorIds?.length || consultorIds.includes(c.cliente?.consultor_id))
-```
-
----
-
-#### 3. Modais - Atualizar indicador de filtro
-
-Nos modais, onde antes aparecia "Filtrado por consultor", agora mostrará quantos consultores estão selecionados:
-
-```tsx
-// DE:
-{consultorFiltro !== 'todos' && (
-  <Badge variant="outline">Filtrado por consultor</Badge>
-)}
-
-// PARA:
-{consultoresSelecionados.length > 0 && (
-  <Badge variant="outline">
-    {consultoresSelecionados.length} consultor(es) selecionado(s)
-  </Badge>
-)}
-```
-
----
-
-### Arquivos a Modificar
+#### 4. Arquivos a criar/modificar
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/pages/Dashboard.tsx` | Substituir Select por Popover multi-select, atualizar estado e chamadas dos hooks |
-| `src/hooks/useClientes.ts` | Atualizar 4 hooks para aceitar array de IDs |
-| `src/hooks/useContratos.ts` | Atualizar 2 hooks para aceitar array de IDs |
-| `src/hooks/useEncerramentos.ts` | Atualizar 2 hooks para aceitar array de IDs |
-| `src/hooks/useDashboard.ts` | Atualizar 3 hooks para aceitar array de IDs |
+| Migration SQL | Adicionar `director` ao enum + inserir role para renata.maciel |
+| `src/hooks/useUserRoles.ts` | Novo hook para CRUD de user_roles |
+| `src/hooks/useAuth.ts` ou `AuthContext.tsx` | Expor a role do usuário logado |
+| `src/pages/Configuracoes.tsx` | Criar página com lista de usuários e formulário de adição |
+| `src/App.tsx` | Adicionar rota /configuracoes |
+| `src/components/layout/Sidebar.tsx` | Mostrar link "Configurações" apenas para admin |
 
----
-
-### Fluxo de Uso
+#### 5. Fluxo de adição de usuário
 
 ```text
-1. Usuário abre Dashboard
-   └── Seletor mostra "Todos os consultores"
-
-2. Clica no seletor
-   └── Popover abre com lista de checkboxes
-
-3. Marca "João Silva" e "Maria Santos"
-   └── Popover fecha
-   └── Botão mostra badges: [João Silva] [Maria Santos] [X]
-   └── Dashboard filtra dados para ambos consultores
-
-4. Clica no [X] ou seleciona "Todos"
-   └── Limpa seleção
-   └── Dashboard mostra dados de todos
+1. Admin acessa /configuracoes
+2. Clica em "Adicionar Usuário"
+3. Informa o email do novo diretor
+4. Sistema cria um registro na user_roles com role = 'director'
+   (o user_id será preenchido quando o usuário se cadastrar)
+5. Novo usuário faz signup com aquele email
+6. Trigger no banco associa o user_id ao registro existente
 ```
 
----
+**Alternativa mais simples (recomendada):** O admin adiciona usuários que JÁ se cadastraram, selecionando da lista de usuários do auth. Isso evita a complexidade do pré-registro.
 
-### Resultado Esperado
+#### 6. Detalhes técnicos
 
-- Usuario pode selecionar um, varios ou todos os consultores
-- Badges mostram quem está selecionado
-- Todos os KPIs, graficos e modais respeitam a multi-seleção
-- Performance mantida usando `.in()` do Supabase ao inves de multiplas queries
+**Verificar role do usuário logado no AuthContext:**
+```typescript
+// Adicionar ao AuthContext
+const [userRole, setUserRole] = useState<string | null>(null);
+
+// Após login, buscar role
+const { data } = await supabase
+  .from('user_roles')
+  .select('role')
+  .eq('user_id', user.id)
+  .single();
+```
+
+**Política RLS para user_roles (já existe):**
+- Admin pode SELECT, INSERT, DELETE
+- Usuário pode ver apenas seu próprio registro
+- Ninguém pode UPDATE (manter assim)
+
+**Página de Configurações:**
+- Tabela com colunas: Email, Role, Ações
+- Botão "Remover" para cada usuário (exceto o próprio admin)
+- Dialog para adicionar: campo de email + seleção de role (apenas `director`)
 
