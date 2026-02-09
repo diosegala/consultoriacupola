@@ -104,13 +104,12 @@ export function useAlertas(consultorIds?: string[]) {
   });
 }
 
-export function useMRRHistorico(consultorIds?: string[]) {
+export function useMRRHistorico(consultorIds?: string[], mesesFuturos: number = 0) {
   return useQuery({
-    queryKey: ['dashboard', 'mrr-historico', consultorIds],
+    queryKey: ['dashboard', 'mrr-historico', consultorIds, mesesFuturos],
     queryFn: async () => {
-      const resultado: { mes: string; mrr: number }[] = [];
+      const resultado: { mes: string; mrr: number | null; mrr_projetado: number | null }[] = [];
       
-      // Buscar todos os contratos com datas e consultor
       const { data: contratos, error } = await supabase
         .from('contratos')
         .select(`
@@ -120,30 +119,33 @@ export function useMRRHistorico(consultorIds?: string[]) {
 
       if (error) throw error;
 
-      // Filtrar por consultor se necessário
       const contratosFiltrados = consultorIds?.length 
         ? (contratos as any[])?.filter(c => consultorIds.includes(c.cliente?.consultor_id))
         : contratos;
 
-      // Calcular MRR para cada mês dos últimos 12 meses
-      for (let i = 11; i >= 0; i--) {
-        const mesRef = subMonths(new Date(), i);
+      const hoje = new Date();
+      const mesAtualIndex = 0; // will be calculated relative to loop
+
+      // Past 11 months + current month + future months
+      for (let i = 11; i >= -mesesFuturos; i--) {
+        const mesRef = subMonths(hoje, i);
         const inicioMes = startOfMonth(mesRef);
         const fimMes = endOfMonth(mesRef);
+        const isFuturo = i < 0;
+        const isAtual = i === 0;
 
-        // Contratos ativos naquele mês
         const mrrMes = (contratosFiltrados || [])
           .filter(c => {
             const inicio = parseISO(c.data_inicio);
             const fim = parseISO(c.data_fim);
-            // Contrato estava ativo durante o mês
             return isBefore(inicio, fimMes) && isBefore(inicioMes, fim);
           })
           .reduce((sum, c) => sum + Number(c.remuneracao_mensal || 0), 0);
 
         resultado.push({
           mes: format(mesRef, 'MMM/yy', { locale: ptBR }),
-          mrr: mrrMes
+          mrr: isFuturo ? null : mrrMes,
+          mrr_projetado: (isFuturo || isAtual) ? mrrMes : null
         });
       }
 

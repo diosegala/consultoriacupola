@@ -16,7 +16,8 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Plus, Pencil, Trash2, Loader2, ShieldCheck } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, ShieldCheck, KeyRound } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   useTiposConsultoriaComContratos, useCreateTipoConsultoria, useUpdateTipoConsultoria,
   useDeleteTipoConsultoria, useCRMs, useCreateCRM, useUpdateCRM, useDeleteCRM,
@@ -68,6 +69,32 @@ export default function Configuracoes() {
   const [selectedRole, setSelectedRole] = useState<'director'>('director');
   const [deleteUserDialogOpen, setDeleteUserDialogOpen] = useState(false);
   const [userRoleToDelete, setUserRoleToDelete] = useState<{ id: string; email: string } | null>(null);
+
+  // Password change
+  const [novaSenha, setNovaSenha] = useState('');
+  const [confirmarSenha, setConfirmarSenha] = useState('');
+  const [loadingSenha, setLoadingSenha] = useState(false);
+
+  const handleChangePassword = async () => {
+    if (novaSenha.length < 6) {
+      toast({ title: 'Erro', description: 'A senha deve ter no mínimo 6 caracteres', variant: 'destructive' });
+      return;
+    }
+    if (novaSenha !== confirmarSenha) {
+      toast({ title: 'Erro', description: 'As senhas não conferem', variant: 'destructive' });
+      return;
+    }
+    setLoadingSenha(true);
+    const { error } = await supabase.auth.updateUser({ password: novaSenha });
+    setLoadingSenha(false);
+    if (error) {
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Sucesso', description: 'Senha alterada com sucesso' });
+      setNovaSenha('');
+      setConfirmarSenha('');
+    }
+  };
 
   // Users already with a role
   const usersWithRoles = userRoles?.map(r => r.user_id) || [];
@@ -175,12 +202,39 @@ export default function Configuracoes() {
         <p className="text-muted-foreground">Gerencie os cadastros auxiliares do sistema</p>
       </div>
 
-      <Tabs defaultValue={isAdmin ? "usuarios" : "tipos"} className="w-full">
+      <Tabs defaultValue="conta" className="w-full">
         <TabsList className="bg-secondary">
+          <TabsTrigger value="conta">Minha Conta</TabsTrigger>
           {isAdmin && <TabsTrigger value="usuarios">Usuários</TabsTrigger>}
           <TabsTrigger value="tipos">Tipos de Consultoria</TabsTrigger>
           <TabsTrigger value="crms">CRMs</TabsTrigger>
         </TabsList>
+
+        {/* Minha Conta */}
+        <TabsContent value="conta" className="mt-6">
+          <Card className="bg-card border-border max-w-md">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-foreground">
+                <KeyRound className="h-5 w-5 text-primary" />
+                Alterar Senha
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="novaSenha">Nova Senha</Label>
+                <Input id="novaSenha" type="password" placeholder="••••••" value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} className="bg-input border-border" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirmarSenha">Confirmar Nova Senha</Label>
+                <Input id="confirmarSenha" type="password" placeholder="••••••" value={confirmarSenha} onChange={(e) => setConfirmarSenha(e.target.value)} className="bg-input border-border" />
+              </div>
+              <Button onClick={handleChangePassword} disabled={loadingSenha} className="bg-primary text-primary-foreground hover:bg-primary/90">
+                {loadingSenha && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Salvar Nova Senha
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         {/* Usuários (admin only) */}
         {isAdmin && (
