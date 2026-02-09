@@ -14,18 +14,22 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 
-const menuItems = [
+const baseMenuItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/clientes', icon: Users, label: 'Clientes' },
   { to: '/contratos', icon: FileText, label: 'Contratos' },
   { to: '/consultores', icon: UserCog, label: 'Consultores' },
-  { to: '/configuracoes', icon: Settings, label: 'Configurações' },
 ];
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
-  const { signOut, user } = useAuth();
+  const { signOut, user, isAdmin } = useAuth();
   const location = useLocation();
+
+  const menuItems = [
+    ...baseMenuItems,
+    ...(isAdmin ? [{ to: '/configuracoes', icon: Settings, label: 'Configurações' }] : []),
+  ];
 
   return (
     <aside 
