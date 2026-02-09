@@ -7,39 +7,28 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import { Plus, Pencil, Trash2, Loader2, ShieldCheck } from 'lucide-react';
 import { 
-  useTiposConsultoriaComContratos, 
-  useCreateTipoConsultoria, 
-  useUpdateTipoConsultoria,
-  useDeleteTipoConsultoria,
-  useCRMs,
-  useCreateCRM,
-  useUpdateCRM,
-  useDeleteCRM,
-  TipoConsultoriaComContratos,
-  CRM
+  useTiposConsultoriaComContratos, useCreateTipoConsultoria, useUpdateTipoConsultoria,
+  useDeleteTipoConsultoria, useCRMs, useCreateCRM, useUpdateCRM, useDeleteCRM,
+  TipoConsultoriaComContratos, CRM
 } from '@/hooks/useDadosAuxiliares';
+import { useUserRoles, useAuthUsers, useAddUserRole, useDeleteUserRole } from '@/hooks/useUserRoles';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Configuracoes() {
   const { toast } = useToast();
+  const { isAdmin, user } = useAuth();
   
   // Tipos de Consultoria
   const { data: tiposConsultoria, isLoading: loadingTipos } = useTiposConsultoriaComContratos(false);
@@ -53,43 +42,50 @@ export default function Configuracoes() {
   const updateCRM = useUpdateCRM();
   const deleteCRM = useDeleteCRM();
 
-  // Dialog states
+  // User roles (admin only)
+  const { data: userRoles, isLoading: loadingRoles } = useUserRoles();
+  const { data: authUsers } = useAuthUsers();
+  const addUserRole = useAddUserRole();
+  const deleteUserRole = useDeleteUserRole();
+
+  // Dialog states - Tipos
   const [tipoDialogOpen, setTipoDialogOpen] = useState(false);
   const [editingTipo, setEditingTipo] = useState<TipoConsultoriaComContratos | null>(null);
   const [tipoNome, setTipoNome] = useState('');
   const [deleteTipoDialogOpen, setDeleteTipoDialogOpen] = useState(false);
   const [tipoToDelete, setTipoToDelete] = useState<TipoConsultoriaComContratos | null>(null);
 
+  // Dialog states - CRMs
   const [crmDialogOpen, setCRMDialogOpen] = useState(false);
   const [editingCRM, setEditingCRM] = useState<CRM | null>(null);
   const [crmNome, setCRMNome] = useState('');
   const [deleteCRMDialogOpen, setDeleteCRMDialogOpen] = useState(false);
   const [crmToDelete, setCRMToDelete] = useState<CRM | null>(null);
 
+  // Dialog states - Users
+  const [userDialogOpen, setUserDialogOpen] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [selectedRole, setSelectedRole] = useState<'director'>('director');
+  const [deleteUserDialogOpen, setDeleteUserDialogOpen] = useState(false);
+  const [userRoleToDelete, setUserRoleToDelete] = useState<{ id: string; email: string } | null>(null);
+
+  // Users already with a role
+  const usersWithRoles = userRoles?.map(r => r.user_id) || [];
+  const availableUsers = authUsers?.filter(u => !usersWithRoles.includes(u.id)) || [];
+
+  // Enrich roles with email
+  const enrichedRoles = userRoles?.map(r => ({
+    ...r,
+    email: authUsers?.find(u => u.id === r.user_id)?.email || r.user_id,
+  })) || [];
+
   // Tipo handlers
-  const openNewTipoDialog = () => {
-    setEditingTipo(null);
-    setTipoNome('');
-    setTipoDialogOpen(true);
-  };
-
-  const openEditTipoDialog = (tipo: TipoConsultoriaComContratos) => {
-    setEditingTipo(tipo);
-    setTipoNome(tipo.nome);
-    setTipoDialogOpen(true);
-  };
-
-  const openDeleteTipoDialog = (tipo: TipoConsultoriaComContratos) => {
-    setTipoToDelete(tipo);
-    setDeleteTipoDialogOpen(true);
-  };
+  const openNewTipoDialog = () => { setEditingTipo(null); setTipoNome(''); setTipoDialogOpen(true); };
+  const openEditTipoDialog = (tipo: TipoConsultoriaComContratos) => { setEditingTipo(tipo); setTipoNome(tipo.nome); setTipoDialogOpen(true); };
+  const openDeleteTipoDialog = (tipo: TipoConsultoriaComContratos) => { setTipoToDelete(tipo); setDeleteTipoDialogOpen(true); };
 
   const handleTipoSubmit = async () => {
-    if (!tipoNome.trim()) {
-      toast({ title: 'Erro', description: 'Nome é obrigatório', variant: 'destructive' });
-      return;
-    }
-
+    if (!tipoNome.trim()) { toast({ title: 'Erro', description: 'Nome é obrigatório', variant: 'destructive' }); return; }
     try {
       if (editingTipo) {
         await updateTipo.mutateAsync({ id: editingTipo.id, nome: tipoNome.trim() });
@@ -99,57 +95,32 @@ export default function Configuracoes() {
         toast({ title: 'Sucesso', description: 'Tipo criado com sucesso' });
       }
       setTipoDialogOpen(false);
-    } catch (error: any) {
-      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
-    }
+    } catch (error: any) { toast({ title: 'Erro', description: error.message, variant: 'destructive' }); }
   };
 
   const handleDeleteTipo = async () => {
     if (!tipoToDelete) return;
-
     try {
       await deleteTipo.mutateAsync(tipoToDelete.id);
       toast({ title: 'Sucesso', description: 'Tipo excluído com sucesso' });
-      setDeleteTipoDialogOpen(false);
-      setTipoToDelete(null);
-    } catch (error: any) {
-      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
-    }
+      setDeleteTipoDialogOpen(false); setTipoToDelete(null);
+    } catch (error: any) { toast({ title: 'Erro', description: error.message, variant: 'destructive' }); }
   };
 
   const toggleTipoAtivo = async (tipo: TipoConsultoriaComContratos) => {
     try {
       await updateTipo.mutateAsync({ id: tipo.id, ativo: !tipo.ativo });
       toast({ title: 'Sucesso', description: `Tipo ${tipo.ativo ? 'desativado' : 'ativado'}` });
-    } catch (error: any) {
-      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
-    }
+    } catch (error: any) { toast({ title: 'Erro', description: error.message, variant: 'destructive' }); }
   };
 
   // CRM handlers
-  const openNewCRMDialog = () => {
-    setEditingCRM(null);
-    setCRMNome('');
-    setCRMDialogOpen(true);
-  };
-
-  const openEditCRMDialog = (crm: CRM) => {
-    setEditingCRM(crm);
-    setCRMNome(crm.nome);
-    setCRMDialogOpen(true);
-  };
-
-  const openDeleteCRMDialog = (crm: CRM) => {
-    setCRMToDelete(crm);
-    setDeleteCRMDialogOpen(true);
-  };
+  const openNewCRMDialog = () => { setEditingCRM(null); setCRMNome(''); setCRMDialogOpen(true); };
+  const openEditCRMDialog = (crm: CRM) => { setEditingCRM(crm); setCRMNome(crm.nome); setCRMDialogOpen(true); };
+  const openDeleteCRMDialog = (crm: CRM) => { setCRMToDelete(crm); setDeleteCRMDialogOpen(true); };
 
   const handleCRMSubmit = async () => {
-    if (!crmNome.trim()) {
-      toast({ title: 'Erro', description: 'Nome é obrigatório', variant: 'destructive' });
-      return;
-    }
-
+    if (!crmNome.trim()) { toast({ title: 'Erro', description: 'Nome é obrigatório', variant: 'destructive' }); return; }
     try {
       if (editingCRM) {
         await updateCRM.mutateAsync({ id: editingCRM.id, nome: crmNome.trim() });
@@ -159,31 +130,42 @@ export default function Configuracoes() {
         toast({ title: 'Sucesso', description: 'CRM criado com sucesso' });
       }
       setCRMDialogOpen(false);
-    } catch (error: any) {
-      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
-    }
+    } catch (error: any) { toast({ title: 'Erro', description: error.message, variant: 'destructive' }); }
   };
 
   const handleDeleteCRM = async () => {
     if (!crmToDelete) return;
-
     try {
       await deleteCRM.mutateAsync(crmToDelete.id);
       toast({ title: 'Sucesso', description: 'CRM excluído com sucesso' });
-      setDeleteCRMDialogOpen(false);
-      setCRMToDelete(null);
-    } catch (error: any) {
-      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
-    }
+      setDeleteCRMDialogOpen(false); setCRMToDelete(null);
+    } catch (error: any) { toast({ title: 'Erro', description: error.message, variant: 'destructive' }); }
   };
 
   const toggleCRMAtivo = async (crm: CRM) => {
     try {
       await updateCRM.mutateAsync({ id: crm.id, ativo: !crm.ativo });
       toast({ title: 'Sucesso', description: `CRM ${crm.ativo ? 'desativado' : 'ativado'}` });
-    } catch (error: any) {
-      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
-    }
+    } catch (error: any) { toast({ title: 'Erro', description: error.message, variant: 'destructive' }); }
+  };
+
+  // User handlers
+  const handleAddUser = async () => {
+    if (!selectedUserId) { toast({ title: 'Erro', description: 'Selecione um usuário', variant: 'destructive' }); return; }
+    try {
+      await addUserRole.mutateAsync({ userId: selectedUserId, role: selectedRole });
+      toast({ title: 'Sucesso', description: 'Usuário adicionado com sucesso' });
+      setUserDialogOpen(false); setSelectedUserId('');
+    } catch (error: any) { toast({ title: 'Erro', description: error.message, variant: 'destructive' }); }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!userRoleToDelete) return;
+    try {
+      await deleteUserRole.mutateAsync(userRoleToDelete.id);
+      toast({ title: 'Sucesso', description: 'Acesso removido com sucesso' });
+      setDeleteUserDialogOpen(false); setUserRoleToDelete(null);
+    } catch (error: any) { toast({ title: 'Erro', description: error.message, variant: 'destructive' }); }
   };
 
   return (
@@ -193,11 +175,71 @@ export default function Configuracoes() {
         <p className="text-muted-foreground">Gerencie os cadastros auxiliares do sistema</p>
       </div>
 
-      <Tabs defaultValue="tipos" className="w-full">
+      <Tabs defaultValue={isAdmin ? "usuarios" : "tipos"} className="w-full">
         <TabsList className="bg-secondary">
+          {isAdmin && <TabsTrigger value="usuarios">Usuários</TabsTrigger>}
           <TabsTrigger value="tipos">Tipos de Consultoria</TabsTrigger>
           <TabsTrigger value="crms">CRMs</TabsTrigger>
         </TabsList>
+
+        {/* Usuários (admin only) */}
+        {isAdmin && (
+          <TabsContent value="usuarios" className="mt-6">
+            <Card className="bg-card border-border">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-foreground">
+                  <ShieldCheck className="h-5 w-5 text-primary" />
+                  Usuários Autorizados
+                </CardTitle>
+                <Button size="sm" onClick={() => { setSelectedUserId(''); setUserDialogOpen(true); }} className="bg-primary text-primary-foreground hover:bg-primary/90">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Adicionar Usuário
+                </Button>
+              </CardHeader>
+              <CardContent className="p-0">
+                {loadingRoles ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-border hover:bg-transparent">
+                        <TableHead className="text-muted-foreground">Email</TableHead>
+                        <TableHead className="text-muted-foreground">Papel</TableHead>
+                        <TableHead className="text-muted-foreground text-right w-[100px]">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {enrichedRoles.map(role => (
+                        <TableRow key={role.id} className="border-border">
+                          <TableCell className="font-medium text-foreground">{role.email}</TableCell>
+                          <TableCell>
+                            <Badge className={role.role === 'admin' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}>
+                              {role.role === 'admin' ? 'Admin' : 'Diretor'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {role.user_id !== user?.id && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => { setUserRoleToDelete({ id: role.id, email: role.email }); setDeleteUserDialogOpen(true); }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
 
         {/* Tipos de Consultoria */}
         <TabsContent value="tipos" className="mt-6">
@@ -211,9 +253,7 @@ export default function Configuracoes() {
             </CardHeader>
             <CardContent className="p-0">
               {loadingTipos ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin" />
-                </div>
+                <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin" /></div>
               ) : (
                 <Table>
                   <TableHeader>
@@ -229,43 +269,22 @@ export default function Configuracoes() {
                       <TableRow key={tipo.id} className="border-border">
                         <TableCell className="font-medium text-foreground">{tipo.nome}</TableCell>
                         <TableCell className="text-center">
-                          <Badge variant="outline" className="border-border text-foreground">
-                            {tipo.total_contratos}
-                          </Badge>
+                          <Badge variant="outline" className="border-border text-foreground">{tipo.total_contratos}</Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge 
-                            className={tipo.ativo 
-                              ? 'bg-success text-success-foreground' 
-                              : 'bg-muted text-muted-foreground'
-                            }
-                          >
+                          <Badge className={tipo.ativo ? 'bg-success text-success-foreground' : 'bg-muted text-muted-foreground'}>
                             {tipo.ativo ? 'Ativo' : 'Inativo'}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex gap-2 justify-end">
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              className="text-muted-foreground hover:text-foreground"
-                              onClick={() => openEditTipoDialog(tipo)}
-                            >
+                            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" onClick={() => openEditTipoDialog(tipo)}>
                               <Pencil className="h-4 w-4" />
                             </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                              onClick={() => openDeleteTipoDialog(tipo)}
-                            >
+                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => openDeleteTipoDialog(tipo)}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
-                            <Button 
-                              variant={tipo.ativo ? 'secondary' : 'default'}
-                              size="sm"
-                              onClick={() => toggleTipoAtivo(tipo)}
-                            >
+                            <Button variant={tipo.ativo ? 'secondary' : 'default'} size="sm" onClick={() => toggleTipoAtivo(tipo)}>
                               {tipo.ativo ? 'Desativar' : 'Ativar'}
                             </Button>
                           </div>
@@ -291,9 +310,7 @@ export default function Configuracoes() {
             </CardHeader>
             <CardContent className="p-0">
               {loadingCRMs ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin" />
-                </div>
+                <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin" /></div>
               ) : (
                 <Table>
                   <TableHeader>
@@ -308,38 +325,19 @@ export default function Configuracoes() {
                       <TableRow key={crm.id} className="border-border">
                         <TableCell className="font-medium text-foreground">{crm.nome}</TableCell>
                         <TableCell>
-                          <Badge 
-                            className={crm.ativo 
-                              ? 'bg-success text-success-foreground' 
-                              : 'bg-muted text-muted-foreground'
-                            }
-                          >
+                          <Badge className={crm.ativo ? 'bg-success text-success-foreground' : 'bg-muted text-muted-foreground'}>
                             {crm.ativo ? 'Ativo' : 'Inativo'}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex gap-2 justify-end">
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              className="text-muted-foreground hover:text-foreground"
-                              onClick={() => openEditCRMDialog(crm)}
-                            >
+                            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" onClick={() => openEditCRMDialog(crm)}>
                               <Pencil className="h-4 w-4" />
                             </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                              onClick={() => openDeleteCRMDialog(crm)}
-                            >
+                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => openDeleteCRMDialog(crm)}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
-                            <Button 
-                              variant={crm.ativo ? 'secondary' : 'default'}
-                              size="sm"
-                              onClick={() => toggleCRMAtivo(crm)}
-                            >
+                            <Button variant={crm.ativo ? 'secondary' : 'default'} size="sm" onClick={() => toggleCRMAtivo(crm)}>
                               {crm.ativo ? 'Desativar' : 'Ativar'}
                             </Button>
                           </div>
@@ -358,34 +356,18 @@ export default function Configuracoes() {
       <Dialog open={tipoDialogOpen} onOpenChange={setTipoDialogOpen}>
         <DialogContent className="bg-card border-border">
           <DialogHeader>
-            <DialogTitle className="text-foreground">
-              {editingTipo ? 'Editar Tipo de Consultoria' : 'Novo Tipo de Consultoria'}
-            </DialogTitle>
+            <DialogTitle className="text-foreground">{editingTipo ? 'Editar Tipo de Consultoria' : 'Novo Tipo de Consultoria'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="tipoNome" className="text-foreground">Nome *</Label>
-              <Input
-                id="tipoNome"
-                value={tipoNome}
-                onChange={(e) => setTipoNome(e.target.value)}
-                placeholder="Nome do tipo"
-                className="bg-input border-border"
-              />
+              <Input id="tipoNome" value={tipoNome} onChange={(e) => setTipoNome(e.target.value)} placeholder="Nome do tipo" className="bg-input border-border" />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setTipoDialogOpen(false)} className="border-border">
-              Cancelar
-            </Button>
-            <Button 
-              onClick={handleTipoSubmit}
-              disabled={createTipo.isPending || updateTipo.isPending}
-              className="bg-primary text-primary-foreground"
-            >
-              {(createTipo.isPending || updateTipo.isPending) && (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              )}
+            <Button variant="outline" onClick={() => setTipoDialogOpen(false)} className="border-border">Cancelar</Button>
+            <Button onClick={handleTipoSubmit} disabled={createTipo.isPending || updateTipo.isPending} className="bg-primary text-primary-foreground">
+              {(createTipo.isPending || updateTipo.isPending) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Salvar
             </Button>
           </DialogFooter>
@@ -397,18 +379,11 @@ export default function Configuracoes() {
         <AlertDialogContent className="bg-card border-border">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-foreground">Excluir Tipo de Consultoria</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja excluir o tipo <strong>{tipoToDelete?.nome}</strong>?
-              Esta ação não pode ser desfeita.
-            </AlertDialogDescription>
+            <AlertDialogDescription>Tem certeza que deseja excluir o tipo <strong>{tipoToDelete?.nome}</strong>? Esta ação não pode ser desfeita.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="border-border">Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteTipo}
-              disabled={deleteTipo.isPending}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
+            <AlertDialogAction onClick={handleDeleteTipo} disabled={deleteTipo.isPending} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {deleteTipo.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Excluir
             </AlertDialogAction>
@@ -420,34 +395,18 @@ export default function Configuracoes() {
       <Dialog open={crmDialogOpen} onOpenChange={setCRMDialogOpen}>
         <DialogContent className="bg-card border-border">
           <DialogHeader>
-            <DialogTitle className="text-foreground">
-              {editingCRM ? 'Editar CRM' : 'Novo CRM'}
-            </DialogTitle>
+            <DialogTitle className="text-foreground">{editingCRM ? 'Editar CRM' : 'Novo CRM'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="crmNome" className="text-foreground">Nome *</Label>
-              <Input
-                id="crmNome"
-                value={crmNome}
-                onChange={(e) => setCRMNome(e.target.value)}
-                placeholder="Nome do CRM"
-                className="bg-input border-border"
-              />
+              <Input id="crmNome" value={crmNome} onChange={(e) => setCRMNome(e.target.value)} placeholder="Nome do CRM" className="bg-input border-border" />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCRMDialogOpen(false)} className="border-border">
-              Cancelar
-            </Button>
-            <Button 
-              onClick={handleCRMSubmit}
-              disabled={createCRM.isPending || updateCRM.isPending}
-              className="bg-primary text-primary-foreground"
-            >
-              {(createCRM.isPending || updateCRM.isPending) && (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              )}
+            <Button variant="outline" onClick={() => setCRMDialogOpen(false)} className="border-border">Cancelar</Button>
+            <Button onClick={handleCRMSubmit} disabled={createCRM.isPending || updateCRM.isPending} className="bg-primary text-primary-foreground">
+              {(createCRM.isPending || updateCRM.isPending) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Salvar
             </Button>
           </DialogFooter>
@@ -459,20 +418,78 @@ export default function Configuracoes() {
         <AlertDialogContent className="bg-card border-border">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-foreground">Excluir CRM</AlertDialogTitle>
+            <AlertDialogDescription>Tem certeza que deseja excluir o CRM <strong>{crmToDelete?.nome}</strong>? Esta ação não pode ser desfeita.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-border">Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteCRM} disabled={deleteCRM.isPending} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {deleteCRM.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog Adicionar Usuário */}
+      <Dialog open={userDialogOpen} onOpenChange={setUserDialogOpen}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Adicionar Usuário</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-foreground">Usuário *</Label>
+              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                <SelectTrigger className="bg-input border-border">
+                  <SelectValue placeholder="Selecione um usuário cadastrado" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableUsers.length === 0 ? (
+                    <SelectItem value="none" disabled>Nenhum usuário disponível</SelectItem>
+                  ) : (
+                    availableUsers.map(u => (
+                      <SelectItem key={u.id} value={u.id}>{u.email}</SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-foreground">Papel</Label>
+              <Select value={selectedRole} onValueChange={(v) => setSelectedRole(v as 'director')}>
+                <SelectTrigger className="bg-input border-border">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="director">Diretor</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUserDialogOpen(false)} className="border-border">Cancelar</Button>
+            <Button onClick={handleAddUser} disabled={addUserRole.isPending || !selectedUserId} className="bg-primary text-primary-foreground">
+              {addUserRole.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Adicionar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Remover Usuário */}
+      <AlertDialog open={deleteUserDialogOpen} onOpenChange={setDeleteUserDialogOpen}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-foreground">Remover Acesso</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir o CRM <strong>{crmToDelete?.nome}</strong>?
-              Esta ação não pode ser desfeita.
+              Tem certeza que deseja remover o acesso de <strong>{userRoleToDelete?.email}</strong>? O usuário não poderá mais acessar o sistema.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="border-border">Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteCRM}
-              disabled={deleteCRM.isPending}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {deleteCRM.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Excluir
+            <AlertDialogAction onClick={handleDeleteUser} disabled={deleteUserRole.isPending} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {deleteUserRole.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Remover
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
