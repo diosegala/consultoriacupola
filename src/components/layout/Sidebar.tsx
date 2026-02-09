@@ -28,7 +28,7 @@ export function Sidebar() {
 
   const menuItems = [
     ...baseMenuItems,
-    ...(isAdmin ? [{ to: '/configuracoes', icon: Settings, label: 'Configurações' }] : []),
+    { to: '/configuracoes', icon: Settings, label: 'Configurações' },
   ];
 
   return (

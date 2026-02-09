@@ -17,6 +17,7 @@ import { useConsultores } from '@/hooks/useConsultores';
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('pt-BR', {
@@ -34,6 +35,7 @@ export default function Dashboard() {
   const [showMRR, setShowMRR] = useState(false);
   const [showAguardandoRenovacao, setShowAguardandoRenovacao] = useState(false);
   const [showChurn, setShowChurn] = useState(false);
+  const [mesesFuturos, setMesesFuturos] = useState<number>(6);
 
   const consultorIdsFiltro = consultoresSelecionados.length > 0 ? consultoresSelecionados : undefined;
 
@@ -42,7 +44,7 @@ export default function Dashboard() {
   const { data: aguardandoRenovacao, isLoading: loadingRenovacao } = useClientesAguardandoRenovacao(consultorIdsFiltro);
   const { data: churnMes, isLoading: loadingChurn } = useChurnDoMes(consultorIdsFiltro);
   const { data: alertas, isLoading: loadingAlertas } = useAlertas(consultorIdsFiltro);
-  const { data: mrrHistorico, isLoading: loadingHistorico } = useMRRHistorico(consultorIdsFiltro);
+  const { data: mrrHistorico, isLoading: loadingHistorico } = useMRRHistorico(consultorIdsFiltro, mesesFuturos);
   const { data: contratosHistorico, isLoading: loadingContratosHist } = useContratosHistorico(consultorIdsFiltro);
   const { data: consultores } = useConsultores();
   const { data: listaClientesAtivos } = useListaClientesAtivos(consultorIdsFiltro);
@@ -244,8 +246,22 @@ export default function Dashboard() {
 
       {/* Gráfico MRR */}
       <Card className="bg-card border-border">
-        <CardHeader>
-          <CardTitle className="text-foreground">Evolução do MRR (últimos 12 meses)</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-foreground">Evolução do MRR</CardTitle>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Projeção:</span>
+            <Select value={String(mesesFuturos)} onValueChange={(v) => setMesesFuturos(Number(v))}>
+              <SelectTrigger className="w-[120px] h-8 bg-input border-border">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0">Sem projeção</SelectItem>
+                <SelectItem value="3">3 meses</SelectItem>
+                <SelectItem value="6">6 meses</SelectItem>
+                <SelectItem value="12">12 meses</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </CardHeader>
         <CardContent>
           {loadingHistorico ? (
@@ -267,7 +283,7 @@ export default function Dashboard() {
                   tickFormatter={(value) => formatCurrency(value)}
                 />
                 <Tooltip 
-                  formatter={(value: number) => [formatCurrency(value), 'MRR']}
+                  formatter={(value: number, name: string) => [formatCurrency(value), name === 'mrr_projetado' ? 'MRR Projetado' : 'MRR']}
                   contentStyle={{
                     backgroundColor: 'hsl(var(--card))',
                     border: '1px solid hsl(var(--border))',
@@ -278,10 +294,24 @@ export default function Dashboard() {
                 <Line 
                   type="monotone" 
                   dataKey="mrr" 
+                  name="MRR"
                   stroke="hsl(var(--primary))" 
                   strokeWidth={2}
                   dot={{ fill: 'hsl(var(--primary))' }}
+                  connectNulls={false}
                 />
+                {mesesFuturos > 0 && (
+                  <Line 
+                    type="monotone" 
+                    dataKey="mrr_projetado" 
+                    name="MRR Projetado"
+                    stroke="hsl(var(--primary))" 
+                    strokeWidth={2}
+                    strokeDasharray="6 4"
+                    dot={{ fill: 'hsl(var(--primary))', strokeDasharray: '' }}
+                    connectNulls={false}
+                  />
+                )}
               </LineChart>
             </ResponsiveContainer>
           )}
