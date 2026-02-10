@@ -1,21 +1,19 @@
 
 
-## Alterar o Titulo da Aba do Navegador
+## Trocar o Favicon para o Icone da CUPOLA
 
 ### O que sera feito
-Trocar o titulo que aparece na aba do navegador de "Lovable App" para "CUPOLA Consultoria".
+Substituir o favicon padrao do app pelo icone verde da CUPOLA que voce enviou.
 
-### Alteracao
+### Passos
 
-Editar o arquivo `index.html` para atualizar:
-- O `<title>` da pagina
-- As meta tags `og:title` e `description` para refletir o nome correto da aplicacao
+1. Copiar a imagem enviada (`icone_cupola_verde.png`) para a pasta `public/` do projeto
+2. Atualizar o `index.html` para referenciar o novo favicon em formato PNG
 
 ### Arquivo a modificar
 
 | Arquivo | Alteracao |
 |---------|-----------|
-| `index.html` | Trocar "Lovable App" por "CUPOLA Consultoria" no title e nas meta tags |
-
-Essa e uma alteracao simples e direta, sem impacto em nenhum outro arquivo.
+| `public/favicon.png` | Novo arquivo (copia da imagem enviada) |
+| `index.html` | Adicionar `<link rel="icon" href="/favicon.png" type="image/png">` |
 
