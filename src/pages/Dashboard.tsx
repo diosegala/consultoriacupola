@@ -5,14 +5,14 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useNavigate } from 'react-router-dom';
-import { Users, DollarSign, Clock, TrendingDown, AlertTriangle, CalendarX, BookOpen, Loader2, ChevronDown, X } from 'lucide-react';
+import { Users, DollarSign, Clock, TrendingDown, AlertTriangle, CalendarX, BookOpen, Loader2, ChevronDown, X, Plane } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 import { useClientesAtivos, useClientesAguardandoRenovacao, useListaClientesAtivos, useListaClientesAguardandoRenovacao } from '@/hooks/useClientes';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useMRRTotal, useListaContratosMRR } from '@/hooks/useContratos';
 import { useChurnDoMes, useListaChurnMes } from '@/hooks/useEncerramentos';
-import { useAlertas, useMRRHistorico, useContratosHistorico } from '@/hooks/useDashboard';
+import { useAlertas, useMRRHistorico, useContratosHistorico, useMediaDespesasViagens, useDespesasViagensMensal } from '@/hooks/useDashboard';
 import { useConsultores } from '@/hooks/useConsultores';
 import { useState } from 'react';
 import { format } from 'date-fns';
@@ -46,6 +46,8 @@ export default function Dashboard() {
   const { data: alertas, isLoading: loadingAlertas } = useAlertas(consultorIdsFiltro);
   const { data: mrrHistorico, isLoading: loadingHistorico } = useMRRHistorico(consultorIdsFiltro, mesesFuturos);
   const { data: contratosHistorico, isLoading: loadingContratosHist } = useContratosHistorico(consultorIdsFiltro);
+  const { data: mediaDespesasViagens, isLoading: loadingMediaViagens } = useMediaDespesasViagens(consultorIdsFiltro);
+  const { data: despesasViagensMensal, isLoading: loadingDespesasMensal } = useDespesasViagensMensal(consultorIdsFiltro);
   const { data: consultores } = useConsultores();
   const { data: listaClientesAtivos } = useListaClientesAtivos(consultorIdsFiltro);
   const { data: listaContratosMRR } = useListaContratosMRR(consultorIdsFiltro);
@@ -160,7 +162,7 @@ export default function Dashboard() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <Card 
           className="bg-card border-border cursor-pointer transition-all hover:scale-[1.02] hover:border-primary/50"
           onClick={() => setShowClientesAtivos(true)}
@@ -240,6 +242,25 @@ export default function Dashboard() {
                 {churnMes || 0}%
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card border-border">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Média Despesas Viagens
+            </CardTitle>
+            <Plane className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            {loadingMediaViagens ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <div className="text-3xl font-bold text-foreground">
+                {formatCurrency(mediaDespesasViagens || 0)}
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground mt-1">por contrato</p>
           </CardContent>
         </Card>
       </div>
@@ -363,6 +384,54 @@ export default function Dashboard() {
                   name="Novos" 
                   fill="hsl(var(--primary))" 
                   stackId="contratos"
+                  radius={[4, 4, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Gráfico Despesas com Viagens por Mês */}
+      <Card className="bg-card border-border">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-foreground">
+            <Plane className="h-5 w-5 text-primary" />
+            Despesas com Viagens por Mês (últimos 12 meses)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loadingDespesasMensal ? (
+            <div className="h-[300px] flex items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={despesasViagensMensal || []}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis 
+                  dataKey="mes" 
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={12}
+                />
+                <YAxis 
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={12}
+                  tickFormatter={(value) => formatCurrency(value)}
+                />
+                <Tooltip 
+                  formatter={(value: number) => [formatCurrency(value), 'Despesas']}
+                  contentStyle={{
+                    backgroundColor: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px'
+                  }}
+                  labelStyle={{ color: 'hsl(var(--foreground))' }}
+                />
+                <Bar 
+                  dataKey="total" 
+                  name="Despesas" 
+                  fill="hsl(var(--primary))" 
                   radius={[4, 4, 0, 0]}
                 />
               </BarChart>

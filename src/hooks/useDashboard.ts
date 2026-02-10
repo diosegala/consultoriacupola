@@ -160,7 +160,6 @@ export function useContratosHistorico(consultorIds?: string[]) {
     queryFn: async () => {
       const resultado: { mes: string; novos: number; encerrados: number }[] = [];
 
-      // Buscar todos os contratos com consultor
       const { data: contratos, error: contratosError } = await supabase
         .from('contratos')
         .select(`
@@ -170,7 +169,6 @@ export function useContratosHistorico(consultorIds?: string[]) {
 
       if (contratosError) throw contratosError;
 
-      // Buscar todos os encerramentos com consultor
       const { data: encerramentos, error: encError } = await supabase
         .from('encerramentos')
         .select(`
@@ -180,7 +178,6 @@ export function useContratosHistorico(consultorIds?: string[]) {
 
       if (encError) throw encError;
 
-      // Filtrar por consultor se necessário
       const contratosFiltrados = consultorIds?.length 
         ? (contratos as any[])?.filter(c => consultorIds.includes(c.cliente?.consultor_id))
         : contratos;
@@ -189,19 +186,16 @@ export function useContratosHistorico(consultorIds?: string[]) {
         ? (encerramentos as any[])?.filter(e => consultorIds.includes(e.cliente?.consultor_id))
         : encerramentos;
 
-      // Calcular para cada mês dos últimos 12 meses
       for (let i = 11; i >= 0; i--) {
         const mesRef = subMonths(new Date(), i);
         const inicioMes = startOfMonth(mesRef);
         const fimMes = endOfMonth(mesRef);
 
-        // Contratos que iniciaram naquele mês
         const novosNoMes = (contratosFiltrados || []).filter(c => {
           const dataInicio = parseISO(c.data_inicio);
           return isWithinInterval(dataInicio, { start: inicioMes, end: fimMes });
         }).length;
 
-        // Encerramentos naquele mês
         const encerradosNoMes = (encerramentosFiltrados || []).filter(e => {
           const dataEnc = parseISO(e.data_encerramento);
           return isWithinInterval(dataEnc, { start: inicioMes, end: fimMes });
@@ -211,6 +205,75 @@ export function useContratosHistorico(consultorIds?: string[]) {
           mes: format(mesRef, 'MMM/yy', { locale: ptBR }),
           novos: novosNoMes,
           encerrados: encerradosNoMes
+        });
+      }
+
+      return resultado;
+    }
+  });
+}
+
+export function useMediaDespesasViagens(consultorIds?: string[]) {
+  return useQuery({
+    queryKey: ['dashboard', 'media-despesas-viagens', consultorIds],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('viagens_contrato')
+        .select(`
+          valor, contrato_id,
+          cliente:clientes!viagens_contrato_cliente_id_fkey(consultor_id)
+        `);
+
+      if (error) throw error;
+
+      const filtrados = consultorIds?.length
+        ? (data as any[])?.filter(v => consultorIds.includes(v.cliente?.consultor_id))
+        : data;
+
+      if (!filtrados || filtrados.length === 0) return 0;
+
+      const totalDespesas = filtrados.reduce((sum, v) => sum + Number(v.valor || 0), 0);
+      const contratosUnicos = new Set(filtrados.map(v => v.contrato_id)).size;
+
+      return contratosUnicos > 0 ? totalDespesas / contratosUnicos : 0;
+    }
+  });
+}
+
+export function useDespesasViagensMensal(consultorIds?: string[]) {
+  return useQuery({
+    queryKey: ['dashboard', 'despesas-viagens-mensal', consultorIds],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('viagens_contrato')
+        .select(`
+          data_viagem, valor,
+          cliente:clientes!viagens_contrato_cliente_id_fkey(consultor_id)
+        `);
+
+      if (error) throw error;
+
+      const filtrados = consultorIds?.length
+        ? (data as any[])?.filter(v => consultorIds.includes(v.cliente?.consultor_id))
+        : data;
+
+      const resultado: { mes: string; total: number }[] = [];
+
+      for (let i = 11; i >= 0; i--) {
+        const mesRef = subMonths(new Date(), i);
+        const inicioMes = startOfMonth(mesRef);
+        const fimMes = endOfMonth(mesRef);
+
+        const totalMes = (filtrados || [])
+          .filter(v => {
+            const dataViagem = parseISO(v.data_viagem);
+            return isWithinInterval(dataViagem, { start: inicioMes, end: fimMes });
+          })
+          .reduce((sum, v) => sum + Number(v.valor || 0), 0);
+
+        resultado.push({
+          mes: format(mesRef, 'MMM/yy', { locale: ptBR }),
+          total: totalMes
         });
       }
 
