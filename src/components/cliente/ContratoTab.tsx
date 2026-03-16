@@ -32,7 +32,7 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
-export function ContratoTab({ clienteId, clienteStatus }: ContratoTabProps) {
+export function ContratoTab({ clienteId, clienteStatus, consultorId }: ContratoTabProps) {
   const { data: contratos, isLoading } = useContratos(clienteId);
   const { data: contratoAtivo } = useContratoAtivo(clienteId);
 
