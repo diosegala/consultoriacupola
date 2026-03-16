@@ -74,6 +74,7 @@ export function ContratoFormDialog({ open, onOpenChange, clienteId, contrato, co
   useEffect(() => {
     if (contrato) {
       form.reset({
+        consultor_id: consultorId || '',
         tipo_consultoria_id: contrato.tipo_consultoria_id || '',
         prazo_meses: contrato.prazo_meses,
         data_inicio: parseISO(contrato.data_inicio),
