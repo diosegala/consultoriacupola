@@ -56,6 +56,7 @@ export function ContratoFormDialog({ open, onOpenChange, clienteId, contrato, co
   const form = useForm<ContratoFormValues>({
     resolver: zodResolver(contratoSchema),
     defaultValues: {
+      consultor_id: '',
       tipo_consultoria_id: '',
       prazo_meses: 12,
       data_inicio: new Date(),
