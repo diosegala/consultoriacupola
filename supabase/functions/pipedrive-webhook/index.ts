@@ -153,6 +153,16 @@ Deno.serve(async (req) => {
       return jsonResponse({ message: 'Evento ignorado - não é deal won' }, 200);
     }
 
+    // 2.5. Filter by pipeline
+    const expectedPipelineId = Deno.env.get('PIPEDRIVE_PIPELINE_ID');
+    if (expectedPipelineId) {
+      const dealPipelineId = String(payload.current?.pipeline_id);
+      if (dealPipelineId !== expectedPipelineId) {
+        console.log(`Evento ignorado - pipeline ${dealPipelineId} não é o esperado (${expectedPipelineId})`);
+        return jsonResponse({ message: 'Evento ignorado - pipeline diferente' }, 200);
+      }
+    }
+
     // 3. Extract deal ID
     const dealId = String(payload.current?.id || payload.meta.id);
     if (!dealId || dealId === 'undefined') {
