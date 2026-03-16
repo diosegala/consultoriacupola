@@ -89,6 +89,7 @@ export function ContratoFormDialog({ open, onOpenChange, clienteId, contrato, co
       });
     } else {
       form.reset({
+        consultor_id: consultorId || '',
         tipo_consultoria_id: '',
         prazo_meses: 12,
         data_inicio: new Date(),
