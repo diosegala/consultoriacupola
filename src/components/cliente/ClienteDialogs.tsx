@@ -103,7 +103,7 @@ export function ContratoFormDialog({ open, onOpenChange, clienteId, contrato, co
         particularidades: '',
       });
     }
-  }, [contrato, form, open]);
+  }, [contrato, form, open, consultorId]);
 
   // Recalcular data_fim quando prazo ou data_inicio mudar
   const watchDataInicio = form.watch('data_inicio');
