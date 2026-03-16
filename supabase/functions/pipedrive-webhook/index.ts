@@ -27,6 +27,7 @@ const PipedriveCurrentSchema = z.object({
   title: z.string().optional(),
   status: z.string().optional(),
   value: z.number().optional(),
+  pipeline_id: z.number().int().positive().optional(),
   org_id: z.union([
     z.object({ name: z.string().optional() }),
     z.number(),
@@ -150,6 +151,16 @@ Deno.serve(async (req) => {
     if (!isDealWon) {
       console.log('Evento ignorado - não é deal won');
       return jsonResponse({ message: 'Evento ignorado - não é deal won' }, 200);
+    }
+
+    // 2.5. Filter by pipeline
+    const expectedPipelineId = Deno.env.get('PIPEDRIVE_PIPELINE_ID');
+    if (expectedPipelineId) {
+      const dealPipelineId = String(payload.current?.pipeline_id);
+      if (dealPipelineId !== expectedPipelineId) {
+        console.log(`Evento ignorado - pipeline ${dealPipelineId} não é o esperado (${expectedPipelineId})`);
+        return jsonResponse({ message: 'Evento ignorado - pipeline diferente' }, 200);
+      }
     }
 
     // 3. Extract deal ID
