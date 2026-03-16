@@ -6,21 +6,33 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-// ========== ZOD VALIDATION SCHEMAS ==========
+// ========== ZOD VALIDATION SCHEMAS (Pipedrive v1 + v2) ==========
+const stringOrNumber = z.union([z.number(), z.string()]);
+
 const PipedriveMetaSchema = z.object({
-  action: z.enum(['added', 'updated', 'deleted', 'merged']),
-  object: z.literal('deal'),
-  id: z.number().int().positive().optional(),
+  action: z.enum(['added', 'updated', 'deleted', 'merged', 'change']),
+  // v1 uses "object", v2 uses "entity"
+  object: z.literal('deal').optional(),
+  entity: z.literal('deal').optional(),
+  id: stringOrNumber.optional(),
   v: z.number().optional(),
-  timestamp: z.number().optional(),
-  company_id: z.number().optional(),
-  user_id: z.number().optional(),
+  timestamp: stringOrNumber.optional(),
+  company_id: stringOrNumber.optional(),
+  user_id: stringOrNumber.optional(),
   host: z.string().optional(),
   webhook_id: z.string().optional(),
   trans_pending: z.boolean().optional(),
-  permitted_user_ids: z.array(z.number()).optional(),
+  permitted_user_ids: z.array(stringOrNumber).optional(),
   is_bulk_update: z.boolean().optional(),
-});
+  is_bulk_edit: z.boolean().optional(),
+  entity_id: z.string().optional(),
+  correlation_id: z.string().optional(),
+  version: z.string().optional(),
+  type: z.string().optional(),
+  webhook_owner_id: z.string().optional(),
+  change_source: z.string().optional(),
+  attempt: z.number().optional(),
+}).passthrough();
 
 const PipedriveCurrentSchema = z.object({
   id: z.number().int().positive(),
@@ -44,22 +56,46 @@ const PipedrivePreviousSchema = z.object({
   status: z.string().optional(),
 }).passthrough();
 
+// Accept both v1 (current) and v2 (data) payload formats
 const PipedrivePayloadSchema = z.object({
   meta: PipedriveMetaSchema,
   current: PipedriveCurrentSchema.optional(),
+  data: PipedriveCurrentSchema.optional(),
   previous: PipedrivePreviousSchema.optional(),
 }).refine(
-  (data) => {
-    // For non-delete actions, current is required
-    if (data.meta.action !== 'deleted' && !data.current) {
+  (payload) => {
+    const current = payload.current || payload.data;
+    // For non-delete actions, current/data is required
+    if (payload.meta.action !== 'deleted' && !current) {
       return false;
     }
     return true;
   },
-  { message: "Campo 'current' é obrigatório para ações que não são 'deleted'" }
+  { message: "Campo 'current' ou 'data' é obrigatório para ações que não são 'deleted'" }
+).refine(
+  (payload) => {
+    // Must be a deal event (v1: meta.object, v2: meta.entity)
+    return payload.meta.object === 'deal' || payload.meta.entity === 'deal';
+  },
+  { message: "Evento deve ser de um deal (meta.object ou meta.entity)" }
 );
 
-type ValidatedPipedrivePayload = z.infer<typeof PipedrivePayloadSchema>;
+type RawPipedrivePayload = z.infer<typeof PipedrivePayloadSchema>;
+
+// Normalized type with `current` always set
+interface NormalizedPayload {
+  meta: RawPipedrivePayload['meta'];
+  current: z.infer<typeof PipedriveCurrentSchema> | undefined;
+  previous: z.infer<typeof PipedrivePreviousSchema> | undefined;
+}
+
+function normalizePayload(raw: RawPipedrivePayload): NormalizedPayload {
+  return {
+    meta: raw.meta,
+    current: raw.current || raw.data,
+    previous: raw.previous,
+  };
+}
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
@@ -126,8 +162,9 @@ Deno.serve(async (req) => {
       }, 400);
     }
 
-    const payload = parseResult.data;
-    console.log('Payload validado com sucesso');
+    // Normalize v1/v2 payload to consistent format
+    const payload = normalizePayload(parseResult.data);
+    console.log('Payload validado com sucesso (formato:', parseResult.data.data ? 'v2' : 'v1', ')');
 
     // 1. Register webhook log immediately (before processing)
     const { data: logData, error: logError } = await supabase
@@ -164,7 +201,7 @@ Deno.serve(async (req) => {
     }
 
     // 3. Extract deal ID
-    const dealId = String(payload.current?.id || payload.meta.id);
+    const dealId = String(payload.current?.id || payload.meta.id || payload.meta.entity_id);
     if (!dealId || dealId === 'undefined') {
       console.error('Deal ID não encontrado no payload');
       await updateLogError(supabase, logId, 'Deal ID não encontrado');
@@ -312,11 +349,11 @@ function jsonResponse(data: unknown, status: number) {
   );
 }
 
-function checkIfDealWon(payload: ValidatedPipedrivePayload): boolean {
+function checkIfDealWon(payload: NormalizedPayload): boolean {
   // Check if current status is 'won'
   if (payload.current?.status === 'won') {
-    // For updates, check if it was just changed to won
-    if (payload.meta.action === 'updated') {
+    // For updates/changes, check if it was just changed to won
+    if (payload.meta.action === 'updated' || payload.meta.action === 'change') {
       // If previous status was also 'won', it's not a new win
       if (payload.previous?.status === 'won') {
         return false;
@@ -327,7 +364,7 @@ function checkIfDealWon(payload: ValidatedPipedrivePayload): boolean {
   return false;
 }
 
-function extractClienteData(payload: ValidatedPipedrivePayload): { nome: string; cidade: string; uf: string } {
+function extractClienteData(payload: NormalizedPayload): { nome: string; cidade: string; uf: string } {
   const current = payload.current;
   
   if (!current) {
@@ -350,7 +387,6 @@ function extractClienteData(payload: ValidatedPipedrivePayload): { nome: string;
   let uf = 'SP';
 
   // Try to find custom fields for cidade and UF
-  // Look for common patterns in custom field keys
   for (const [key, value] of Object.entries(current)) {
     if (typeof value === 'string' && value.length <= 255) {
       const keyLower = key.toLowerCase();
@@ -358,7 +394,6 @@ function extractClienteData(payload: ValidatedPipedrivePayload): { nome: string;
         cidade = value.replace(/[<>'"]/g, '');
       }
       if (keyLower.includes('estado') || keyLower.includes('uf') || keyLower.includes('state')) {
-        // Handle UF - could be full state name or abbreviation
         const sanitizedValue = value.replace(/[^a-zA-Z\s]/g, '');
         uf = sanitizedValue.length <= 2 ? sanitizedValue.toUpperCase() : sanitizedValue.substring(0, 2).toUpperCase();
       }
@@ -368,7 +403,7 @@ function extractClienteData(payload: ValidatedPipedrivePayload): { nome: string;
   return { nome, cidade, uf };
 }
 
-function extractContratoData(payload: ValidatedPipedrivePayload): { prazoMeses: number; remuneracaoTotal: number } {
+function extractContratoData(payload: NormalizedPayload): { prazoMeses: number; remuneracaoTotal: number } {
   const current = payload.current;
   
   if (!current) {
@@ -388,7 +423,6 @@ function extractContratoData(payload: ValidatedPipedrivePayload): { prazoMeses: 
     const keyLower = key.toLowerCase();
     if (keyLower.includes('prazo') || keyLower.includes('meses') || keyLower.includes('duracao')) {
       const numValue = parseInt(String(value), 10);
-      // Validate prazo is within reasonable bounds
       if (!isNaN(numValue) && numValue > 0 && numValue <= 120) {
         prazoMeses = numValue;
       }
