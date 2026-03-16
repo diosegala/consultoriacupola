@@ -120,7 +120,7 @@ export default function ClienteDetalhe() {
         </TabsList>
 
         <TabsContent value="contrato" className="mt-6">
-          <ContratoTab clienteId={cliente.id} clienteStatus={cliente.status} />
+          <ContratoTab clienteId={cliente.id} clienteStatus={cliente.status} consultorId={cliente.consultor_id} />
         </TabsContent>
 
         <TabsContent value="onboarding" className="mt-6">
