@@ -1,66 +1,41 @@
 
 
-## Card de Media de Despesas com Viagens + Grafico Mensal
+## Adicionar campo de Consultor no formulario de edicao do contrato
 
-### O que sera feito
+### Contexto
 
-1. **Novo KPI Card** - Adicionar um quinto card no Dashboard mostrando a media das despesas com viagens (total de despesas dividido pelo numero de contratos que possuem viagens lancadas).
+Atualmente o `consultor_id` pertence a tabela `clientes`, nao a `contratos`. O formulario de contrato (`ContratoFormDialog`) nao permite alterar o consultor -- isso so e possivel editando o cliente. O usuario quer poder trocar o consultor diretamente ao editar um contrato.
 
-2. **Novo Grafico de Barras** - Adicionar um grafico de barras como ultimo grafico do Dashboard, mostrando o total de despesas com viagens por mes (ultimos 12 meses).
+### Abordagem
 
----
+Como o campo `consultor_id` esta na tabela `clientes` (e nao em `contratos`), a solucao e adicionar um campo Select de consultor no `ContratoFormDialog` que, ao salvar, tambem atualiza o `consultor_id` do cliente associado.
 
-### Detalhes
+Nao e necessario alterar o schema do banco de dados.
 
-#### KPI Card - Media de Despesas com Viagens
-- Posicionado junto aos outros 4 cards existentes (a grid passara a ter 5 cards, distribuidos em 2 linhas no desktop)
-- Mostra o valor medio de despesas por contrato (soma total / quantidade de contratos com viagens)
-- Icone de aviao ou mapa para representar viagens
-- Se nao houver viagens lancadas, mostra R$ 0
+### Alteracoes
 
-#### Grafico de Barras - Despesas com Viagens por Mes
-- Ultimo grafico do Dashboard (abaixo do grafico de Contratos Novos vs Encerrados e acima da tabela de Alertas)
-- Barras mostrando o total de despesas com viagens em cada mes dos ultimos 12 meses
-- Segue o mesmo padrao visual dos outros graficos (cores, tooltips, responsividade)
+**Arquivo: `src/components/cliente/ClienteDialogs.tsx`**
 
----
+1. Importar `useConsultores` e `useUpdateCliente`
+2. Adicionar `consultor_id` ao `contratoSchema` (campo opcional)
+3. Buscar a lista de consultores no componente
+4. Ao carregar para edicao, preencher o campo com o `consultor_id` do cliente (recebido via prop)
+5. No `onSubmit`, alem de salvar o contrato, chamar `useUpdateCliente` para atualizar o `consultor_id` do cliente se ele tiver mudado
+6. Adicionar o campo Select de Consultor no formulario, ao lado do campo Tipo de Consultoria
 
-### Secao Tecnica
+**Arquivo: `src/components/cliente/ClienteDialogs.tsx` (interface)**
 
-#### Novo hook em `src/hooks/useDashboard.ts`
+- Adicionar prop opcional `consultorId?: string | null` ao `ContratoFormDialogProps`
 
-Adicionar duas funcoes:
+**Arquivo: `src/pages/Contratos.tsx`**
 
-1. **`useMediaDespesasViagens(consultorIds?)`** - Busca todas as viagens com o consultor_id do cliente, calcula a media por contrato
-2. **`useDespesasViagensMensal(consultorIds?)`** - Agrupa viagens por mes (usando `data_viagem`), retorna array com `{ mes, total }` para os ultimos 12 meses
+- Passar `consultorId={editingContrato?.cliente?.consultor_id}` ao `ContratoFormDialog`
 
-Ambas consultam a tabela `viagens_contrato` com join em `clientes` para filtrar por consultor.
+**Arquivo: `src/components/cliente/ContratoTab.tsx`**
 
-#### Alteracoes em `src/pages/Dashboard.tsx`
+- Buscar o `consultor_id` do cliente e passa-lo ao `ContratoFormDialog`
 
-| Alteracao | Detalhe |
-|-----------|---------|
-| Importar novos hooks | `useMediaDespesasViagens` e `useDespesasViagensMensal` |
-| Novo KPI card | Card com icone Plane, mostrando media formatada como moeda |
-| Novo grafico | `BarChart` do Recharts com barras de despesas por mes |
-| Grid dos cards | Ajustar grid para acomodar 5 cards (manter `lg:grid-cols-4` ou mudar para `lg:grid-cols-5`) |
+### Detalhes tecnicos
 
-#### Estrutura dos dados
-
-```text
-useMediaDespesasViagens -> numero (media em R$)
-
-useDespesasViagensMensal -> [
-  { mes: "mar/25", total: 2500 },
-  { mes: "abr/25", total: 1800 },
-  ...
-]
-```
-
-### Arquivos a modificar
-
-| Arquivo | Alteracao |
-|---------|-----------|
-| `src/hooks/useDashboard.ts` | Adicionar `useMediaDespesasViagens` e `useDespesasViagensMensal` |
-| `src/pages/Dashboard.tsx` | Adicionar KPI card de viagens + grafico de barras mensal |
+O campo `consultor_id` continua na tabela `clientes`. O formulario faz um update em `clientes` (apenas o campo `consultor_id`) em paralelo ao update do contrato, usando o hook `useUpdateCliente` ja existente.
 
