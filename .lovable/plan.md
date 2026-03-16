@@ -1,21 +1,48 @@
 
 
-## Configurar Secrets para Autenticação do Webhook Pipedrive
+## Adicionar Filtragem por Pipeline na Edge Function
 
-### O que fazer
+### Contexto
 
-Criar dois secrets no backend do projeto usando a ferramenta `add_secret`:
-
-1. **`PIPEDRIVE_WEBHOOK_USER`** — Nome de usuário que será usado no campo "Nome de usuário autent. HTTP" do Pipedrive
-2. **`PIPEDRIVE_WEBHOOK_PASSWORD`** — Senha que será usada no campo "Senha autent. HTTP" do Pipedrive
+O Pipedrive envia webhooks para todos os pipelines. Precisamos filtrar para processar apenas deals do pipeline de **Consultoria**, ignorando os demais.
 
 ### Como funciona
 
-- Ao executar, o sistema pedirá que você insira o valor de cada secret
-- Você pode escolher qualquer valor (ex: `cupola_webhook` para user e uma senha forte para password)
-- Depois, basta preencher os mesmos valores nos campos de autenticação HTTP do webhook no Pipedrive
+O payload do Pipedrive inclui o campo `pipeline_id` (inteiro) no objeto `current`. Vamos:
 
-### Nenhuma alteração de código necessária
+1. **Criar um secret `PIPEDRIVE_PIPELINE_ID`** com o ID numérico do pipeline de Consultoria no Pipedrive
+2. **Adicionar validação na edge function** logo após o check de "deal won" (linha 150), verificando se o `pipeline_id` do deal corresponde ao esperado
 
-A edge function já foi atualizada na mensagem anterior para ler esses secrets. Só falta criá-los.
+### Alteração na Edge Function
+
+Após a verificação de deal won (linha 150-153), adicionar:
+
+```typescript
+// Filter by pipeline
+const expectedPipelineId = Deno.env.get('PIPEDRIVE_PIPELINE_ID');
+if (expectedPipelineId) {
+  const dealPipelineId = String(payload.current?.pipeline_id);
+  if (dealPipelineId !== expectedPipelineId) {
+    console.log(`Evento ignorado - pipeline ${dealPipelineId} não é o esperado (${expectedPipelineId})`);
+    return jsonResponse({ message: 'Evento ignorado - pipeline diferente' }, 200);
+  }
+}
+```
+
+Também atualizar o `PipedriveCurrentSchema` (linha 25) para incluir `pipeline_id`:
+
+```typescript
+pipeline_id: z.number().int().positive().optional(),
+```
+
+### Como descobrir o pipeline_id
+
+No Pipedrive, acesse **Configurações > Pipelines** ou use a API. O ID aparece na URL ao abrir o pipeline.
+
+### Arquivos a modificar
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `supabase/functions/pipedrive-webhook/index.ts` | Adicionar `pipeline_id` ao schema e validação por pipeline |
+| Secrets | Criar `PIPEDRIVE_PIPELINE_ID` |
 
