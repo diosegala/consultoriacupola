@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 interface ContratoTabProps {
   clienteId: string;
   clienteStatus: string;
+  consultorId?: string | null;
 }
 
 function formatCurrency(value: number): string {

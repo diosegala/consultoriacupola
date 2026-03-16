@@ -192,6 +192,32 @@ export function ContratoFormDialog({ open, onOpenChange, clienteId, contrato, co
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
+              {/* Consultor Responsável */}
+              <FormField
+                control={form.control}
+                name="consultor_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Consultor Responsável</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ''}>
+                      <FormControl>
+                        <SelectTrigger className="bg-background border-input">
+                          <SelectValue placeholder="Selecione..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="bg-popover border-border">
+                        {consultores?.map((consultor) => (
+                          <SelectItem key={consultor.id} value={consultor.id}>
+                            {consultor.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               {/* Tipo de Consultoria */}
               <FormField
                 control={form.control}
@@ -217,7 +243,9 @@ export function ContratoFormDialog({ open, onOpenChange, clienteId, contrato, co
                   </FormItem>
                 )}
               />
+            </div>
 
+            <div className="grid grid-cols-2 gap-4">
               {/* Momento */}
               <FormField
                 control={form.control}
