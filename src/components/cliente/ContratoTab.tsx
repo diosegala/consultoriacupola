@@ -238,6 +238,7 @@ export function ContratoTab({ clienteId, clienteStatus, consultorId }: ContratoT
         onOpenChange={setShowForm}
         clienteId={clienteId}
         contrato={editingContrato}
+        consultorId={consultorId}
       />
 
       {contratoAtivo && (
