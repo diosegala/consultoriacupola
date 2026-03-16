@@ -921,6 +921,7 @@ export default function Contratos() {
           }}
           clienteId={editingContrato.cliente_id}
           contrato={editingContrato}
+          consultorId={editingContrato.cliente?.consultor_id}
         />
       )}
 
