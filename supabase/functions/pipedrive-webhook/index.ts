@@ -27,6 +27,7 @@ const PipedriveCurrentSchema = z.object({
   title: z.string().optional(),
   status: z.string().optional(),
   value: z.number().optional(),
+  pipeline_id: z.number().int().positive().optional(),
   org_id: z.union([
     z.object({ name: z.string().optional() }),
     z.number(),
