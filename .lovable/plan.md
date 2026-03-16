@@ -1,66 +1,55 @@
 
 
-## Card de Media de Despesas com Viagens + Grafico Mensal
+## Atualizar Webhook Pipedrive com HTTP Basic Authentication
 
-### O que sera feito
+### O que muda
 
-1. **Novo KPI Card** - Adicionar um quinto card no Dashboard mostrando a media das despesas com viagens (total de despesas dividido pelo numero de contratos que possuem viagens lancadas).
+O plano anterior usava token via query parameter. Como o Pipedrive oferece campos nativos de **Nome de usuario** e **Senha** HTTP Basic Auth, vamos usar essa abordagem -- mais segura e padrao.
 
-2. **Novo Grafico de Barras** - Adicionar um grafico de barras como ultimo grafico do Dashboard, mostrando o total de despesas com viagens por mes (ultimos 12 meses).
+### Como funciona
 
----
+O Pipedrive envia o header `Authorization: Basic base64(usuario:senha)` automaticamente. A edge function decodifica e valida contra secrets armazenados.
 
-### Detalhes
+### Passos
 
-#### KPI Card - Media de Despesas com Viagens
-- Posicionado junto aos outros 4 cards existentes (a grid passara a ter 5 cards, distribuidos em 2 linhas no desktop)
-- Mostra o valor medio de despesas por contrato (soma total / quantidade de contratos com viagens)
-- Icone de aviao ou mapa para representar viagens
-- Se nao houver viagens lancadas, mostra R$ 0
+1. **Criar 2 secrets**: `PIPEDRIVE_WEBHOOK_USER` e `PIPEDRIVE_WEBHOOK_PASSWORD` com valores que voce definir
+2. **Atualizar `supabase/functions/pipedrive-webhook/index.ts`**: Adicionar validacao de HTTP Basic Auth logo apos o check de metodo POST
 
-#### Grafico de Barras - Despesas com Viagens por Mes
-- Ultimo grafico do Dashboard (abaixo do grafico de Contratos Novos vs Encerrados e acima da tabela de Alertas)
-- Barras mostrando o total de despesas com viagens em cada mes dos ultimos 12 meses
-- Segue o mesmo padrao visual dos outros graficos (cores, tooltips, responsividade)
+### Alteracao na Edge Function
 
----
+Adicionar apos a verificacao de POST (linha 76):
 
-### Secao Tecnica
+```typescript
+// Validate HTTP Basic Auth
+const authHeader = req.headers.get('Authorization');
+if (!authHeader || !authHeader.startsWith('Basic ')) {
+  return jsonResponse({ error: 'Autenticação necessária' }, 401);
+}
 
-#### Novo hook em `src/hooks/useDashboard.ts`
+const expectedUser = Deno.env.get('PIPEDRIVE_WEBHOOK_USER');
+const expectedPass = Deno.env.get('PIPEDRIVE_WEBHOOK_PASSWORD');
 
-Adicionar duas funcoes:
+const base64Credentials = authHeader.replace('Basic ', '');
+const decoded = atob(base64Credentials);
+const [user, pass] = decoded.split(':');
 
-1. **`useMediaDespesasViagens(consultorIds?)`** - Busca todas as viagens com o consultor_id do cliente, calcula a media por contrato
-2. **`useDespesasViagensMensal(consultorIds?)`** - Agrupa viagens por mes (usando `data_viagem`), retorna array com `{ mes, total }` para os ultimos 12 meses
-
-Ambas consultam a tabela `viagens_contrato` com join em `clientes` para filtrar por consultor.
-
-#### Alteracoes em `src/pages/Dashboard.tsx`
-
-| Alteracao | Detalhe |
-|-----------|---------|
-| Importar novos hooks | `useMediaDespesasViagens` e `useDespesasViagensMensal` |
-| Novo KPI card | Card com icone Plane, mostrando media formatada como moeda |
-| Novo grafico | `BarChart` do Recharts com barras de despesas por mes |
-| Grid dos cards | Ajustar grid para acomodar 5 cards (manter `lg:grid-cols-4` ou mudar para `lg:grid-cols-5`) |
-
-#### Estrutura dos dados
-
-```text
-useMediaDespesasViagens -> numero (media em R$)
-
-useDespesasViagensMensal -> [
-  { mes: "mar/25", total: 2500 },
-  { mes: "abr/25", total: 1800 },
-  ...
-]
+if (user !== expectedUser || pass !== expectedPass) {
+  return jsonResponse({ error: 'Credenciais inválidas' }, 401);
+}
 ```
+
+### Configuracao no Pipedrive
+
+Ao criar o webhook no Pipedrive, preencher:
+- **URL**: `https://wmmnbonigciftewukvum.supabase.co/functions/v1/pipedrive-webhook`
+- **Nome de usuario autent. HTTP**: o valor definido no secret `PIPEDRIVE_WEBHOOK_USER`
+- **Senha autent. HTTP**: o valor definido no secret `PIPEDRIVE_WEBHOOK_PASSWORD`
+- **Evento**: Deal updated
 
 ### Arquivos a modificar
 
 | Arquivo | Alteracao |
 |---------|-----------|
-| `src/hooks/useDashboard.ts` | Adicionar `useMediaDespesasViagens` e `useDespesasViagensMensal` |
-| `src/pages/Dashboard.tsx` | Adicionar KPI card de viagens + grafico de barras mensal |
+| `supabase/functions/pipedrive-webhook/index.ts` | Adicionar validacao HTTP Basic Auth |
+| Secrets | Criar `PIPEDRIVE_WEBHOOK_USER` e `PIPEDRIVE_WEBHOOK_PASSWORD` |
 
