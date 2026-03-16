@@ -148,6 +148,15 @@ export function ContratoFormDialog({ open, onOpenChange, clienteId, contrato, co
         ativo: true,
       };
 
+      // Update consultor if changed
+      const newConsultorId = values.consultor_id || null;
+      if (newConsultorId !== (consultorId || null)) {
+        await updateCliente.mutateAsync({
+          id: clienteId,
+          consultor_id: newConsultorId,
+        });
+      }
+
       if (isEditing && contrato) {
         await updateContrato.mutateAsync({
           id: contrato.id,
