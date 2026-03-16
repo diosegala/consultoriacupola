@@ -74,6 +74,23 @@ Deno.serve(async (req) => {
     );
   }
 
+  // Validate HTTP Basic Auth
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Basic ')) {
+    return jsonResponse({ error: 'Autenticação necessária' }, 401);
+  }
+
+  const expectedUser = Deno.env.get('PIPEDRIVE_WEBHOOK_USER');
+  const expectedPass = Deno.env.get('PIPEDRIVE_WEBHOOK_PASSWORD');
+
+  const base64Credentials = authHeader.replace('Basic ', '');
+  const decoded = atob(base64Credentials);
+  const [user, pass] = decoded.split(':');
+
+  if (user !== expectedUser || pass !== expectedPass) {
+    return jsonResponse({ error: 'Credenciais inválidas' }, 401);
+  }
+
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
