@@ -42,12 +42,15 @@ interface ContratoFormDialogProps {
   onOpenChange: (open: boolean) => void;
   clienteId: string;
   contrato?: ContratoComTipo | null;
+  consultorId?: string | null;
 }
 
-export function ContratoFormDialog({ open, onOpenChange, clienteId, contrato }: ContratoFormDialogProps) {
+export function ContratoFormDialog({ open, onOpenChange, clienteId, contrato, consultorId }: ContratoFormDialogProps) {
   const { data: tiposConsultoria } = useTiposConsultoria();
+  const { data: consultores } = useConsultores();
   const createContrato = useCreateContrato();
   const updateContrato = useUpdateContrato();
+  const updateCliente = useUpdateCliente();
   const isEditing = !!contrato;
 
   const form = useForm<ContratoFormValues>({
