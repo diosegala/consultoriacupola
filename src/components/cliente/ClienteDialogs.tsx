@@ -15,10 +15,13 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { useCreateContrato, useUpdateContrato, useRenovarContrato, ContratoComTipo } from '@/hooks/useContratos';
 import { useTiposConsultoria } from '@/hooks/useDadosAuxiliares';
+import { useConsultores } from '@/hooks/useConsultores';
+import { useUpdateCliente } from '@/hooks/useClientes';
 import { useEncerrarContrato } from '@/hooks/useEncerramentos';
 import { toast } from '@/hooks/use-toast';
 
 const contratoSchema = z.object({
+  consultor_id: z.string().optional().nullable(),
   tipo_consultoria_id: z.string().optional().nullable(),
   prazo_meses: z.coerce.number().min(1, 'Prazo deve ser maior que 0'),
   data_inicio: z.date({ required_error: 'Data de início é obrigatória' }),
@@ -39,17 +42,21 @@ interface ContratoFormDialogProps {
   onOpenChange: (open: boolean) => void;
   clienteId: string;
   contrato?: ContratoComTipo | null;
+  consultorId?: string | null;
 }
 
-export function ContratoFormDialog({ open, onOpenChange, clienteId, contrato }: ContratoFormDialogProps) {
+export function ContratoFormDialog({ open, onOpenChange, clienteId, contrato, consultorId }: ContratoFormDialogProps) {
   const { data: tiposConsultoria } = useTiposConsultoria();
+  const { data: consultores } = useConsultores();
   const createContrato = useCreateContrato();
   const updateContrato = useUpdateContrato();
+  const updateCliente = useUpdateCliente();
   const isEditing = !!contrato;
 
   const form = useForm<ContratoFormValues>({
     resolver: zodResolver(contratoSchema),
     defaultValues: {
+      consultor_id: '',
       tipo_consultoria_id: '',
       prazo_meses: 12,
       data_inicio: new Date(),
@@ -67,6 +74,7 @@ export function ContratoFormDialog({ open, onOpenChange, clienteId, contrato }: 
   useEffect(() => {
     if (contrato) {
       form.reset({
+        consultor_id: consultorId || '',
         tipo_consultoria_id: contrato.tipo_consultoria_id || '',
         prazo_meses: contrato.prazo_meses,
         data_inicio: parseISO(contrato.data_inicio),
@@ -81,6 +89,7 @@ export function ContratoFormDialog({ open, onOpenChange, clienteId, contrato }: 
       });
     } else {
       form.reset({
+        consultor_id: consultorId || '',
         tipo_consultoria_id: '',
         prazo_meses: 12,
         data_inicio: new Date(),
@@ -94,7 +103,7 @@ export function ContratoFormDialog({ open, onOpenChange, clienteId, contrato }: 
         particularidades: '',
       });
     }
-  }, [contrato, form, open]);
+  }, [contrato, form, open, consultorId]);
 
   // Recalcular data_fim quando prazo ou data_inicio mudar
   const watchDataInicio = form.watch('data_inicio');
@@ -139,6 +148,15 @@ export function ContratoFormDialog({ open, onOpenChange, clienteId, contrato }: 
         ativo: true,
       };
 
+      // Update consultor if changed
+      const newConsultorId = values.consultor_id || null;
+      if (newConsultorId !== (consultorId || null)) {
+        await updateCliente.mutateAsync({
+          id: clienteId,
+          consultor_id: newConsultorId,
+        });
+      }
+
       if (isEditing && contrato) {
         await updateContrato.mutateAsync({
           id: contrato.id,
@@ -174,6 +192,32 @@ export function ContratoFormDialog({ open, onOpenChange, clienteId, contrato }: 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
+              {/* Consultor Responsável */}
+              <FormField
+                control={form.control}
+                name="consultor_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Consultor Responsável</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ''}>
+                      <FormControl>
+                        <SelectTrigger className="bg-background border-input">
+                          <SelectValue placeholder="Selecione..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="bg-popover border-border">
+                        {consultores?.map((consultor) => (
+                          <SelectItem key={consultor.id} value={consultor.id}>
+                            {consultor.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               {/* Tipo de Consultoria */}
               <FormField
                 control={form.control}
@@ -199,7 +243,9 @@ export function ContratoFormDialog({ open, onOpenChange, clienteId, contrato }: 
                   </FormItem>
                 )}
               />
+            </div>
 
+            <div className="grid grid-cols-2 gap-4">
               {/* Momento */}
               <FormField
                 control={form.control}

@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 interface ContratoTabProps {
   clienteId: string;
   clienteStatus: string;
+  consultorId?: string | null;
 }
 
 function formatCurrency(value: number): string {
@@ -31,7 +32,7 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
-export function ContratoTab({ clienteId, clienteStatus }: ContratoTabProps) {
+export function ContratoTab({ clienteId, clienteStatus, consultorId }: ContratoTabProps) {
   const { data: contratos, isLoading } = useContratos(clienteId);
   const { data: contratoAtivo } = useContratoAtivo(clienteId);
 
@@ -237,6 +238,7 @@ export function ContratoTab({ clienteId, clienteStatus }: ContratoTabProps) {
         onOpenChange={setShowForm}
         clienteId={clienteId}
         contrato={editingContrato}
+        consultorId={consultorId}
       />
 
       {contratoAtivo && (
