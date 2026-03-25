@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -22,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Eye } from 'lucide-react';
 import { useConsultoresComStats, useCreateConsultor, useUpdateConsultor, useDeleteConsultor, Consultor } from '@/hooks/useConsultores';
 import { useToast } from '@/hooks/use-toast';
 
@@ -36,6 +37,7 @@ function formatCurrency(value: number): string {
 }
 
 export default function Consultores() {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const { data: consultores, isLoading } = useConsultoresComStats();
   const createConsultor = useCreateConsultor();
@@ -177,15 +179,16 @@ export default function Consultores() {
                   <TableHead className="text-muted-foreground">Nome</TableHead>
                   <TableHead className="text-muted-foreground">Email</TableHead>
                   <TableHead className="text-muted-foreground text-center">Clientes Ativos</TableHead>
-                  <TableHead className="text-muted-foreground">MRR sob Gestão</TableHead>
-                  <TableHead className="text-muted-foreground">Status</TableHead>
-                  <TableHead className="w-[200px] text-muted-foreground text-right">Ações</TableHead>
+                   <TableHead className="text-muted-foreground">MRR sob Gestão</TableHead>
+                   <TableHead className="text-muted-foreground text-center">Score IA</TableHead>
+                   <TableHead className="text-muted-foreground">Status</TableHead>
+                   <TableHead className="w-[200px] text-muted-foreground text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {consultores?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       Nenhum consultor cadastrado
                     </TableCell>
                   </TableRow>
@@ -195,19 +198,28 @@ export default function Consultores() {
                       <TableCell className="font-medium text-foreground">{consultor.nome}</TableCell>
                       <TableCell className="text-muted-foreground">{consultor.email || '-'}</TableCell>
                       <TableCell className="text-center text-foreground">{consultor.clientes_ativos}</TableCell>
-                      <TableCell className="text-foreground">{formatCurrency(consultor.mrr_sob_gestao)}</TableCell>
-                      <TableCell>
-                        <Badge 
-                          className={consultor.ativo 
-                            ? 'bg-success text-success-foreground' 
-                            : 'bg-muted text-muted-foreground'
-                          }
-                        >
-                          {consultor.ativo ? 'Ativo' : 'Inativo'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex gap-2 justify-end">
+                       <TableCell className="text-foreground">{formatCurrency(consultor.mrr_sob_gestao)}</TableCell>
+                       <TableCell className="text-center text-muted-foreground">—</TableCell>
+                       <TableCell>
+                         <Badge 
+                           className={consultor.ativo 
+                             ? 'bg-success text-success-foreground' 
+                             : 'bg-muted text-muted-foreground'
+                           }
+                         >
+                           {consultor.ativo ? 'Ativo' : 'Inativo'}
+                         </Badge>
+                       </TableCell>
+                       <TableCell className="text-right">
+                         <div className="flex gap-2 justify-end">
+                           <Button
+                             variant="ghost"
+                             size="icon"
+                             className="text-muted-foreground hover:text-foreground"
+                             onClick={() => navigate(`/consultores/${consultor.id}`)}
+                           >
+                             <Eye className="h-4 w-4" />
+                           </Button>
                           <Button 
                             variant="ghost" 
                             size="icon"
