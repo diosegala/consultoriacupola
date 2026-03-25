@@ -70,31 +70,6 @@ export default function Auth() {
     }
   };
 
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validateForm()) return;
-
-    setLoading(true);
-    const { error } = await signUp(email, password);
-    setLoading(false);
-
-    if (error) {
-      const message = error.message.includes('already registered')
-        ? 'Este email já está cadastrado. Tente fazer login.'
-        : error.message;
-      
-      toast({
-        title: 'Erro ao cadastrar',
-        description: message,
-        variant: 'destructive',
-      });
-    } else {
-      toast({
-        title: 'Conta criada com sucesso!',
-        description: 'Você já pode fazer login.',
-      });
-    }
-  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
