@@ -20,6 +20,8 @@ export function KanbanBoard() {
   const [filtroConsultor, setFiltroConsultor] = useState<string>('todos');
   const [reuniaoDialogOpen, setReuniaoDialogOpen] = useState(false);
   const [selectedProjeto, setSelectedProjeto] = useState<Projeto | null>(null);
+  const [novoProjetoOpen, setNovoProjetoOpen] = useState(false);
+  const [vincularOpen, setVincularOpen] = useState(false);
 
   const { data: etapas, isLoading: loadingEtapas } = useProjetosEtapas();
   const { data: projetos, isLoading: loadingProjetos } = useProjetos(
