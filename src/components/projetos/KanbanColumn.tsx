@@ -35,6 +35,7 @@ export function KanbanColumn({ etapa, projetos, onRegistrarReuniao, onCardClick 
                   projeto={projeto}
                   index={index}
                   onRegistrarReuniao={onRegistrarReuniao}
+                  onClick={onCardClick}
                 />
               ))}
               {provided.placeholder}
