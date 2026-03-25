@@ -110,6 +110,9 @@ export function KanbanBoard() {
           consultorId={selectedProjeto.consultor_id}
         />
       )}
+
+      <NovoProjetoDialog open={novoProjetoOpen} onOpenChange={setNovoProjetoOpen} />
+      <VincularConsultorDialog open={vincularOpen} onOpenChange={setVincularOpen} />
     </div>
   );
 }
