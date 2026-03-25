@@ -23,10 +23,10 @@ export function KanbanBoard() {
   const [novoProjetoOpen, setNovoProjetoOpen] = useState(false);
   const [vincularOpen, setVincularOpen] = useState(false);
 
+  const { data: myConsultorId } = useMyConsultorId();
   const { data: etapas, isLoading: loadingEtapas } = useProjetosEtapas();
-  const { data: projetos, isLoading: loadingProjetos } = useProjetos(
-    isConsultor ? undefined : (filtroConsultor !== 'todos' ? filtroConsultor : undefined)
-  );
+  const consultorFilter = isConsultor ? myConsultorId ?? undefined : (filtroConsultor !== 'todos' ? filtroConsultor : undefined);
+  const { data: projetos, isLoading: loadingProjetos } = useProjetos(consultorFilter);
   const { data: consultores } = useConsultores();
   const moverProjeto = useMoverProjeto();
 
