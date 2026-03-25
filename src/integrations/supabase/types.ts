@@ -470,12 +470,80 @@ export type Database = {
           },
         ]
       }
+      projeto_checklist: {
+        Row: {
+          concluido: boolean
+          created_at: string
+          id: string
+          ordem: number
+          projeto_id: string
+          titulo: string
+        }
+        Insert: {
+          concluido?: boolean
+          created_at?: string
+          id?: string
+          ordem?: number
+          projeto_id: string
+          titulo: string
+        }
+        Update: {
+          concluido?: boolean
+          created_at?: string
+          id?: string
+          ordem?: number
+          projeto_id?: string
+          titulo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projeto_checklist_projeto_id_fkey"
+            columns: ["projeto_id"]
+            isOneToOne: false
+            referencedRelation: "projetos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projeto_comentarios: {
+        Row: {
+          created_at: string
+          id: string
+          projeto_id: string
+          texto: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          projeto_id: string
+          texto: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          projeto_id?: string
+          texto?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projeto_comentarios_projeto_id_fkey"
+            columns: ["projeto_id"]
+            isOneToOne: false
+            referencedRelation: "projetos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projetos: {
         Row: {
           cliente_id: string
           consultor_id: string
           contrato_id: string | null
           created_at: string
+          due_date: string | null
           etapa_id: string
           id: string
           observacoes: string | null
@@ -487,6 +555,7 @@ export type Database = {
           consultor_id: string
           contrato_id?: string | null
           created_at?: string
+          due_date?: string | null
           etapa_id: string
           id?: string
           observacoes?: string | null
@@ -498,6 +567,7 @@ export type Database = {
           consultor_id?: string
           contrato_id?: string | null
           created_at?: string
+          due_date?: string | null
           etapa_id?: string
           id?: string
           observacoes?: string | null

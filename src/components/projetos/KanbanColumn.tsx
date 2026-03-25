@@ -7,9 +7,10 @@ interface KanbanColumnProps {
   etapa: ProjetoEtapa;
   projetos: Projeto[];
   onRegistrarReuniao: (projeto: Projeto) => void;
+  onCardClick: (projeto: Projeto) => void;
 }
 
-export function KanbanColumn({ etapa, projetos, onRegistrarReuniao }: KanbanColumnProps) {
+export function KanbanColumn({ etapa, projetos, onRegistrarReuniao, onCardClick }: KanbanColumnProps) {
   return (
     <div className="flex flex-col min-w-[280px] max-w-[280px] bg-muted/50 rounded-lg">
       <div className="p-3 border-b border-border">
@@ -34,6 +35,7 @@ export function KanbanColumn({ etapa, projetos, onRegistrarReuniao }: KanbanColu
                   projeto={projeto}
                   index={index}
                   onRegistrarReuniao={onRegistrarReuniao}
+                  onClick={onCardClick}
                 />
               ))}
               {provided.placeholder}

@@ -5,6 +5,7 @@ import { useProjetosEtapas, useProjetos, useMoverProjeto, type Projeto } from '@
 import { NovaReuniaoDialog } from '@/components/consultor/NovaReuniaoDialog';
 import { NovoProjetoDialog } from './NovoProjetoDialog';
 import { VincularConsultorDialog } from './VincularConsultorDialog';
+import { ProjetoDetalheSheet } from './ProjetoDetalheSheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -22,6 +23,8 @@ export function KanbanBoard() {
   const [selectedProjeto, setSelectedProjeto] = useState<Projeto | null>(null);
   const [novoProjetoOpen, setNovoProjetoOpen] = useState(false);
   const [vincularOpen, setVincularOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetProjeto, setSheetProjeto] = useState<Projeto | null>(null);
 
   const { data: myConsultorId } = useMyConsultorId();
   const { data: etapas, isLoading: loadingEtapas } = useProjetosEtapas();
@@ -44,6 +47,13 @@ export function KanbanBoard() {
     setSelectedProjeto(projeto);
     setReuniaoDialogOpen(true);
   }, []);
+
+  const handleCardClick = useCallback((projeto: Projeto) => {
+    setSheetProjeto(projeto);
+    setSheetOpen(true);
+  }, []);
+
+  const getEtapaNome = (etapaId: string) => etapas?.find(e => e.id === etapaId)?.nome;
 
   if (loadingEtapas || loadingProjetos) {
     return (
@@ -98,6 +108,7 @@ export function KanbanBoard() {
               etapa={etapa}
               projetos={projetosByEtapa(etapa.id)}
               onRegistrarReuniao={handleRegistrarReuniao}
+              onCardClick={handleCardClick}
             />
           ))}
         </div>
@@ -113,6 +124,14 @@ export function KanbanBoard() {
 
       <NovoProjetoDialog open={novoProjetoOpen} onOpenChange={setNovoProjetoOpen} />
       <VincularConsultorDialog open={vincularOpen} onOpenChange={setVincularOpen} />
+
+      <ProjetoDetalheSheet
+        projeto={sheetProjeto}
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        etapaNome={sheetProjeto ? getEtapaNome(sheetProjeto.etapa_id) : undefined}
+        onRegistrarReuniao={handleRegistrarReuniao}
+      />
     </div>
   );
 }

@@ -16,11 +16,16 @@ export interface Projeto {
   etapa_id: string;
   ordem_na_etapa: number;
   observacoes: string | null;
+  due_date: string | null;
   created_at: string;
   updated_at: string;
   clientes?: { nome: string; cidade: string; uf: string };
   consultores?: { nome: string };
   contratos?: { tipo_consultoria_id: string | null; data_fim: string } | null;
+  _comentarios_count?: number;
+  _checklist_done?: number;
+  _checklist_total?: number;
+  _reunioes_count?: number;
 }
 
 export function useProjetosEtapas() {
