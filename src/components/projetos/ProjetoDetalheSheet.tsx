@@ -18,7 +18,7 @@ import type { Projeto } from '@/hooks/useProjetos';
 import { useMoverProjeto } from '@/hooks/useProjetos';
 import { useProjetoComentarios, useCreateComentario, useDeleteComentario } from '@/hooks/useProjetoComentarios';
 import { useProjetoChecklist, useCreateChecklistItem, useToggleChecklistItem, useDeleteChecklistItem } from '@/hooks/useProjetoChecklist';
-import { useReunioes } from '@/hooks/useReunioes';
+import { useReunioesByConsultor } from '@/hooks/useReunioes';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
