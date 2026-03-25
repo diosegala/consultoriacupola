@@ -3,9 +3,14 @@ import { DragDropContext, type DropResult } from '@hello-pangea/dnd';
 import { KanbanColumn } from './KanbanColumn';
 import { useProjetosEtapas, useProjetos, useMoverProjeto, type Projeto } from '@/hooks/useProjetos';
 import { NovaReuniaoDialog } from '@/components/consultor/NovaReuniaoDialog';
+import { NovoProjetoDialog } from './NovoProjetoDialog';
+import { VincularConsultorDialog } from './VincularConsultorDialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, Users } from 'lucide-react';
 import { useConsultores } from '@/hooks/useConsultores';
+import { useMyConsultorId } from '@/hooks/useConsultorUser';
 import { useAuth } from '@/contexts/AuthContext';
 
 export function KanbanBoard() {
@@ -15,11 +20,13 @@ export function KanbanBoard() {
   const [filtroConsultor, setFiltroConsultor] = useState<string>('todos');
   const [reuniaoDialogOpen, setReuniaoDialogOpen] = useState(false);
   const [selectedProjeto, setSelectedProjeto] = useState<Projeto | null>(null);
+  const [novoProjetoOpen, setNovoProjetoOpen] = useState(false);
+  const [vincularOpen, setVincularOpen] = useState(false);
 
+  const { data: myConsultorId } = useMyConsultorId();
   const { data: etapas, isLoading: loadingEtapas } = useProjetosEtapas();
-  const { data: projetos, isLoading: loadingProjetos } = useProjetos(
-    isConsultor ? undefined : (filtroConsultor !== 'todos' ? filtroConsultor : undefined)
-  );
+  const consultorFilter = isConsultor ? myConsultorId ?? undefined : (filtroConsultor !== 'todos' ? filtroConsultor : undefined);
+  const { data: projetos, isLoading: loadingProjetos } = useProjetos(consultorFilter);
   const { data: consultores } = useConsultores();
   const moverProjeto = useMoverProjeto();
 
@@ -55,8 +62,8 @@ export function KanbanBoard() {
 
   return (
     <div className="space-y-4">
-      {!isConsultor && (
-        <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
+        {!isConsultor && (
           <Select value={filtroConsultor} onValueChange={setFiltroConsultor}>
             <SelectTrigger className="w-[250px]">
               <SelectValue placeholder="Filtrar por consultor" />
@@ -68,8 +75,20 @@ export function KanbanBoard() {
               ))}
             </SelectContent>
           </Select>
-        </div>
-      )}
+        )}
+
+        <Button size="sm" onClick={() => setNovoProjetoOpen(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Novo Projeto
+        </Button>
+
+        {isAdmin && (
+          <Button size="sm" variant="outline" onClick={() => setVincularOpen(true)}>
+            <Users className="h-4 w-4 mr-2" />
+            Vincular Consultores
+          </Button>
+        )}
+      </div>
 
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="flex gap-4 overflow-x-auto pb-4" style={{ minHeight: 'calc(100vh - 220px)' }}>
@@ -91,6 +110,9 @@ export function KanbanBoard() {
           consultorId={selectedProjeto.consultor_id}
         />
       )}
+
+      <NovoProjetoDialog open={novoProjetoOpen} onOpenChange={setNovoProjetoOpen} />
+      <VincularConsultorDialog open={vincularOpen} onOpenChange={setVincularOpen} />
     </div>
   );
 }
