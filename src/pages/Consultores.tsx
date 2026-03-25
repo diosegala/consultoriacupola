@@ -37,6 +37,7 @@ function formatCurrency(value: number): string {
 }
 
 export default function Consultores() {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const { data: consultores, isLoading } = useConsultoresComStats();
   const createConsultor = useCreateConsultor();
