@@ -90,6 +90,26 @@ serve(async (req) => {
       .update({ status_analise: "analisando" })
       .eq("id", reuniao_id);
 
+    // Truncate transcription to avoid token limits (keep ~30k chars)
+    const maxTranscricaoLength = 30000;
+    let transcricaoLimpa = reuniao.transcricao;
+    // Strip any residual HTML tags
+    if (/<\s*(html|head|body|div|p|span)\b/i.test(transcricaoLimpa)) {
+      transcricaoLimpa = transcricaoLimpa
+        .replace(/<script[\s\S]*?<\/script>/gi, '')
+        .replace(/<style[\s\S]*?<\/style>/gi, '')
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/(p|div|li|h[1-6]|tr)>/gi, '\n')
+        .replace(/<[^>]+>/g, '')
+        .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+    }
+    if (transcricaoLimpa.length > maxTranscricaoLength) {
+      transcricaoLimpa = transcricaoLimpa.substring(0, maxTranscricaoLength) + '\n\n[Transcrição truncada por limite de tamanho]';
+    }
+
     const systemPrompt = `Você é um analista especializado em qualidade de atendimento de consultoria empresarial. 
 Analise a transcrição de uma reunião entre um consultor e um cliente.
 
@@ -100,7 +120,7 @@ Avalie nos seguintes critérios (nota de 0 a 10 cada):
 4. Domínio técnico - Demonstra conhecimento da área?
 5. Orientação para resultados - Foca em ações concretas e próximos passos?
 
-Retorne a análise usando a função fornecida.`;
+Retorne a análise usando a função fornecida. Seja conciso nos textos.`;
 
     const userPrompt = `Consultor: ${reuniao.consultores?.nome || "Desconhecido"}
 Cliente: ${reuniao.clientes?.nome || "Desconhecido"}
@@ -108,7 +128,7 @@ Data: ${reuniao.data_reuniao}
 Duração: ${reuniao.duracao_minutos || "N/A"} minutos
 
 TRANSCRIÇÃO:
-${reuniao.transcricao}`;
+${transcricaoLimpa}`;
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -117,11 +137,12 @@ ${reuniao.transcricao}`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
+        max_tokens: 8192,
         tools: [
           {
             type: "function",
@@ -143,12 +164,12 @@ ${reuniao.transcricao}`;
                   pontos_fortes: {
                     type: "array",
                     items: { type: "string" },
-                    description: "Lista de pontos fortes identificados",
+                    description: "Lista de 3-5 pontos fortes identificados (frases curtas)",
                   },
                   pontos_melhoria: {
                     type: "array",
                     items: { type: "string" },
-                    description: "Lista de pontos de melhoria",
+                    description: "Lista de 3-5 pontos de melhoria (frases curtas)",
                   },
                 },
                 required: [
@@ -186,31 +207,70 @@ ${reuniao.transcricao}`;
     const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
 
     if (!toolCall) {
+      // Fallback: try to parse from message content
+      const content = aiData.choices?.[0]?.message?.content;
+      if (!content) {
+        await supabase.from("reunioes").update({ status_analise: "erro" }).eq("id", reuniao_id);
+        return new Response(JSON.stringify({ error: "IA não retornou análise estruturada" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    let analise: any;
+    try {
+      const rawArgs = toolCall ? toolCall.function.arguments : aiData.choices[0].message.content;
+      // Clean potential markdown wrapping
+      let cleaned = rawArgs.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+      const jsonStart = cleaned.search(/[\{\[]/);
+      const jsonEnd = cleaned.lastIndexOf(jsonStart !== -1 && cleaned[jsonStart] === '[' ? ']' : '}');
+      if (jsonStart !== -1 && jsonEnd !== -1) {
+        cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
+      }
+      try {
+        analise = JSON.parse(cleaned);
+      } catch {
+        // Fix common issues
+        cleaned = cleaned.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']').replace(/[\x00-\x1F\x7F]/g, '');
+        analise = JSON.parse(cleaned);
+      }
+    } catch (parseErr) {
+      console.error("Erro ao parsear resposta da IA:", parseErr);
       await supabase.from("reunioes").update({ status_analise: "erro" }).eq("id", reuniao_id);
-      return new Response(JSON.stringify({ error: "IA não retornou análise estruturada" }), {
+      return new Response(JSON.stringify({ error: "Erro ao processar resposta da IA" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const analise = JSON.parse(toolCall.function.arguments);
+    // Ensure all required fields have defaults
+    analise.empatia = Number(analise.empatia) || 0;
+    analise.clareza = Number(analise.clareza) || 0;
+    analise.proatividade = Number(analise.proatividade) || 0;
+    analise.dominio_tecnico = Number(analise.dominio_tecnico) || 0;
+    analise.orientacao_resultados = Number(analise.orientacao_resultados) || 0;
+    analise.pontos_fortes = Array.isArray(analise.pontos_fortes) ? analise.pontos_fortes : [];
+    analise.pontos_melhoria = Array.isArray(analise.pontos_melhoria) ? analise.pontos_melhoria : [];
+
+    const analiseData = analise;
     const scoreMedia =
-      (analise.empatia + analise.clareza + analise.proatividade +
-        analise.dominio_tecnico + analise.orientacao_resultados) / 5;
+      (analiseData.empatia + analiseData.clareza + analiseData.proatividade +
+        analiseData.dominio_tecnico + analiseData.orientacao_resultados) / 5;
 
     const { error: updateError } = await supabase
       .from("reunioes")
       .update({
-        resumo_ia: analise.resumo,
+        resumo_ia: analiseData.resumo || '',
         score_ia: Math.round(scoreMedia * 10) / 10,
         analise_ia: {
-          empatia: analise.empatia,
-          clareza: analise.clareza,
-          proatividade: analise.proatividade,
-          dominio_tecnico: analise.dominio_tecnico,
-          orientacao_resultados: analise.orientacao_resultados,
-          pontos_fortes: analise.pontos_fortes,
-          pontos_melhoria: analise.pontos_melhoria,
+          empatia: analiseData.empatia,
+          clareza: analiseData.clareza,
+          proatividade: analiseData.proatividade,
+          dominio_tecnico: analiseData.dominio_tecnico,
+          orientacao_resultados: analiseData.orientacao_resultados,
+          pontos_fortes: analiseData.pontos_fortes,
+          pontos_melhoria: analiseData.pontos_melhoria,
         },
         status_analise: "concluido",
       })
