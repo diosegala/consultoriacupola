@@ -76,8 +76,12 @@ export default function Configuracoes() {
   const [loadingSenha, setLoadingSenha] = useState(false);
 
   const handleChangePassword = async () => {
-    if (novaSenha.length < 6) {
-      toast({ title: 'Erro', description: 'A senha deve ter no mínimo 6 caracteres', variant: 'destructive' });
+    if (novaSenha.length < 8) {
+      toast({ title: 'Erro', description: 'A senha deve ter no mínimo 8 caracteres', variant: 'destructive' });
+      return;
+    }
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(novaSenha)) {
+      toast({ title: 'Erro', description: 'A senha deve conter pelo menos 1 caractere especial', variant: 'destructive' });
       return;
     }
     if (novaSenha !== confirmarSenha) {

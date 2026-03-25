@@ -4,7 +4,7 @@ import { Sidebar } from './Sidebar';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export function AppLayout() {
-  const { user, loading, userRole } = useAuth();
+  const { user, loading, userRole, forcePasswordChange } = useAuth();
 
   if (loading) {
     return (
@@ -20,6 +20,11 @@ export function AppLayout() {
 
   if (!user) {
     return <Navigate to="/auth" replace />;
+  }
+
+  // Force password change on first login
+  if (forcePasswordChange) {
+    return <Navigate to="/trocar-senha" replace />;
   }
 
   // Consultors accessing restricted routes get redirected to /projetos

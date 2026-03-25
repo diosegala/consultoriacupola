@@ -126,12 +126,12 @@ export default function Auth() {
               variant="link"
               className="w-full text-muted-foreground"
               onClick={async () => {
-                if (!email) {
-                  toast({ title: 'Informe o email', description: 'Preencha o campo de email para receber o link de redefinição.', variant: 'destructive' });
-                  return;
-                }
-                const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                  redirectTo: `${window.location.origin}/auth`,
+                    if (!email) {
+                      toast({ title: 'Informe o email', description: 'Preencha o campo de email para receber o link de redefinição.', variant: 'destructive' });
+                      return;
+                    }
+                    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                      redirectTo: `${window.location.origin}/reset-password`,
                 });
                 if (error) {
                   toast({ title: 'Erro', description: error.message, variant: 'destructive' });
