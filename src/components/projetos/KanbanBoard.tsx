@@ -3,9 +3,14 @@ import { DragDropContext, type DropResult } from '@hello-pangea/dnd';
 import { KanbanColumn } from './KanbanColumn';
 import { useProjetosEtapas, useProjetos, useMoverProjeto, type Projeto } from '@/hooks/useProjetos';
 import { NovaReuniaoDialog } from '@/components/consultor/NovaReuniaoDialog';
+import { NovoProjetoDialog } from './NovoProjetoDialog';
+import { VincularConsultorDialog } from './VincularConsultorDialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, Users } from 'lucide-react';
 import { useConsultores } from '@/hooks/useConsultores';
+import { useMyConsultorId } from '@/hooks/useConsultorUser';
 import { useAuth } from '@/contexts/AuthContext';
 
 export function KanbanBoard() {
