@@ -22,6 +22,14 @@ export function AppLayout() {
     return <Navigate to="/auth" replace />;
   }
 
+  // Consultors accessing restricted routes get redirected to /projetos
+  const isConsultor = userRole === 'consultor';
+  const restrictedPaths = ['/', '/clientes', '/contratos', '/consultores', '/configuracoes'];
+  const currentPath = window.location.pathname;
+  if (isConsultor && restrictedPaths.some(p => currentPath === p || (p !== '/' && currentPath.startsWith(p)))) {
+    return <Navigate to="/projetos" replace />;
+  }
+
   return (
     <div className="flex min-h-screen w-full bg-background">
       <Sidebar />
