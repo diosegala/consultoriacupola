@@ -1,87 +1,91 @@
-
-
-## Modulo de Gestao de Consultores com Analise de Reunioes por IA
+## Kanban de Projetos de Consultoria com Acesso por Perfil
 
 ### Visao geral
 
-Criar um sistema completo para registrar reunioes dos consultores, armazenar transcricoes e usar IA para analisar a qualidade do atendimento, gerando um score por consultor.
+Criar um board Kanban estilo Trello onde cada cliente ativo e um card, organizado por etapas do processo de consultoria. Os consultores acessam apenas essa area (+ registrar reunioes), enquanto diretores/admins continuam com acesso total ao sistema.
 
-### Sobre a integracao com Google Drive
+### Mudancas necessarias
 
-A integracao automatica com Google Drive requer uma configuracao OAuth customizada (nao ha conector pronto disponivel). Proponho comecar com **upload manual ou colagem de transcricoes** para ja ter o sistema funcionando, e numa segunda fase implementar a integracao com Google Drive via OAuth. Isso permite voce ja comecar a usar e avaliar o sistema.
+**1. Nova role `consultor` no banco**
 
-### Fase 1 — Estrutura de dados e UI (esta implementacao)
+Adicionar `consultor` ao enum `app_role`. Isso permite distinguir usuarios consultores dos admins/directors no sistema de permissoes.
 
-**Novas tabelas no banco:**
+Tambem sera necessaria uma tabela de vinculacao `consultor_user` para associar um `user_id` (auth) a um `consultor_id` (tabela consultores), permitindo que o consultor veja apenas seus proprios clientes no kanban.
 
-1. **`reunioes`** — registro de cada reuniao
-   - `id`, `consultor_id`, `cliente_id`, `data_reuniao`, `duracao_minutos`
-   - `transcricao` (text, conteudo da transcricao)
-   - `resumo_ia` (text, resumo gerado pela IA)
-   - `score_ia` (numeric, 0-10)
-   - `analise_ia` (jsonb, detalhamento da analise)
-   - `google_meet_link` (text, opcional)
-   - `created_at`, `updated_at`
-   - RLS com `is_authorized_user()`
+**2. Nova tabela `projetos_etapas**`
 
-2. **`scores_consultor`** — score agregado por consultor (view materializada ou tabela)
-   - `consultor_id`, `score_medio`, `total_reunioes_analisadas`, `ultima_atualizacao`
+Tabela com as etapas configuráveis do Kanban:
 
-**Novas paginas e componentes:**
+- `id`, `nome`, `ordem`, `ativo`, `created_at`
+- Exemplos de etapas iniciais: "Pré-Onboarding", "Onboarding", "Elaboração do Diagnóstico", "Apresentação do Diagnóstico"; "Primeiro Cliente Oculto", "Elaboração de OKRs", "Reuniões de acompanhamento"
+- RLS: consultores podem ler, admins podem CRUD
 
-1. **Pagina de detalhe do consultor** (`/consultores/:id`)
-   - Cards com metricas: clientes ativos, MRR, score medio, total de reunioes
-   - Lista de reunioes com data, cliente, score e status da analise
-   - Botao "Nova Reuniao" para registrar e colar/enviar transcricao
+**3. Nova tabela `projetos**`
 
-2. **Dialog de nova reuniao**
-   - Selecao de cliente, data, duracao
-   - Campo de texto grande para colar a transcricao OU upload de arquivo .txt/.md
-   - Ao salvar, dispara analise automatica pela IA
+Registra a posicao de cada cliente no kanban:
 
-3. **Visualizador de reuniao**
-   - Transcricao completa
-   - Resumo gerado pela IA
-   - Score com breakdown (empatia, clareza, proatividade, dominio tecnico, etc.)
+- `id`, `cliente_id`, `contrato_id`, `consultor_id`, `etapa_id`, `ordem_na_etapa`, `observacoes`, `created_at`, `updated_at`
+- RLS: consultores veem apenas seus projetos, admins veem tudo
 
-4. **Coluna de Score na tabela de consultores** (pagina existente)
+**4. Pagina Kanban (`/projetos`)**
 
-**Edge function `analisar-reuniao`:**
-- Recebe a transcricao
-- Usa Lovable AI (Gemini) para gerar:
-  - Resumo da reuniao
-  - Score de 0 a 10 com criterios: empatia, clareza na comunicacao, proatividade, dominio tecnico, orientacao para resultados
-  - Pontos fortes e pontos de melhoria
-- Salva resultado na tabela `reunioes`
+- Board com colunas representando cada etapa
+- Cards arrastáveis (drag-and-drop) com nome do cliente, tipo de consultoria e indicadores
+- Ao mover um card, atualiza `etapa_id` e `ordem_na_etapa`
+- Botao no card para abrir detalhes e registrar reuniao/transcricao
+- Biblioteca: `@hello-pangea/dnd` (fork mantido do react-beautiful-dnd)
 
-**Arquivos a criar/modificar:**
+**5. Controle de acesso por role**
 
-| Arquivo | Acao |
-|---------|------|
-| `src/pages/ConsultorDetalhe.tsx` | Criar pagina de detalhe |
-| `src/components/consultor/ReunioesList.tsx` | Lista de reunioes |
-| `src/components/consultor/NovaReuniaoDialog.tsx` | Dialog para registrar reuniao |
-| `src/components/consultor/ReuniaoAnalise.tsx` | Visualizador de analise |
-| `src/hooks/useReunioes.ts` | Hook para CRUD de reunioes |
-| `src/pages/Consultores.tsx` | Adicionar link para detalhe e coluna de score |
-| `src/App.tsx` | Adicionar rota `/consultores/:id` |
-| `supabase/functions/analisar-reuniao/index.ts` | Edge function com IA |
-| Migracao SQL | Criar tabelas `reunioes` |
+- Role `consultor`: ve apenas `/projetos` e pode registrar reunioes
+- Role `admin`/`director`: ve tudo (dashboard, clientes, contratos, consultores, projetos, config)
+- Sidebar condicional: mostra itens conforme a role do usuario
+- AppLayout redireciona consultor para `/projetos` por padrao
+- Rotas protegidas: consultores nao acessam `/clientes`, `/contratos`, `/configuracoes`
 
-### Fase 2 — Integracao Google Drive (futura)
+**6. Registro de reunioes a partir do Kanban**
 
-- OAuth com Google para acessar arquivos do Drive
-- Busca automatica de transcricoes do Gemini (formato padrao do Google Meet)
-- Sincronizacao periodica ou por demanda
+- No card do projeto, botao "Registrar Reuniao" abre o mesmo dialog `NovaReuniaoDialog` existente
+- Consultor cola/importa transcricao
+- A analise de IA roda automaticamente (fluxo ja implementado)
+- Diretor visualiza os resultados na area de consultores
 
-### Criterios de analise da IA (configuravel)
+### Arquivos a criar/modificar
 
-O agente avaliara cada transcricao nos seguintes eixos:
-- **Empatia e escuta ativa** — o consultor demonstra interesse genuino?
-- **Clareza na comunicacao** — explica conceitos de forma acessivel?
-- **Proatividade** — traz sugestoes e antecipa problemas?
-- **Dominio tecnico** — demonstra conhecimento da area?
-- **Orientacao para resultados** — foca em acoes concretas e proximos passos?
 
-Cada eixo recebe nota de 0-10, e o score final e a media ponderada.
+| Arquivo                                    | Acao                                                                                      |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| Migracao SQL                               | Adicionar role `consultor`, criar tabelas `projetos_etapas`, `projetos`, `consultor_user` |
+| `src/pages/Projetos.tsx`                   | Pagina com board Kanban                                                                   |
+| `src/components/projetos/KanbanBoard.tsx`  | Componente do board com drag-and-drop                                                     |
+| `src/components/projetos/KanbanCard.tsx`   | Card de cliente                                                                           |
+| `src/components/projetos/KanbanColumn.tsx` | Coluna de etapa                                                                           |
+| `src/hooks/useProjetos.ts`                 | Hook para CRUD de projetos e etapas                                                       |
+| `src/components/layout/Sidebar.tsx`        | Menu condicional por role                                                                 |
+| `src/components/layout/AppLayout.tsx`      | Redirect e protecao de rotas por role                                                     |
+| `src/contexts/AuthContext.tsx`             | Expor `isConsultor`                                                                       |
+| `src/App.tsx`                              | Adicionar rota `/projetos`                                                                |
+| `package.json`                             | Adicionar `@hello-pangea/dnd`                                                             |
 
+
+### Fluxo do consultor
+
+```text
+Login → /projetos (Kanban)
+  │
+  ├── Ve seus clientes como cards nas colunas
+  ├── Arrasta card para proxima etapa
+  ├── Clica no card → detalhes do projeto
+  │     └── Registrar Reuniao → cola transcricao → IA analisa
+  └── Sidebar: apenas "Projetos" e "Sair"
+```
+
+### Fluxo do diretor/admin
+
+```text
+Login → / (Dashboard)
+  │
+  ├── Acessa tudo: Dashboard, Clientes, Contratos, Consultores, Projetos, Config
+  ├── Em /projetos: ve o kanban de TODOS os consultores (com filtro por consultor)
+  └── Em /consultores/:id: ve reunioes e analises de IA
+```
