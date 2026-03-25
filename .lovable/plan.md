@@ -1,91 +1,62 @@
-## Kanban de Projetos de Consultoria com Acesso por Perfil
+
+
+## Vincular Consultores a Usuarios + Criar Projetos pela UI
 
 ### Visao geral
 
-Criar um board Kanban estilo Trello onde cada cliente ativo e um card, organizado por etapas do processo de consultoria. Os consultores acessam apenas essa area (+ registrar reunioes), enquanto diretores/admins continuam com acesso total ao sistema.
+Duas funcionalidades novas na pagina `/projetos`:
 
-### Mudancas necessarias
+1. **Vincular consultores a usuarios** -- admin pode associar um usuario auth a um consultor (tabela `consultor_user`) diretamente da pagina de Projetos
+2. **Criar projetos (cards)** para clientes ativos -- botao "Novo Projeto" abre dialog com selecao de cliente, consultor e etapa inicial. Consultores so veem seus clientes; admins veem todos.
 
-**1. Nova role `consultor` no banco**
+### Mudancas
 
-Adicionar `consultor` ao enum `app_role`. Isso permite distinguir usuarios consultores dos admins/directors no sistema de permissoes.
+**1. Dialog "Novo Projeto" (`src/components/projetos/NovoProjetoDialog.tsx`)**
 
-Tambem sera necessaria uma tabela de vinculacao `consultor_user` para associar um `user_id` (auth) a um `consultor_id` (tabela consultores), permitindo que o consultor veja apenas seus proprios clientes no kanban.
+- Campos: cliente (select filtrado), consultor (select, pre-selecionado se consultor logado), contrato (auto-detectado do cliente ativo), etapa inicial (select das etapas)
+- Para consultores: lista apenas clientes com `consultor_id` igual ao do consultor logado, e consultor fica fixo
+- Para admins: lista todos os clientes ativos, permite selecionar qualquer consultor
+- Filtra clientes que ja tem projeto criado (evitar duplicatas)
+- Usa `useCreateProjeto` existente
 
-**2. Nova tabela `projetos_etapas**`
+**2. Dialog "Vincular Consultor a Usuario" (`src/components/projetos/VincularConsultorDialog.tsx`)**
 
-Tabela com as etapas configuráveis do Kanban:
+- Visivel apenas para admins
+- Seleciona um consultor (da tabela `consultores`) e um usuario (da lista de auth users)
+- Ao salvar, insere na tabela `consultor_user` e tambem adiciona a role `consultor` em `user_roles` se o usuario ainda nao tiver role
+- Mostra lista de vinculos existentes com opcao de remover
 
-- `id`, `nome`, `ordem`, `ativo`, `created_at`
-- Exemplos de etapas iniciais: "Pré-Onboarding", "Onboarding", "Elaboração do Diagnóstico", "Apresentação do Diagnóstico"; "Primeiro Cliente Oculto", "Elaboração de OKRs", "Reuniões de acompanhamento"
-- RLS: consultores podem ler, admins podem CRUD
+**3. Atualizar KanbanBoard (`src/components/projetos/KanbanBoard.tsx`)**
 
-**3. Nova tabela `projetos**`
+- Adicionar botao "Novo Projeto" no header (ao lado do filtro de consultor)
+- Adicionar botao "Vincular Consultores" (apenas para admin)
+- Para consultores: buscar o `consultor_id` do usuario logado via hook para filtrar automaticamente
 
-Registra a posicao de cada cliente no kanban:
+**4. Hook para consultor_user (`src/hooks/useConsultorUser.ts`)**
 
-- `id`, `cliente_id`, `contrato_id`, `consultor_id`, `etapa_id`, `ordem_na_etapa`, `observacoes`, `created_at`, `updated_at`
-- RLS: consultores veem apenas seus projetos, admins veem tudo
+- `useConsultorUsers()` -- lista todos os vinculos (admin)
+- `useMyConsultorId()` -- retorna o consultor_id do usuario logado
+- `useCreateConsultorUser()` -- insere vinculo
+- `useDeleteConsultorUser()` -- remove vinculo
 
-**4. Pagina Kanban (`/projetos`)**
+**5. Ajuste no useProjetos**
 
-- Board com colunas representando cada etapa
-- Cards arrastáveis (drag-and-drop) com nome do cliente, tipo de consultoria e indicadores
-- Ao mover um card, atualiza `etapa_id` e `ordem_na_etapa`
-- Botao no card para abrir detalhes e registrar reuniao/transcricao
-- Biblioteca: `@hello-pangea/dnd` (fork mantido do react-beautiful-dnd)
+- `useProjetos`: quando `isConsultor`, filtrar pelo `consultor_id` do usuario logado (usando `useMyConsultorId`)
 
-**5. Controle de acesso por role**
+### Arquivos
 
-- Role `consultor`: ve apenas `/projetos` e pode registrar reunioes
-- Role `admin`/`director`: ve tudo (dashboard, clientes, contratos, consultores, projetos, config)
-- Sidebar condicional: mostra itens conforme a role do usuario
-- AppLayout redireciona consultor para `/projetos` por padrao
-- Rotas protegidas: consultores nao acessam `/clientes`, `/contratos`, `/configuracoes`
+| Arquivo | Acao |
+|---------|------|
+| `src/components/projetos/NovoProjetoDialog.tsx` | Criar -- dialog para criar projeto/card |
+| `src/components/projetos/VincularConsultorDialog.tsx` | Criar -- dialog para vincular consultor a usuario |
+| `src/hooks/useConsultorUser.ts` | Criar -- hooks para CRUD de consultor_user |
+| `src/components/projetos/KanbanBoard.tsx` | Editar -- adicionar botoes e integrar dialogs |
+| `src/hooks/useProjetos.ts` | Editar -- filtro automatico para consultores |
 
-**6. Registro de reunioes a partir do Kanban**
+### Detalhes tecnicos
 
-- No card do projeto, botao "Registrar Reuniao" abre o mesmo dialog `NovaReuniaoDialog` existente
-- Consultor cola/importa transcricao
-- A analise de IA roda automaticamente (fluxo ja implementado)
-- Diretor visualiza os resultados na area de consultores
+- Nao precisa de migracao SQL -- as tabelas `consultor_user`, `projetos`, `projetos_etapas` e a role `consultor` ja existem
+- RLS ja esta configurada corretamente para todos os casos
+- A query de clientes disponiveis para criar projeto: buscar clientes ativos que ainda nao tem registro na tabela `projetos`
+- O `useAuthUsers` existente ja busca a lista de usuarios via edge function `list-auth-users`
 
-### Arquivos a criar/modificar
-
-
-| Arquivo                                    | Acao                                                                                      |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| Migracao SQL                               | Adicionar role `consultor`, criar tabelas `projetos_etapas`, `projetos`, `consultor_user` |
-| `src/pages/Projetos.tsx`                   | Pagina com board Kanban                                                                   |
-| `src/components/projetos/KanbanBoard.tsx`  | Componente do board com drag-and-drop                                                     |
-| `src/components/projetos/KanbanCard.tsx`   | Card de cliente                                                                           |
-| `src/components/projetos/KanbanColumn.tsx` | Coluna de etapa                                                                           |
-| `src/hooks/useProjetos.ts`                 | Hook para CRUD de projetos e etapas                                                       |
-| `src/components/layout/Sidebar.tsx`        | Menu condicional por role                                                                 |
-| `src/components/layout/AppLayout.tsx`      | Redirect e protecao de rotas por role                                                     |
-| `src/contexts/AuthContext.tsx`             | Expor `isConsultor`                                                                       |
-| `src/App.tsx`                              | Adicionar rota `/projetos`                                                                |
-| `package.json`                             | Adicionar `@hello-pangea/dnd`                                                             |
-
-
-### Fluxo do consultor
-
-```text
-Login → /projetos (Kanban)
-  │
-  ├── Ve seus clientes como cards nas colunas
-  ├── Arrasta card para proxima etapa
-  ├── Clica no card → detalhes do projeto
-  │     └── Registrar Reuniao → cola transcricao → IA analisa
-  └── Sidebar: apenas "Projetos" e "Sair"
-```
-
-### Fluxo do diretor/admin
-
-```text
-Login → / (Dashboard)
-  │
-  ├── Acessa tudo: Dashboard, Clientes, Contratos, Consultores, Projetos, Config
-  ├── Em /projetos: ve o kanban de TODOS os consultores (com filtro por consultor)
-  └── Em /consultores/:id: ve reunioes e analises de IA
-```
