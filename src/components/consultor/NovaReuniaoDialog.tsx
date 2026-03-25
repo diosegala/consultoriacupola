@@ -36,6 +36,23 @@ export function NovaReuniaoDialog({ open, onOpenChange, consultorId }: NovaReuni
     transcricao: '',
   });
 
+  const stripHtml = (html: string): string => {
+    // Remove script and style tags with content
+    let text = html.replace(/<script[\s\S]*?<\/script>/gi, '');
+    text = text.replace(/<style[\s\S]*?<\/style>/gi, '');
+    // Replace <br>, <p>, <div>, <li> with newlines
+    text = text.replace(/<br\s*\/?>/gi, '\n');
+    text = text.replace(/<\/(p|div|li|h[1-6]|tr)>/gi, '\n');
+    // Remove all remaining HTML tags
+    text = text.replace(/<[^>]+>/g, '');
+    // Decode HTML entities
+    text = text.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+    text = text.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ');
+    // Collapse multiple blank lines
+    text = text.replace(/\n{3,}/g, '\n\n').trim();
+    return text;
+  };
+
   const fetchTranscricaoFromLink = async () => {
     if (!linkTranscricao.trim()) {
       toast({ title: 'Erro', description: 'Insira o link do arquivo', variant: 'destructive' });
@@ -46,10 +63,14 @@ export function NovaReuniaoDialog({ open, onOpenChange, consultorId }: NovaReuni
     try {
       const response = await fetch(linkTranscricao.trim());
       if (!response.ok) throw new Error('Não foi possível acessar o arquivo');
-      const text = await response.text();
-      if (!text.trim()) throw new Error('O arquivo está vazio');
-      setFormData(prev => ({ ...prev, transcricao: text }));
-      toast({ title: 'Transcrição importada', description: `${text.length} caracteres carregados` });
+      const rawText = await response.text();
+      if (!rawText.trim()) throw new Error('O arquivo está vazio');
+      // Strip HTML if content looks like HTML
+      const isHtml = /<\s*(html|head|body|div|p|span)\b/i.test(rawText);
+      const cleanText = isHtml ? stripHtml(rawText) : rawText;
+      if (!cleanText.trim()) throw new Error('Não foi possível extrair texto do documento');
+      setFormData(prev => ({ ...prev, transcricao: cleanText }));
+      toast({ title: 'Transcrição importada', description: `${cleanText.length} caracteres carregados` });
     } catch (error: any) {
       toast({
         title: 'Erro ao importar',
