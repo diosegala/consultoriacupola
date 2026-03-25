@@ -62,8 +62,8 @@ export function KanbanBoard() {
 
   return (
     <div className="space-y-4">
-      {!isConsultor && (
-        <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
+        {!isConsultor && (
           <Select value={filtroConsultor} onValueChange={setFiltroConsultor}>
             <SelectTrigger className="w-[250px]">
               <SelectValue placeholder="Filtrar por consultor" />
@@ -75,8 +75,20 @@ export function KanbanBoard() {
               ))}
             </SelectContent>
           </Select>
-        </div>
-      )}
+        )}
+
+        <Button size="sm" onClick={() => setNovoProjetoOpen(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Novo Projeto
+        </Button>
+
+        {isAdmin && (
+          <Button size="sm" variant="outline" onClick={() => setVincularOpen(true)}>
+            <Users className="h-4 w-4 mr-2" />
+            Vincular Consultores
+          </Button>
+        )}
+      </div>
 
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="flex gap-4 overflow-x-auto pb-4" style={{ minHeight: 'calc(100vh - 220px)' }}>
