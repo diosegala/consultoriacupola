@@ -198,19 +198,28 @@ export default function Consultores() {
                       <TableCell className="font-medium text-foreground">{consultor.nome}</TableCell>
                       <TableCell className="text-muted-foreground">{consultor.email || '-'}</TableCell>
                       <TableCell className="text-center text-foreground">{consultor.clientes_ativos}</TableCell>
-                      <TableCell className="text-foreground">{formatCurrency(consultor.mrr_sob_gestao)}</TableCell>
-                      <TableCell>
-                        <Badge 
-                          className={consultor.ativo 
-                            ? 'bg-success text-success-foreground' 
-                            : 'bg-muted text-muted-foreground'
-                          }
-                        >
-                          {consultor.ativo ? 'Ativo' : 'Inativo'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex gap-2 justify-end">
+                       <TableCell className="text-foreground">{formatCurrency(consultor.mrr_sob_gestao)}</TableCell>
+                       <TableCell className="text-center text-muted-foreground">—</TableCell>
+                       <TableCell>
+                         <Badge 
+                           className={consultor.ativo 
+                             ? 'bg-success text-success-foreground' 
+                             : 'bg-muted text-muted-foreground'
+                           }
+                         >
+                           {consultor.ativo ? 'Ativo' : 'Inativo'}
+                         </Badge>
+                       </TableCell>
+                       <TableCell className="text-right">
+                         <div className="flex gap-2 justify-end">
+                           <Button
+                             variant="ghost"
+                             size="icon"
+                             className="text-muted-foreground hover:text-foreground"
+                             onClick={() => navigate(`/consultores/${consultor.id}`)}
+                           >
+                             <Eye className="h-4 w-4" />
+                           </Button>
                           <Button 
                             variant="ghost" 
                             size="icon"
