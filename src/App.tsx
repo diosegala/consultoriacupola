@@ -15,6 +15,8 @@ import Consultores from "./pages/Consultores";
 import ConsultorDetalhe from "./pages/ConsultorDetalhe";
 import Configuracoes from "./pages/Configuracoes";
 import Projetos from "./pages/Projetos";
+import ResetPassword from "./pages/ResetPassword";
+import TrocarSenha from "./pages/TrocarSenha";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +30,8 @@ const App = () => (
         <AuthProvider>
           <Routes>
             <Route path="/auth" element={<Auth />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/trocar-senha" element={<TrocarSenha />} />
             <Route element={<AppLayout />}>
               <Route path="/" element={<Dashboard />} />
               <Route path="/clientes" element={<Clientes />} />

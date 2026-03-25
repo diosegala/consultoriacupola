@@ -70,14 +70,25 @@ export default function Configuracoes() {
   const [deleteUserDialogOpen, setDeleteUserDialogOpen] = useState(false);
   const [userRoleToDelete, setUserRoleToDelete] = useState<{ id: string; email: string } | null>(null);
 
+  // Create user dialog
+  const [createUserDialogOpen, setCreateUserDialogOpen] = useState(false);
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserRole, setNewUserRole] = useState<'consultor' | 'director'>('consultor');
+  const [creatingUser, setCreatingUser] = useState(false);
+
   // Password change
   const [novaSenha, setNovaSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
   const [loadingSenha, setLoadingSenha] = useState(false);
 
   const handleChangePassword = async () => {
-    if (novaSenha.length < 6) {
-      toast({ title: 'Erro', description: 'A senha deve ter no mínimo 6 caracteres', variant: 'destructive' });
+    if (novaSenha.length < 8) {
+      toast({ title: 'Erro', description: 'A senha deve ter no mínimo 8 caracteres', variant: 'destructive' });
+      return;
+    }
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(novaSenha)) {
+      toast({ title: 'Erro', description: 'A senha deve conter pelo menos 1 caractere especial', variant: 'destructive' });
       return;
     }
     if (novaSenha !== confirmarSenha) {
@@ -186,6 +197,38 @@ export default function Configuracoes() {
     } catch (error: any) { toast({ title: 'Erro', description: error.message, variant: 'destructive' }); }
   };
 
+  const handleCreateUser = async () => {
+    if (!newUserEmail || !newUserPassword) {
+      toast({ title: 'Erro', description: 'Email e senha são obrigatórios', variant: 'destructive' });
+      return;
+    }
+    if (newUserPassword.length < 8) {
+      toast({ title: 'Erro', description: 'A senha deve ter no mínimo 8 caracteres', variant: 'destructive' });
+      return;
+    }
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(newUserPassword)) {
+      toast({ title: 'Erro', description: 'A senha deve conter pelo menos 1 caractere especial', variant: 'destructive' });
+      return;
+    }
+    setCreatingUser(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await supabase.functions.invoke('create-user', {
+        body: { email: newUserEmail, password: newUserPassword, role: newUserRole },
+      });
+      if (response.error) throw new Error(response.error.message);
+      if (response.data?.error) throw new Error(response.data.error);
+      toast({ title: 'Sucesso', description: `Usuário ${newUserEmail} criado. Ele precisará trocar a senha no primeiro acesso.` });
+      setCreateUserDialogOpen(false);
+      setNewUserEmail('');
+      setNewUserPassword('');
+      setNewUserRole('consultor');
+    } catch (error: any) {
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+    }
+    setCreatingUser(false);
+  };
+
   const handleDeleteUser = async () => {
     if (!userRoleToDelete) return;
     try {
@@ -245,10 +288,16 @@ export default function Configuracoes() {
                   <ShieldCheck className="h-5 w-5 text-primary" />
                   Usuários Autorizados
                 </CardTitle>
-                <Button size="sm" onClick={() => { setSelectedUserId(''); setUserDialogOpen(true); }} className="bg-primary text-primary-foreground hover:bg-primary/90">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Adicionar Usuário
-                </Button>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => { setNewUserEmail(''); setNewUserPassword(''); setNewUserRole('consultor'); setCreateUserDialogOpen(true); }} className="bg-primary text-primary-foreground hover:bg-primary/90">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Criar Novo Usuário
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => { setSelectedUserId(''); setUserDialogOpen(true); }}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Adicionar Existente
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 {loadingRoles ? (
@@ -548,6 +597,45 @@ export default function Configuracoes() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog Criar Novo Usuário */}
+      <Dialog open={createUserDialogOpen} onOpenChange={setCreateUserDialogOpen}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Criar Novo Usuário</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-foreground">Email *</Label>
+              <Input value={newUserEmail} onChange={(e) => setNewUserEmail(e.target.value)} placeholder="email@exemplo.com" className="bg-input border-border" type="email" />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-foreground">Senha Temporária *</Label>
+              <Input value={newUserPassword} onChange={(e) => setNewUserPassword(e.target.value)} placeholder="Min. 8 caracteres + especial" className="bg-input border-border" type="password" />
+              <p className="text-xs text-muted-foreground">O usuário será obrigado a trocar a senha no primeiro acesso.</p>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-foreground">Papel</Label>
+              <Select value={newUserRole} onValueChange={(v) => setNewUserRole(v as 'consultor' | 'director')}>
+                <SelectTrigger className="bg-input border-border">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="consultor">Consultor</SelectItem>
+                  <SelectItem value="director">Diretor</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateUserDialogOpen(false)} className="border-border">Cancelar</Button>
+            <Button onClick={handleCreateUser} disabled={creatingUser} className="bg-primary text-primary-foreground">
+              {creatingUser && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Criar Usuário
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

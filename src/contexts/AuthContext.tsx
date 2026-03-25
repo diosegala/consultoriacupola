@@ -12,8 +12,8 @@ interface AuthContextType {
   userRole: AppRole | null;
   isAdmin: boolean;
   isConsultor: boolean;
+  forcePasswordChange: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -24,14 +24,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<AppRole | null>(null);
+  const [forcePasswordChange, setForcePasswordChange] = useState(false);
 
   const fetchUserRole = async (userId: string) => {
     const { data } = await supabase
       .from('user_roles')
-      .select('role')
+      .select('role, force_password_change')
       .eq('user_id', userId)
       .single();
     setUserRole(data?.role ?? null);
+    setForcePasswordChange((data as any)?.force_password_change ?? false);
   };
 
   useEffect(() => {
@@ -44,6 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setTimeout(() => fetchUserRole(session.user.id), 0);
         } else {
           setUserRole(null);
+          setForcePasswordChange(false);
         }
       }
     );
@@ -65,18 +68,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error };
   };
 
-  const signUp = async (email: string, password: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { emailRedirectTo: redirectUrl },
-    });
-    return { error };
-  };
-
   const signOut = async () => {
     setUserRole(null);
+    setForcePasswordChange(false);
     await supabase.auth.signOut();
   };
 
@@ -84,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isConsultor = userRole === 'consultor';
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, userRole, isAdmin, isConsultor, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, userRole, isAdmin, isConsultor, forcePasswordChange, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );
