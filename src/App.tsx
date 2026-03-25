@@ -12,6 +12,7 @@ import ClienteNovo from "./pages/ClienteNovo";
 import ClienteDetalhe from "./pages/ClienteDetalhe";
 import Contratos from "./pages/Contratos";
 import Consultores from "./pages/Consultores";
+import ConsultorDetalhe from "./pages/ConsultorDetalhe";
 import Configuracoes from "./pages/Configuracoes";
 import NotFound from "./pages/NotFound";
 
