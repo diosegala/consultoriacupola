@@ -197,6 +197,38 @@ export default function Configuracoes() {
     } catch (error: any) { toast({ title: 'Erro', description: error.message, variant: 'destructive' }); }
   };
 
+  const handleCreateUser = async () => {
+    if (!newUserEmail || !newUserPassword) {
+      toast({ title: 'Erro', description: 'Email e senha são obrigatórios', variant: 'destructive' });
+      return;
+    }
+    if (newUserPassword.length < 8) {
+      toast({ title: 'Erro', description: 'A senha deve ter no mínimo 8 caracteres', variant: 'destructive' });
+      return;
+    }
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(newUserPassword)) {
+      toast({ title: 'Erro', description: 'A senha deve conter pelo menos 1 caractere especial', variant: 'destructive' });
+      return;
+    }
+    setCreatingUser(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await supabase.functions.invoke('create-user', {
+        body: { email: newUserEmail, password: newUserPassword, role: newUserRole },
+      });
+      if (response.error) throw new Error(response.error.message);
+      if (response.data?.error) throw new Error(response.data.error);
+      toast({ title: 'Sucesso', description: `Usuário ${newUserEmail} criado. Ele precisará trocar a senha no primeiro acesso.` });
+      setCreateUserDialogOpen(false);
+      setNewUserEmail('');
+      setNewUserPassword('');
+      setNewUserRole('consultor');
+    } catch (error: any) {
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+    }
+    setCreatingUser(false);
+  };
+
   const handleDeleteUser = async () => {
     if (!userRoleToDelete) return;
     try {
