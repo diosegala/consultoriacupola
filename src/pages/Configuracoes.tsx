@@ -288,10 +288,16 @@ export default function Configuracoes() {
                   <ShieldCheck className="h-5 w-5 text-primary" />
                   Usuários Autorizados
                 </CardTitle>
-                <Button size="sm" onClick={() => { setSelectedUserId(''); setUserDialogOpen(true); }} className="bg-primary text-primary-foreground hover:bg-primary/90">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Adicionar Usuário
-                </Button>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => { setNewUserEmail(''); setNewUserPassword(''); setNewUserRole('consultor'); setCreateUserDialogOpen(true); }} className="bg-primary text-primary-foreground hover:bg-primary/90">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Criar Novo Usuário
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => { setSelectedUserId(''); setUserDialogOpen(true); }}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Adicionar Existente
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 {loadingRoles ? (
