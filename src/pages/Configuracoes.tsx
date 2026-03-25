@@ -597,6 +597,45 @@ export default function Configuracoes() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog Criar Novo Usuário */}
+      <Dialog open={createUserDialogOpen} onOpenChange={setCreateUserDialogOpen}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Criar Novo Usuário</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-foreground">Email *</Label>
+              <Input value={newUserEmail} onChange={(e) => setNewUserEmail(e.target.value)} placeholder="email@exemplo.com" className="bg-input border-border" type="email" />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-foreground">Senha Temporária *</Label>
+              <Input value={newUserPassword} onChange={(e) => setNewUserPassword(e.target.value)} placeholder="Min. 8 caracteres + especial" className="bg-input border-border" type="password" />
+              <p className="text-xs text-muted-foreground">O usuário será obrigado a trocar a senha no primeiro acesso.</p>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-foreground">Papel</Label>
+              <Select value={newUserRole} onValueChange={(v) => setNewUserRole(v as 'consultor' | 'director')}>
+                <SelectTrigger className="bg-input border-border">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="consultor">Consultor</SelectItem>
+                  <SelectItem value="director">Diretor</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateUserDialogOpen(false)} className="border-border">Cancelar</Button>
+            <Button onClick={handleCreateUser} disabled={creatingUser} className="bg-primary text-primary-foreground">
+              {creatingUser && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Criar Usuário
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
