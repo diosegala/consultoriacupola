@@ -11,6 +11,7 @@ interface AuthContextType {
   loading: boolean;
   userRole: AppRole | null;
   isAdmin: boolean;
+  isConsultor: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;

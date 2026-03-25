@@ -7,29 +7,33 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  FileText
+  FileText,
+  Kanban
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 
-const baseMenuItems = [
+const adminMenuItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/clientes', icon: Users, label: 'Clientes' },
   { to: '/contratos', icon: FileText, label: 'Contratos' },
   { to: '/consultores', icon: UserCog, label: 'Consultores' },
+  { to: '/projetos', icon: Kanban, label: 'Projetos' },
+  { to: '/configuracoes', icon: Settings, label: 'Configurações' },
+];
+
+const consultorMenuItems = [
+  { to: '/projetos', icon: Kanban, label: 'Projetos' },
 ];
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
-  const { signOut, user, isAdmin } = useAuth();
+  const { signOut, user, isConsultor } = useAuth();
   const location = useLocation();
 
-  const menuItems = [
-    ...baseMenuItems,
-    { to: '/configuracoes', icon: Settings, label: 'Configurações' },
-  ];
+  const menuItems = isConsultor ? consultorMenuItems : adminMenuItems;
 
   return (
     <aside 

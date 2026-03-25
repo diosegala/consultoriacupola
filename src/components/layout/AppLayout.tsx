@@ -4,7 +4,7 @@ import { Sidebar } from './Sidebar';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export function AppLayout() {
-  const { user, loading } = useAuth();
+  const { user, loading, userRole } = useAuth();
 
   if (loading) {
     return (
