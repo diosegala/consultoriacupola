@@ -1,66 +1,87 @@
 
 
-## Card de Media de Despesas com Viagens + Grafico Mensal
+## Modulo de Gestao de Consultores com Analise de Reunioes por IA
 
-### O que sera feito
+### Visao geral
 
-1. **Novo KPI Card** - Adicionar um quinto card no Dashboard mostrando a media das despesas com viagens (total de despesas dividido pelo numero de contratos que possuem viagens lancadas).
+Criar um sistema completo para registrar reunioes dos consultores, armazenar transcricoes e usar IA para analisar a qualidade do atendimento, gerando um score por consultor.
 
-2. **Novo Grafico de Barras** - Adicionar um grafico de barras como ultimo grafico do Dashboard, mostrando o total de despesas com viagens por mes (ultimos 12 meses).
+### Sobre a integracao com Google Drive
 
----
+A integracao automatica com Google Drive requer uma configuracao OAuth customizada (nao ha conector pronto disponivel). Proponho comecar com **upload manual ou colagem de transcricoes** para ja ter o sistema funcionando, e numa segunda fase implementar a integracao com Google Drive via OAuth. Isso permite voce ja comecar a usar e avaliar o sistema.
 
-### Detalhes
+### Fase 1 — Estrutura de dados e UI (esta implementacao)
 
-#### KPI Card - Media de Despesas com Viagens
-- Posicionado junto aos outros 4 cards existentes (a grid passara a ter 5 cards, distribuidos em 2 linhas no desktop)
-- Mostra o valor medio de despesas por contrato (soma total / quantidade de contratos com viagens)
-- Icone de aviao ou mapa para representar viagens
-- Se nao houver viagens lancadas, mostra R$ 0
+**Novas tabelas no banco:**
 
-#### Grafico de Barras - Despesas com Viagens por Mes
-- Ultimo grafico do Dashboard (abaixo do grafico de Contratos Novos vs Encerrados e acima da tabela de Alertas)
-- Barras mostrando o total de despesas com viagens em cada mes dos ultimos 12 meses
-- Segue o mesmo padrao visual dos outros graficos (cores, tooltips, responsividade)
+1. **`reunioes`** — registro de cada reuniao
+   - `id`, `consultor_id`, `cliente_id`, `data_reuniao`, `duracao_minutos`
+   - `transcricao` (text, conteudo da transcricao)
+   - `resumo_ia` (text, resumo gerado pela IA)
+   - `score_ia` (numeric, 0-10)
+   - `analise_ia` (jsonb, detalhamento da analise)
+   - `google_meet_link` (text, opcional)
+   - `created_at`, `updated_at`
+   - RLS com `is_authorized_user()`
 
----
+2. **`scores_consultor`** — score agregado por consultor (view materializada ou tabela)
+   - `consultor_id`, `score_medio`, `total_reunioes_analisadas`, `ultima_atualizacao`
 
-### Secao Tecnica
+**Novas paginas e componentes:**
 
-#### Novo hook em `src/hooks/useDashboard.ts`
+1. **Pagina de detalhe do consultor** (`/consultores/:id`)
+   - Cards com metricas: clientes ativos, MRR, score medio, total de reunioes
+   - Lista de reunioes com data, cliente, score e status da analise
+   - Botao "Nova Reuniao" para registrar e colar/enviar transcricao
 
-Adicionar duas funcoes:
+2. **Dialog de nova reuniao**
+   - Selecao de cliente, data, duracao
+   - Campo de texto grande para colar a transcricao OU upload de arquivo .txt/.md
+   - Ao salvar, dispara analise automatica pela IA
 
-1. **`useMediaDespesasViagens(consultorIds?)`** - Busca todas as viagens com o consultor_id do cliente, calcula a media por contrato
-2. **`useDespesasViagensMensal(consultorIds?)`** - Agrupa viagens por mes (usando `data_viagem`), retorna array com `{ mes, total }` para os ultimos 12 meses
+3. **Visualizador de reuniao**
+   - Transcricao completa
+   - Resumo gerado pela IA
+   - Score com breakdown (empatia, clareza, proatividade, dominio tecnico, etc.)
 
-Ambas consultam a tabela `viagens_contrato` com join em `clientes` para filtrar por consultor.
+4. **Coluna de Score na tabela de consultores** (pagina existente)
 
-#### Alteracoes em `src/pages/Dashboard.tsx`
+**Edge function `analisar-reuniao`:**
+- Recebe a transcricao
+- Usa Lovable AI (Gemini) para gerar:
+  - Resumo da reuniao
+  - Score de 0 a 10 com criterios: empatia, clareza na comunicacao, proatividade, dominio tecnico, orientacao para resultados
+  - Pontos fortes e pontos de melhoria
+- Salva resultado na tabela `reunioes`
 
-| Alteracao | Detalhe |
-|-----------|---------|
-| Importar novos hooks | `useMediaDespesasViagens` e `useDespesasViagensMensal` |
-| Novo KPI card | Card com icone Plane, mostrando media formatada como moeda |
-| Novo grafico | `BarChart` do Recharts com barras de despesas por mes |
-| Grid dos cards | Ajustar grid para acomodar 5 cards (manter `lg:grid-cols-4` ou mudar para `lg:grid-cols-5`) |
+**Arquivos a criar/modificar:**
 
-#### Estrutura dos dados
+| Arquivo | Acao |
+|---------|------|
+| `src/pages/ConsultorDetalhe.tsx` | Criar pagina de detalhe |
+| `src/components/consultor/ReunioesList.tsx` | Lista de reunioes |
+| `src/components/consultor/NovaReuniaoDialog.tsx` | Dialog para registrar reuniao |
+| `src/components/consultor/ReuniaoAnalise.tsx` | Visualizador de analise |
+| `src/hooks/useReunioes.ts` | Hook para CRUD de reunioes |
+| `src/pages/Consultores.tsx` | Adicionar link para detalhe e coluna de score |
+| `src/App.tsx` | Adicionar rota `/consultores/:id` |
+| `supabase/functions/analisar-reuniao/index.ts` | Edge function com IA |
+| Migracao SQL | Criar tabelas `reunioes` |
 
-```text
-useMediaDespesasViagens -> numero (media em R$)
+### Fase 2 — Integracao Google Drive (futura)
 
-useDespesasViagensMensal -> [
-  { mes: "mar/25", total: 2500 },
-  { mes: "abr/25", total: 1800 },
-  ...
-]
-```
+- OAuth com Google para acessar arquivos do Drive
+- Busca automatica de transcricoes do Gemini (formato padrao do Google Meet)
+- Sincronizacao periodica ou por demanda
 
-### Arquivos a modificar
+### Criterios de analise da IA (configuravel)
 
-| Arquivo | Alteracao |
-|---------|-----------|
-| `src/hooks/useDashboard.ts` | Adicionar `useMediaDespesasViagens` e `useDespesasViagensMensal` |
-| `src/pages/Dashboard.tsx` | Adicionar KPI card de viagens + grafico de barras mensal |
+O agente avaliara cada transcricao nos seguintes eixos:
+- **Empatia e escuta ativa** — o consultor demonstra interesse genuino?
+- **Clareza na comunicacao** — explica conceitos de forma acessivel?
+- **Proatividade** — traz sugestoes e antecipa problemas?
+- **Dominio tecnico** — demonstra conhecimento da area?
+- **Orientacao para resultados** — foca em acoes concretas e proximos passos?
+
+Cada eixo recebe nota de 0-10, e o score final e a media ponderada.
 
