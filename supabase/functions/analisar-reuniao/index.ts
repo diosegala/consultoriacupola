@@ -207,14 +207,53 @@ ${transcricaoLimpa}`;
     const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
 
     if (!toolCall) {
+      // Fallback: try to parse from message content
+      const content = aiData.choices?.[0]?.message?.content;
+      if (!content) {
+        await supabase.from("reunioes").update({ status_analise: "erro" }).eq("id", reuniao_id);
+        return new Response(JSON.stringify({ error: "IA não retornou análise estruturada" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    let analise: any;
+    try {
+      const rawArgs = toolCall ? toolCall.function.arguments : aiData.choices[0].message.content;
+      // Clean potential markdown wrapping
+      let cleaned = rawArgs.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+      const jsonStart = cleaned.search(/[\{\[]/);
+      const jsonEnd = cleaned.lastIndexOf(jsonStart !== -1 && cleaned[jsonStart] === '[' ? ']' : '}');
+      if (jsonStart !== -1 && jsonEnd !== -1) {
+        cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
+      }
+      try {
+        analise = JSON.parse(cleaned);
+      } catch {
+        // Fix common issues
+        cleaned = cleaned.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']').replace(/[\x00-\x1F\x7F]/g, '');
+        analise = JSON.parse(cleaned);
+      }
+    } catch (parseErr) {
+      console.error("Erro ao parsear resposta da IA:", parseErr);
       await supabase.from("reunioes").update({ status_analise: "erro" }).eq("id", reuniao_id);
-      return new Response(JSON.stringify({ error: "IA não retornou análise estruturada" }), {
+      return new Response(JSON.stringify({ error: "Erro ao processar resposta da IA" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const analise = JSON.parse(toolCall.function.arguments);
+    // Ensure all required fields have defaults
+    analise.empatia = Number(analise.empatia) || 0;
+    analise.clareza = Number(analise.clareza) || 0;
+    analise.proatividade = Number(analise.proatividade) || 0;
+    analise.dominio_tecnico = Number(analise.dominio_tecnico) || 0;
+    analise.orientacao_resultados = Number(analise.orientacao_resultados) || 0;
+    analise.pontos_fortes = Array.isArray(analise.pontos_fortes) ? analise.pontos_fortes : [];
+    analise.pontos_melhoria = Array.isArray(analise.pontos_melhoria) ? analise.pontos_melhoria : [];
+
+    const analiseData = analise;
     const scoreMedia =
       (analise.empatia + analise.clareza + analise.proatividade +
         analise.dominio_tecnico + analise.orientacao_resultados) / 5;
