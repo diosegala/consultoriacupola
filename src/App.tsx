@@ -14,6 +14,7 @@ import Contratos from "./pages/Contratos";
 import Consultores from "./pages/Consultores";
 import ConsultorDetalhe from "./pages/ConsultorDetalhe";
 import Configuracoes from "./pages/Configuracoes";
+import Projetos from "./pages/Projetos";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
