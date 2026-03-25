@@ -108,6 +108,35 @@ export type Database = {
           },
         ]
       }
+      consultor_user: {
+        Row: {
+          consultor_id: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          consultor_id: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          consultor_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consultor_user_consultor_id_fkey"
+            columns: ["consultor_id"]
+            isOneToOne: true
+            referencedRelation: "consultores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       consultores: {
         Row: {
           ativo: boolean
@@ -441,6 +470,95 @@ export type Database = {
           },
         ]
       }
+      projetos: {
+        Row: {
+          cliente_id: string
+          consultor_id: string
+          contrato_id: string | null
+          created_at: string
+          etapa_id: string
+          id: string
+          observacoes: string | null
+          ordem_na_etapa: number
+          updated_at: string
+        }
+        Insert: {
+          cliente_id: string
+          consultor_id: string
+          contrato_id?: string | null
+          created_at?: string
+          etapa_id: string
+          id?: string
+          observacoes?: string | null
+          ordem_na_etapa?: number
+          updated_at?: string
+        }
+        Update: {
+          cliente_id?: string
+          consultor_id?: string
+          contrato_id?: string | null
+          created_at?: string
+          etapa_id?: string
+          id?: string
+          observacoes?: string | null
+          ordem_na_etapa?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projetos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projetos_consultor_id_fkey"
+            columns: ["consultor_id"]
+            isOneToOne: false
+            referencedRelation: "consultores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projetos_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projetos_etapa_id_fkey"
+            columns: ["etapa_id"]
+            isOneToOne: false
+            referencedRelation: "projetos_etapas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projetos_etapas: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          nome: string
+          ordem: number
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome: string
+          ordem?: number
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome?: string
+          ordem?: number
+        }
+        Relationships: []
+      }
       reunioes: {
         Row: {
           analise_ia: Json | null
@@ -634,6 +752,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_consultor_id_for_user: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -644,7 +763,7 @@ export type Database = {
       is_authorized_user: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "admin" | "director"
+      app_role: "admin" | "director" | "consultor"
       classificacao_encerramento: "churn" | "fim_contrato"
       etapa_onboarding:
         | "pre_onboarding"
@@ -782,7 +901,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "director"],
+      app_role: ["admin", "director", "consultor"],
       classificacao_encerramento: ["churn", "fim_contrato"],
       etapa_onboarding: [
         "pre_onboarding",

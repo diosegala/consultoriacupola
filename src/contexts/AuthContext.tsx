@@ -11,6 +11,7 @@ interface AuthContextType {
   loading: boolean;
   userRole: AppRole | null;
   isAdmin: boolean;
+  isConsultor: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -80,9 +81,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const isAdmin = userRole === 'admin';
+  const isConsultor = userRole === 'consultor';
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, userRole, isAdmin, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, userRole, isAdmin, isConsultor, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );

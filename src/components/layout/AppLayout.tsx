@@ -4,7 +4,7 @@ import { Sidebar } from './Sidebar';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export function AppLayout() {
-  const { user, loading } = useAuth();
+  const { user, loading, userRole } = useAuth();
 
   if (loading) {
     return (
@@ -20,6 +20,14 @@ export function AppLayout() {
 
   if (!user) {
     return <Navigate to="/auth" replace />;
+  }
+
+  // Consultors accessing restricted routes get redirected to /projetos
+  const isConsultor = userRole === 'consultor';
+  const restrictedPaths = ['/', '/clientes', '/contratos', '/consultores', '/configuracoes'];
+  const currentPath = window.location.pathname;
+  if (isConsultor && restrictedPaths.some(p => currentPath === p || (p !== '/' && currentPath.startsWith(p)))) {
+    return <Navigate to="/projetos" replace />;
   }
 
   return (
