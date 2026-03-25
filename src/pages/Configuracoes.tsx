@@ -70,6 +70,13 @@ export default function Configuracoes() {
   const [deleteUserDialogOpen, setDeleteUserDialogOpen] = useState(false);
   const [userRoleToDelete, setUserRoleToDelete] = useState<{ id: string; email: string } | null>(null);
 
+  // Create user dialog
+  const [createUserDialogOpen, setCreateUserDialogOpen] = useState(false);
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserRole, setNewUserRole] = useState<'consultor' | 'director'>('consultor');
+  const [creatingUser, setCreatingUser] = useState(false);
+
   // Password change
   const [novaSenha, setNovaSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
