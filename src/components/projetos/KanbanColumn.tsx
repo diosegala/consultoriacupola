@@ -7,6 +7,7 @@ interface KanbanColumnProps {
   etapa: ProjetoEtapa;
   projetos: Projeto[];
   onRegistrarReuniao: (projeto: Projeto) => void;
+  onCardClick: (projeto: Projeto) => void;
 }
 
 export function KanbanColumn({ etapa, projetos, onRegistrarReuniao }: KanbanColumnProps) {
