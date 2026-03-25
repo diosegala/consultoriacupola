@@ -179,9 +179,10 @@ export default function Consultores() {
                   <TableHead className="text-muted-foreground">Nome</TableHead>
                   <TableHead className="text-muted-foreground">Email</TableHead>
                   <TableHead className="text-muted-foreground text-center">Clientes Ativos</TableHead>
-                  <TableHead className="text-muted-foreground">MRR sob Gestão</TableHead>
-                  <TableHead className="text-muted-foreground">Status</TableHead>
-                  <TableHead className="w-[200px] text-muted-foreground text-right">Ações</TableHead>
+                   <TableHead className="text-muted-foreground">MRR sob Gestão</TableHead>
+                   <TableHead className="text-muted-foreground text-center">Score IA</TableHead>
+                   <TableHead className="text-muted-foreground">Status</TableHead>
+                   <TableHead className="w-[200px] text-muted-foreground text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
