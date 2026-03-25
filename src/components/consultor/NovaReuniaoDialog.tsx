@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Loader2, FileText, Link as LinkIcon } from 'lucide-react';
 import { useClientes } from '@/hooks/useClientes';
 import { useCreateReuniao, useAnalisarReuniao } from '@/hooks/useReunioes';
 import { useToast } from '@/hooks/use-toast';
@@ -23,6 +24,10 @@ export function NovaReuniaoDialog({ open, onOpenChange, consultorId }: NovaReuni
   const createReuniao = useCreateReuniao();
   const analisarReuniao = useAnalisarReuniao();
 
+  const [transcricaoMode, setTranscricaoMode] = useState<'colar' | 'link'>('colar');
+  const [linkTranscricao, setLinkTranscricao] = useState('');
+  const [loadingLink, setLoadingLink] = useState(false);
+
   const [formData, setFormData] = useState({
     cliente_id: '',
     data_reuniao: format(new Date(), 'yyyy-MM-dd'),
@@ -30,6 +35,31 @@ export function NovaReuniaoDialog({ open, onOpenChange, consultorId }: NovaReuni
     google_meet_link: '',
     transcricao: '',
   });
+
+  const fetchTranscricaoFromLink = async () => {
+    if (!linkTranscricao.trim()) {
+      toast({ title: 'Erro', description: 'Insira o link do arquivo', variant: 'destructive' });
+      return;
+    }
+
+    setLoadingLink(true);
+    try {
+      const response = await fetch(linkTranscricao.trim());
+      if (!response.ok) throw new Error('Não foi possível acessar o arquivo');
+      const text = await response.text();
+      if (!text.trim()) throw new Error('O arquivo está vazio');
+      setFormData(prev => ({ ...prev, transcricao: text }));
+      toast({ title: 'Transcrição importada', description: `${text.length} caracteres carregados` });
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao importar',
+        description: error.message || 'Verifique se o link é público e acessível',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingLink(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!formData.cliente_id || !formData.data_reuniao) {
@@ -55,7 +85,6 @@ export function NovaReuniaoDialog({ open, onOpenChange, consultorId }: NovaReuni
       onOpenChange(false);
       resetForm();
 
-      // Fire and forget - analysis runs in background
       analisarReuniao.mutate(reuniao.id, {
         onSuccess: () => {
           toast({ title: 'Análise concluída', description: 'A IA finalizou a análise da reunião' });
@@ -77,6 +106,8 @@ export function NovaReuniaoDialog({ open, onOpenChange, consultorId }: NovaReuni
       google_meet_link: '',
       transcricao: '',
     });
+    setLinkTranscricao('');
+    setTranscricaoMode('colar');
   };
 
   const clientesAtivos = clientes?.filter(c => c.status === 'ativo') || [];
@@ -140,15 +171,60 @@ export function NovaReuniaoDialog({ open, onOpenChange, consultorId }: NovaReuni
 
           <div className="space-y-2">
             <Label className="text-foreground">Transcrição *</Label>
-            <Textarea
-              value={formData.transcricao}
-              onChange={(e) => setFormData({ ...formData, transcricao: e.target.value })}
-              placeholder="Cole aqui a transcrição da reunião do Google Meet..."
-              className="bg-input border-border min-h-[200px] font-mono text-sm"
-            />
-            <p className="text-xs text-muted-foreground">
-              Cole a transcrição gerada pelo Gemini no Google Meet. A análise por IA será feita automaticamente.
-            </p>
+            <Tabs value={transcricaoMode} onValueChange={(v) => setTranscricaoMode(v as 'colar' | 'link')}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="colar" className="gap-2">
+                  <FileText className="h-4 w-4" /> Colar texto
+                </TabsTrigger>
+                <TabsTrigger value="link" className="gap-2">
+                  <LinkIcon className="h-4 w-4" /> Importar via link
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="colar" className="mt-3">
+                <Textarea
+                  value={formData.transcricao}
+                  onChange={(e) => setFormData({ ...formData, transcricao: e.target.value })}
+                  placeholder="Cole aqui a transcrição da reunião do Google Meet..."
+                  className="bg-input border-border min-h-[200px] font-mono text-sm"
+                />
+              </TabsContent>
+
+              <TabsContent value="link" className="mt-3 space-y-3">
+                <div className="flex gap-2">
+                  <Input
+                    value={linkTranscricao}
+                    onChange={(e) => setLinkTranscricao(e.target.value)}
+                    placeholder="https://docs.google.com/... ou link direto para .txt"
+                    className="bg-input border-border flex-1"
+                  />
+                  <Button
+                    type="button"
+                    onClick={fetchTranscricaoFromLink}
+                    disabled={loadingLink}
+                    variant="outline"
+                    className="border-border"
+                  >
+                    {loadingLink ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Importar'}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Insira um link público para o arquivo de transcrição (.txt, Google Docs com compartilhamento público, etc.)
+                </p>
+                {formData.transcricao && (
+                  <div className="rounded-md border border-border bg-muted/50 p-3">
+                    <p className="text-xs text-muted-foreground mb-1">Prévia ({formData.transcricao.length} caracteres):</p>
+                    <p className="text-sm text-foreground line-clamp-4 font-mono">{formData.transcricao}</p>
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+
+            {transcricaoMode === 'colar' && (
+              <p className="text-xs text-muted-foreground">
+                Cole a transcrição gerada pelo Gemini no Google Meet. A análise por IA será feita automaticamente.
+              </p>
+            )}
           </div>
         </div>
 
