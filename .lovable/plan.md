@@ -1,62 +1,108 @@
 
 
-## Vincular Consultores a Usuarios + Criar Projetos pela UI
+## Etapa 1: Cards enriquecidos + Painel lateral no Kanban
 
-### Visao geral
+### Banco de dados
 
-Duas funcionalidades novas na pagina `/projetos`:
+Nova migracão com 2 tabelas:
 
-1. **Vincular consultores a usuarios** -- admin pode associar um usuario auth a um consultor (tabela `consultor_user`) diretamente da pagina de Projetos
-2. **Criar projetos (cards)** para clientes ativos -- botao "Novo Projeto" abre dialog com selecao de cliente, consultor e etapa inicial. Consultores so veem seus clientes; admins veem todos.
+**`projeto_comentarios`**: `id`, `projeto_id` (FK projetos ON DELETE CASCADE), `user_id` (uuid), `texto` (text), `created_at`
+- RLS: autenticados podem ler/inserir (is_authorized_user OR consultor do projeto)
 
-### Mudancas
+**`projeto_checklist`**: `id`, `projeto_id` (FK projetos ON DELETE CASCADE), `titulo` (text), `concluido` (boolean default false), `ordem` (integer default 0), `created_at`
+- RLS: autenticados podem CRUD (is_authorized_user OR consultor do projeto)
 
-**1. Dialog "Novo Projeto" (`src/components/projetos/NovoProjetoDialog.tsx`)**
+Adicionar coluna `due_date` (date, nullable) na tabela `projetos`.
 
-- Campos: cliente (select filtrado), consultor (select, pre-selecionado se consultor logado), contrato (auto-detectado do cliente ativo), etapa inicial (select das etapas)
-- Para consultores: lista apenas clientes com `consultor_id` igual ao do consultor logado, e consultor fica fixo
-- Para admins: lista todos os clientes ativos, permite selecionar qualquer consultor
-- Filtra clientes que ja tem projeto criado (evitar duplicatas)
-- Usa `useCreateProjeto` existente
+### Alteracoes no card (`KanbanCard.tsx`)
 
-**2. Dialog "Vincular Consultor a Usuario" (`src/components/projetos/VincularConsultorDialog.tsx`)**
+- Mostrar `due_date` com icone de calendario (vermelho se vencido, amarelo se proximos 3 dias)
+- Mostrar contagem de reunioes, comentarios e checklist (ex: "2/5 tarefas")
+- Ao clicar no card (nao no botao de reuniao), abre painel lateral
 
-- Visivel apenas para admins
-- Seleciona um consultor (da tabela `consultores`) e um usuario (da lista de auth users)
-- Ao salvar, insere na tabela `consultor_user` e tambem adiciona a role `consultor` em `user_roles` se o usuario ainda nao tiver role
-- Mostra lista de vinculos existentes com opcao de remover
+### Painel lateral (`ProjetoDetalheSheet.tsx`)
 
-**3. Atualizar KanbanBoard (`src/components/projetos/KanbanBoard.tsx`)**
+Sheet (shadcn) que abre pela direita com:
 
-- Adicionar botao "Novo Projeto" no header (ao lado do filtro de consultor)
-- Adicionar botao "Vincular Consultores" (apenas para admin)
-- Para consultores: buscar o `consultor_id` do usuario logado via hook para filtrar automaticamente
+1. **Cabecalho**: nome do cliente, consultor, etapa atual, due date editavel
+2. **Observacoes**: textarea editavel
+3. **Checklist**: lista de itens com checkbox, campo para adicionar novo, reordenavel
+4. **Comentarios**: lista cronologica com campo para novo comentario
+5. **Reunioes**: lista de reunioes do cliente/consultor com scores e botao "Nova Reuniao"
 
-**4. Hook para consultor_user (`src/hooks/useConsultorUser.ts`)**
+### Hooks novos
 
-- `useConsultorUsers()` -- lista todos os vinculos (admin)
-- `useMyConsultorId()` -- retorna o consultor_id do usuario logado
-- `useCreateConsultorUser()` -- insere vinculo
-- `useDeleteConsultorUser()` -- remove vinculo
-
-**5. Ajuste no useProjetos**
-
-- `useProjetos`: quando `isConsultor`, filtrar pelo `consultor_id` do usuario logado (usando `useMyConsultorId`)
+- `useProjetoComentarios(projetoId)` -- CRUD comentarios
+- `useProjetoChecklist(projetoId)` -- CRUD checklist
+- `useReunioesByProjeto(clienteId, consultorId)` -- lista reunioes filtradas
 
 ### Arquivos
 
 | Arquivo | Acao |
 |---------|------|
-| `src/components/projetos/NovoProjetoDialog.tsx` | Criar -- dialog para criar projeto/card |
-| `src/components/projetos/VincularConsultorDialog.tsx` | Criar -- dialog para vincular consultor a usuario |
-| `src/hooks/useConsultorUser.ts` | Criar -- hooks para CRUD de consultor_user |
-| `src/components/projetos/KanbanBoard.tsx` | Editar -- adicionar botoes e integrar dialogs |
-| `src/hooks/useProjetos.ts` | Editar -- filtro automatico para consultores |
+| Migracao SQL | Criar tabelas + add due_date |
+| `src/components/projetos/ProjetoDetalheSheet.tsx` | Criar -- painel lateral |
+| `src/hooks/useProjetoComentarios.ts` | Criar |
+| `src/hooks/useProjetoChecklist.ts` | Criar |
+| `src/components/projetos/KanbanCard.tsx` | Editar -- indicadores + onClick |
+| `src/components/projetos/KanbanBoard.tsx` | Editar -- state do sheet |
+| `src/hooks/useProjetos.ts` | Editar -- incluir due_date no tipo e select de reunioes count |
 
-### Detalhes tecnicos
+---
 
-- Nao precisa de migracao SQL -- as tabelas `consultor_user`, `projetos`, `projetos_etapas` e a role `consultor` ja existem
-- RLS ja esta configurada corretamente para todos os casos
-- A query de clientes disponiveis para criar projeto: buscar clientes ativos que ainda nao tem registro na tabela `projetos`
-- O `useAuthUsers` existente ja busca a lista de usuarios via edge function `list-auth-users`
+## Etapa 2: Remover cadastro aberto da pagina de login
+
+- Remover a aba "Cadastrar" e o `TabsList` do `Auth.tsx`
+- Manter apenas o formulario de login e o link "Esqueci minha senha"
+
+---
+
+## Etapa 3: Pagina de redefinicao de senha + troca obrigatoria no primeiro acesso
+
+### Validacao de senha
+
+Schema atualizado: minimo 8 caracteres + pelo menos 1 caractere especial. Aplicado em:
+- `Auth.tsx` (login validation)
+- `Configuracoes.tsx` (alterar senha)
+- Nova pagina `/reset-password`
+
+### Pagina `/reset-password`
+
+- Rota publica em `App.tsx`
+- Detecta `type=recovery` no hash da URL
+- Formulario: nova senha + confirmar, com validacao (8+ chars, caractere especial)
+- Chama `supabase.auth.updateUser({ password })`
+- Redireciona para `/auth` apos sucesso
+
+### Corrigir redirect do "Esqueci minha senha"
+
+Em `Auth.tsx`, alterar `redirectTo` de `/auth` para `/reset-password`.
+
+### Troca obrigatoria no primeiro acesso
+
+O admin cria o usuario com senha temporaria via `supabase.auth.admin.createUser` (edge function). Para forcar a troca:
+
+- Adicionar campo `force_password_change` (boolean, default false) na tabela `user_roles`
+- Quando admin cria usuario, insere com `force_password_change = true`
+- No `AppLayout.tsx`, verificar se o usuario logado tem `force_password_change = true` — se sim, redirecionar para `/trocar-senha`
+- Pagina `/trocar-senha` (rota protegida): formulario de nova senha, ao salvar atualiza a senha via `updateUser` e seta `force_password_change = false`
+- Edge function `create-user` para admin criar usuarios com senha temporaria
+
+### Arquivos
+
+| Arquivo | Acao |
+|---------|------|
+| Migracao SQL | Add `force_password_change` em user_roles |
+| `src/pages/ResetPassword.tsx` | Criar |
+| `src/pages/TrocarSenha.tsx` | Criar -- troca obrigatoria |
+| `supabase/functions/create-user/index.ts` | Criar -- admin cria usuario |
+| `src/pages/Auth.tsx` | Editar -- remover signup, fix redirect, validacao |
+| `src/pages/Configuracoes.tsx` | Editar -- validacao senha |
+| `src/components/layout/AppLayout.tsx` | Editar -- check force_password_change |
+| `src/App.tsx` | Editar -- add rotas |
+| `src/contexts/AuthContext.tsx` | Editar -- expor forcePasswordChange |
+
+---
+
+Executarei etapa por etapa, sinalizando ao concluir cada uma para voce aprovar antes de avancar.
 
