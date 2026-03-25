@@ -255,22 +255,22 @@ ${transcricaoLimpa}`;
 
     const analiseData = analise;
     const scoreMedia =
-      (analise.empatia + analise.clareza + analise.proatividade +
-        analise.dominio_tecnico + analise.orientacao_resultados) / 5;
+      (analiseData.empatia + analiseData.clareza + analiseData.proatividade +
+        analiseData.dominio_tecnico + analiseData.orientacao_resultados) / 5;
 
     const { error: updateError } = await supabase
       .from("reunioes")
       .update({
-        resumo_ia: analise.resumo,
+        resumo_ia: analiseData.resumo || '',
         score_ia: Math.round(scoreMedia * 10) / 10,
         analise_ia: {
-          empatia: analise.empatia,
-          clareza: analise.clareza,
-          proatividade: analise.proatividade,
-          dominio_tecnico: analise.dominio_tecnico,
-          orientacao_resultados: analise.orientacao_resultados,
-          pontos_fortes: analise.pontos_fortes,
-          pontos_melhoria: analise.pontos_melhoria,
+          empatia: analiseData.empatia,
+          clareza: analiseData.clareza,
+          proatividade: analiseData.proatividade,
+          dominio_tecnico: analiseData.dominio_tecnico,
+          orientacao_resultados: analiseData.orientacao_resultados,
+          pontos_fortes: analiseData.pontos_fortes,
+          pontos_melhoria: analiseData.pontos_melhoria,
         },
         status_analise: "concluido",
       })
