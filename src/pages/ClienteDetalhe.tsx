@@ -21,6 +21,7 @@ import { ContratoTab } from '@/components/cliente/ContratoTab';
 import { OnboardingTab } from '@/components/cliente/OnboardingTab';
 import { AtendimentoTab } from '@/components/cliente/AtendimentoTab';
 import { FerramentasTab } from '@/components/cliente/FerramentasTab';
+import { DesempenhoClienteTab } from '@/components/cliente/DesempenhoClienteTab';
 import { ClienteFormDialog } from '@/components/cliente/ClienteFormDialog';
 import { toast } from 'sonner';
 
