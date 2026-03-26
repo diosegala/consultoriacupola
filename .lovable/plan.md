@@ -1,68 +1,46 @@
 
 
-## Replicar funcionalidades do Kanban de referencia
+## Melhorias no Kanban: Data Limite, Periodo e Reuniao Pre-selecionada
 
-### O que o projeto de referencia tem que este projeto ja tem
-- Drag-and-drop com `@hello-pangea/dnd`
-- Cards com due date (indicador visual de atraso/proximo)
-- Checklist com progresso
-- Contagem de comentarios
-- Painel lateral (Sheet) com: due date editavel, observacoes, checklist, comentarios, reunioes
+### Problema 1: Data limite nao persiste
 
-### O que o projeto de referencia tem que FALTA neste projeto
+A funcao `handleSaveDueDate` salva no banco mas nao invalida o cache do React Query, entao o card nao atualiza. Alem disso, a tabela `projetos` so tem `due_date` (data unica) -- precisa de `due_date_start` para suportar periodo.
 
-| Funcionalidade | Descricao |
-|----------------|-----------|
-| **Card Modal (Dialog)** | O projeto de referencia usa um Dialog grande (max-w-4xl, layout 2 colunas) em vez de Sheet lateral. Mais espaco para detalhes. |
-| **Tags coloridas nos cards** | Sistema de tags com cores customizaveis (12 cores), adicionar/remover tags por card |
-| **Barra de progresso visual** | Barra colorida no checklist (nao apenas "2/5") |
-| **Multiplas checklists por card** | Cada card pode ter varias checklists nomeadas (ex: "Documentos", "Entregas") |
-| **Atribuicao de responsavel por item de checklist** | Cada item pode ter um membro responsavel |
-| **Datas por item de checklist** | Data de inicio e prazo por item individual |
-| **Busca e filtros no board** | Barra de busca + filtro por membro + filtro por tag |
-| **Estilo CSS dos cards** | Classes `.kanban-card` com hover ring, dragging com scale+rotate |
-| **Log de atividades** | Historico de acoes no card (quem fez o que e quando) |
-| **Eventos/reunioes agendaveis** | Formulario completo com data, hora inicio/fim para agendar eventos dentro do card |
+### Problema 2: Reuniao sem cliente pre-selecionado
 
-### Plano de implementacao
+O `NovaReuniaoDialog` recebe apenas `consultorId` mas nao recebe `clienteId`. Quando aberto a partir de um card, o cliente deveria vir pre-preenchido.
 
-**Fase 1 -- Melhorias visuais e CSS**
-- Adicionar classes `.kanban-card` e `.kanban-card-dragging` no `index.css`
-- Refatorar `KanbanCard.tsx` para usar essas classes e melhorar indicadores visuais (badge de due date com fundo colorido)
+### Solucao
 
-**Fase 2 -- Tags**
-- Migracao SQL: criar tabelas `projeto_tags` (id, nome, cor) e `projeto_tag_vinculo` (projeto_id, tag_id)
-- Hook `useProjetoTags` com CRUD
-- Exibir tags coloridas nos cards
-- Adicionar/remover tags no painel de detalhe
+**Migracao SQL**
+- Adicionar coluna `due_date_start` (date, nullable) na tabela `projetos` para suportar periodo (inicio-fim)
 
-**Fase 3 -- Upgrade do painel de detalhe (Sheet → Dialog)**
-- Trocar `ProjetoDetalheSheet` de Sheet para Dialog full (2 colunas: conteudo principal + sidebar com acoes)
-- Adicionar barra de progresso visual no checklist
-- Permitir multiplas checklists nomeadas por projeto (requer refatoracao da tabela `projeto_checklist` para ter checklist groups)
+**`ProjetoDetalheSheet.tsx`**
+- Apos salvar due date, invalidar queries `['projetos']` e `['projeto_checklist', ...]` via queryClient para o card refletir a mudanca
+- Trocar Calendar de `mode="single"` para `mode="range"`, salvando `due_date_start` e `due_date` (fim)
+- Exibir o periodo selecionado no botao
 
-**Fase 4 -- Filtros no board**
-- Criar componente `BoardFilters` com busca por texto + filtro por consultor (ja existe parcialmente) + filtro por tag
-- Integrar no `KanbanBoard.tsx`
+**`KanbanCard.tsx`**
+- Atualizar para exibir periodo (ex: "15/04 - 30/04") quando ambas as datas existirem
 
-**Fase 5 -- Atribuicao e datas em itens de checklist**
-- Migracao SQL: adicionar colunas `assigned_to`, `start_date`, `due_date` em `projeto_checklist`
-- UI de atribuicao de responsavel e datas por item dentro do dialog
+**`NovaReuniaoDialog.tsx`**
+- Adicionar prop opcional `clienteId?: string`
+- Quando recebido, pre-preencher `formData.cliente_id` com esse valor
 
-### Arquivos principais
+**`KanbanBoard.tsx`**
+- Passar `clienteId={selectedProjeto?.cliente_id}` para o `NovaReuniaoDialog`
+
+**`useProjetos.ts`**
+- Incluir `due_date_start` no tipo `Projeto`
+
+### Arquivos
 
 | Arquivo | Acao |
 |---------|------|
-| `src/index.css` | Adicionar classes kanban-card |
-| Migracao SQL | Tags, checklist groups, colunas extras em checklist |
-| `src/components/projetos/KanbanCard.tsx` | Refatorar visual, adicionar tags |
-| `src/components/projetos/ProjetoDetalheSheet.tsx` | Converter para Dialog, layout 2 colunas, multiplas checklists, tags, barra de progresso |
-| `src/components/projetos/BoardFilters.tsx` | Criar -- busca + filtros |
-| `src/components/projetos/KanbanBoard.tsx` | Integrar filtros |
-| `src/hooks/useProjetoTags.ts` | Criar |
-| `src/hooks/useProjetoChecklist.ts` | Refatorar para suportar multiplos checklists |
-
-### Nota
-
-Vou implementar por fases para manter o controle. A Fase 1 (visual) e Fase 2 (tags) sao as mais impactantes visualmente. As fases 3-5 adicionam profundidade funcional. Posso executar todas de uma vez ou fase por fase -- o que preferir.
+| Migracao SQL | Adicionar `due_date_start` em projetos |
+| `src/components/projetos/ProjetoDetalheSheet.tsx` | Invalidar cache + calendar range |
+| `src/components/projetos/KanbanCard.tsx` | Exibir periodo |
+| `src/components/consultor/NovaReuniaoDialog.tsx` | Aceitar `clienteId` prop |
+| `src/components/projetos/KanbanBoard.tsx` | Passar clienteId ao dialog |
+| `src/hooks/useProjetos.ts` | Adicionar `due_date_start` ao tipo |
 
