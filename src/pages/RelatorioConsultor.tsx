@@ -253,7 +253,7 @@ function transformReunioes(reunioes: any[]): Meeting[] {
     .filter((r: any) => r.status_analise === 'concluido' && r.analise_ia)
     .map((r: any) => {
       const analise = r.analise_ia as any;
-      const criterios = analise?.criterios || {};
+      const criterios = analise || {};
 
       const criteria: MeetingCriteria = {
         empathy: 0, clarity: 0, proactivity: 0, technical: 0, results: 0,
