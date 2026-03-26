@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd';
 import { KanbanColumn } from './KanbanColumn';
 import { useProjetosEtapas, useProjetos, useMoverProjeto, type Projeto } from '@/hooks/useProjetos';
@@ -6,9 +6,9 @@ import { NovaReuniaoDialog } from '@/components/consultor/NovaReuniaoDialog';
 import { NovoProjetoDialog } from './NovoProjetoDialog';
 import { VincularConsultorDialog } from './VincularConsultorDialog';
 import { ProjetoDetalheSheet } from './ProjetoDetalheSheet';
+import { BoardFilters } from './BoardFilters';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Users } from 'lucide-react';
 import { useConsultores } from '@/hooks/useConsultores';
 import { useMyConsultorId } from '@/hooks/useConsultorUser';
@@ -19,6 +19,8 @@ export function KanbanBoard() {
   const isConsultor = userRole === 'consultor';
 
   const [filtroConsultor, setFiltroConsultor] = useState<string>('todos');
+  const [filtroTag, setFiltroTag] = useState<string>('todas');
+  const [searchText, setSearchText] = useState('');
   const [reuniaoDialogOpen, setReuniaoDialogOpen] = useState(false);
   const [selectedProjeto, setSelectedProjeto] = useState<Projeto | null>(null);
   const [novoProjetoOpen, setNovoProjetoOpen] = useState(false);
@@ -32,6 +34,18 @@ export function KanbanBoard() {
   const { data: projetos, isLoading: loadingProjetos } = useProjetos(consultorFilter);
   const { data: consultores } = useConsultores();
   const moverProjeto = useMoverProjeto();
+
+  const filteredProjetos = useMemo(() => {
+    let list = projetos ?? [];
+    if (searchText.trim()) {
+      const lower = searchText.toLowerCase();
+      list = list.filter(p => p.clientes?.nome?.toLowerCase().includes(lower));
+    }
+    if (filtroTag !== 'todas') {
+      list = list.filter(p => p._tags?.some(t => t.id === filtroTag));
+    }
+    return list;
+  }, [projetos, searchText, filtroTag]);
 
   const handleDragEnd = useCallback((result: DropResult) => {
     if (!result.destination) return;
@@ -66,26 +80,23 @@ export function KanbanBoard() {
   }
 
   const projetosByEtapa = (etapaId: string) =>
-    (projetos ?? [])
+    filteredProjetos
       .filter((p) => p.etapa_id === etapaId)
       .sort((a, b) => a.ordem_na_etapa - b.ordem_na_etapa);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
-        {!isConsultor && (
-          <Select value={filtroConsultor} onValueChange={setFiltroConsultor}>
-            <SelectTrigger className="w-[250px]">
-              <SelectValue placeholder="Filtrar por consultor" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos os consultores</SelectItem>
-              {consultores?.filter(c => c.ativo).map((c) => (
-                <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+        <BoardFilters
+          searchText={searchText}
+          onSearchChange={setSearchText}
+          filtroConsultor={filtroConsultor}
+          onFiltroConsultorChange={setFiltroConsultor}
+          filtroTag={filtroTag}
+          onFiltroTagChange={setFiltroTag}
+          consultores={consultores}
+          isConsultor={isConsultor}
+        />
 
         <Button size="sm" onClick={() => setNovoProjetoOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
