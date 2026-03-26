@@ -55,6 +55,15 @@ export function useConsultoresComStats() {
 
       if (clientesError) throw clientesError;
 
+      // Buscar reuniões analisadas com score
+      const { data: reunioes, error: reunioesError } = await supabase
+        .from('reunioes')
+        .select('consultor_id, score_ia')
+        .eq('status_analise', 'concluido')
+        .not('score_ia', 'is', null);
+
+      if (reunioesError) throw reunioesError;
+
       // Calcular stats para cada consultor
       return consultores.map(consultor => {
         const clientesDoConsultor = (clientes as any[]).filter(
