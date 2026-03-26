@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import cupolaLogo from '@/assets/cupola-logo.png';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 
@@ -44,14 +45,10 @@ export function Sidebar() {
     >
       {/* Logo */}
       <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
-        {!collapsed && (
-          <div>
-            <h1 className="text-xl font-bold text-primary">CUPOLA</h1>
-            <p className="text-[10px] text-muted-foreground tracking-widest">CONSULTORIA</p>
-          </div>
-        )}
-        {collapsed && (
-          <span className="text-primary font-bold text-xl mx-auto">C</span>
+      {!collapsed ? (
+          <img src={cupolaLogo} alt="Cupola Consultoria" className="h-8 object-contain" />
+        ) : (
+          <img src={cupolaLogo} alt="Cupola" className="h-6 object-contain mx-auto" />
         )}
         <Button
           variant="ghost"
