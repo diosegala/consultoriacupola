@@ -1,108 +1,68 @@
 
 
-## Etapa 1: Cards enriquecidos + Painel lateral no Kanban
+## Replicar funcionalidades do Kanban de referencia
 
-### Banco de dados
+### O que o projeto de referencia tem que este projeto ja tem
+- Drag-and-drop com `@hello-pangea/dnd`
+- Cards com due date (indicador visual de atraso/proximo)
+- Checklist com progresso
+- Contagem de comentarios
+- Painel lateral (Sheet) com: due date editavel, observacoes, checklist, comentarios, reunioes
 
-Nova migracão com 2 tabelas:
+### O que o projeto de referencia tem que FALTA neste projeto
 
-**`projeto_comentarios`**: `id`, `projeto_id` (FK projetos ON DELETE CASCADE), `user_id` (uuid), `texto` (text), `created_at`
-- RLS: autenticados podem ler/inserir (is_authorized_user OR consultor do projeto)
+| Funcionalidade | Descricao |
+|----------------|-----------|
+| **Card Modal (Dialog)** | O projeto de referencia usa um Dialog grande (max-w-4xl, layout 2 colunas) em vez de Sheet lateral. Mais espaco para detalhes. |
+| **Tags coloridas nos cards** | Sistema de tags com cores customizaveis (12 cores), adicionar/remover tags por card |
+| **Barra de progresso visual** | Barra colorida no checklist (nao apenas "2/5") |
+| **Multiplas checklists por card** | Cada card pode ter varias checklists nomeadas (ex: "Documentos", "Entregas") |
+| **Atribuicao de responsavel por item de checklist** | Cada item pode ter um membro responsavel |
+| **Datas por item de checklist** | Data de inicio e prazo por item individual |
+| **Busca e filtros no board** | Barra de busca + filtro por membro + filtro por tag |
+| **Estilo CSS dos cards** | Classes `.kanban-card` com hover ring, dragging com scale+rotate |
+| **Log de atividades** | Historico de acoes no card (quem fez o que e quando) |
+| **Eventos/reunioes agendaveis** | Formulario completo com data, hora inicio/fim para agendar eventos dentro do card |
 
-**`projeto_checklist`**: `id`, `projeto_id` (FK projetos ON DELETE CASCADE), `titulo` (text), `concluido` (boolean default false), `ordem` (integer default 0), `created_at`
-- RLS: autenticados podem CRUD (is_authorized_user OR consultor do projeto)
+### Plano de implementacao
 
-Adicionar coluna `due_date` (date, nullable) na tabela `projetos`.
+**Fase 1 -- Melhorias visuais e CSS**
+- Adicionar classes `.kanban-card` e `.kanban-card-dragging` no `index.css`
+- Refatorar `KanbanCard.tsx` para usar essas classes e melhorar indicadores visuais (badge de due date com fundo colorido)
 
-### Alteracoes no card (`KanbanCard.tsx`)
+**Fase 2 -- Tags**
+- Migracao SQL: criar tabelas `projeto_tags` (id, nome, cor) e `projeto_tag_vinculo` (projeto_id, tag_id)
+- Hook `useProjetoTags` com CRUD
+- Exibir tags coloridas nos cards
+- Adicionar/remover tags no painel de detalhe
 
-- Mostrar `due_date` com icone de calendario (vermelho se vencido, amarelo se proximos 3 dias)
-- Mostrar contagem de reunioes, comentarios e checklist (ex: "2/5 tarefas")
-- Ao clicar no card (nao no botao de reuniao), abre painel lateral
+**Fase 3 -- Upgrade do painel de detalhe (Sheet → Dialog)**
+- Trocar `ProjetoDetalheSheet` de Sheet para Dialog full (2 colunas: conteudo principal + sidebar com acoes)
+- Adicionar barra de progresso visual no checklist
+- Permitir multiplas checklists nomeadas por projeto (requer refatoracao da tabela `projeto_checklist` para ter checklist groups)
 
-### Painel lateral (`ProjetoDetalheSheet.tsx`)
+**Fase 4 -- Filtros no board**
+- Criar componente `BoardFilters` com busca por texto + filtro por consultor (ja existe parcialmente) + filtro por tag
+- Integrar no `KanbanBoard.tsx`
 
-Sheet (shadcn) que abre pela direita com:
+**Fase 5 -- Atribuicao e datas em itens de checklist**
+- Migracao SQL: adicionar colunas `assigned_to`, `start_date`, `due_date` em `projeto_checklist`
+- UI de atribuicao de responsavel e datas por item dentro do dialog
 
-1. **Cabecalho**: nome do cliente, consultor, etapa atual, due date editavel
-2. **Observacoes**: textarea editavel
-3. **Checklist**: lista de itens com checkbox, campo para adicionar novo, reordenavel
-4. **Comentarios**: lista cronologica com campo para novo comentario
-5. **Reunioes**: lista de reunioes do cliente/consultor com scores e botao "Nova Reuniao"
-
-### Hooks novos
-
-- `useProjetoComentarios(projetoId)` -- CRUD comentarios
-- `useProjetoChecklist(projetoId)` -- CRUD checklist
-- `useReunioesByProjeto(clienteId, consultorId)` -- lista reunioes filtradas
-
-### Arquivos
-
-| Arquivo | Acao |
-|---------|------|
-| Migracao SQL | Criar tabelas + add due_date |
-| `src/components/projetos/ProjetoDetalheSheet.tsx` | Criar -- painel lateral |
-| `src/hooks/useProjetoComentarios.ts` | Criar |
-| `src/hooks/useProjetoChecklist.ts` | Criar |
-| `src/components/projetos/KanbanCard.tsx` | Editar -- indicadores + onClick |
-| `src/components/projetos/KanbanBoard.tsx` | Editar -- state do sheet |
-| `src/hooks/useProjetos.ts` | Editar -- incluir due_date no tipo e select de reunioes count |
-
----
-
-## Etapa 2: Remover cadastro aberto da pagina de login
-
-- Remover a aba "Cadastrar" e o `TabsList` do `Auth.tsx`
-- Manter apenas o formulario de login e o link "Esqueci minha senha"
-
----
-
-## Etapa 3: Pagina de redefinicao de senha + troca obrigatoria no primeiro acesso
-
-### Validacao de senha
-
-Schema atualizado: minimo 8 caracteres + pelo menos 1 caractere especial. Aplicado em:
-- `Auth.tsx` (login validation)
-- `Configuracoes.tsx` (alterar senha)
-- Nova pagina `/reset-password`
-
-### Pagina `/reset-password`
-
-- Rota publica em `App.tsx`
-- Detecta `type=recovery` no hash da URL
-- Formulario: nova senha + confirmar, com validacao (8+ chars, caractere especial)
-- Chama `supabase.auth.updateUser({ password })`
-- Redireciona para `/auth` apos sucesso
-
-### Corrigir redirect do "Esqueci minha senha"
-
-Em `Auth.tsx`, alterar `redirectTo` de `/auth` para `/reset-password`.
-
-### Troca obrigatoria no primeiro acesso
-
-O admin cria o usuario com senha temporaria via `supabase.auth.admin.createUser` (edge function). Para forcar a troca:
-
-- Adicionar campo `force_password_change` (boolean, default false) na tabela `user_roles`
-- Quando admin cria usuario, insere com `force_password_change = true`
-- No `AppLayout.tsx`, verificar se o usuario logado tem `force_password_change = true` — se sim, redirecionar para `/trocar-senha`
-- Pagina `/trocar-senha` (rota protegida): formulario de nova senha, ao salvar atualiza a senha via `updateUser` e seta `force_password_change = false`
-- Edge function `create-user` para admin criar usuarios com senha temporaria
-
-### Arquivos
+### Arquivos principais
 
 | Arquivo | Acao |
 |---------|------|
-| Migracao SQL | Add `force_password_change` em user_roles |
-| `src/pages/ResetPassword.tsx` | Criar |
-| `src/pages/TrocarSenha.tsx` | Criar -- troca obrigatoria |
-| `supabase/functions/create-user/index.ts` | Criar -- admin cria usuario |
-| `src/pages/Auth.tsx` | Editar -- remover signup, fix redirect, validacao |
-| `src/pages/Configuracoes.tsx` | Editar -- validacao senha |
-| `src/components/layout/AppLayout.tsx` | Editar -- check force_password_change |
-| `src/App.tsx` | Editar -- add rotas |
-| `src/contexts/AuthContext.tsx` | Editar -- expor forcePasswordChange |
+| `src/index.css` | Adicionar classes kanban-card |
+| Migracao SQL | Tags, checklist groups, colunas extras em checklist |
+| `src/components/projetos/KanbanCard.tsx` | Refatorar visual, adicionar tags |
+| `src/components/projetos/ProjetoDetalheSheet.tsx` | Converter para Dialog, layout 2 colunas, multiplas checklists, tags, barra de progresso |
+| `src/components/projetos/BoardFilters.tsx` | Criar -- busca + filtros |
+| `src/components/projetos/KanbanBoard.tsx` | Integrar filtros |
+| `src/hooks/useProjetoTags.ts` | Criar |
+| `src/hooks/useProjetoChecklist.ts` | Refatorar para suportar multiplos checklists |
 
----
+### Nota
 
-Executarei etapa por etapa, sinalizando ao concluir cada uma para voce aprovar antes de avancar.
+Vou implementar por fases para manter o controle. A Fase 1 (visual) e Fase 2 (tags) sao as mais impactantes visualmente. As fases 3-5 adicionam profundidade funcional. Posso executar todas de uma vez ou fase por fase -- o que preferir.
 
