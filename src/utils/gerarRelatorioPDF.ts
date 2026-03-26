@@ -18,9 +18,9 @@ const criterioLabels: Record<string, string> = {
 };
 
 function getScoreRGB(score: number): [number, number, number] {
-  if (score >= 8) return [34, 197, 94];    // green
-  if (score >= 6) return [234, 179, 8];    // yellow
-  return [239, 68, 68];                     // red
+  if (score >= 8) return [34, 197, 94];
+  if (score >= 6) return [234, 179, 8];
+  return [239, 68, 68];
 }
 
 function addNewPageIfNeeded(doc: jsPDF, y: number, needed: number): number {
@@ -31,7 +31,24 @@ function addNewPageIfNeeded(doc: jsPDF, y: number, needed: number): number {
   return y;
 }
 
-export function gerarRelatorioPDF(
+function loadImageAsBase64(url: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+export async function gerarRelatorioPDF(
   consultor: ConsultorInfo,
   reunioes: ReuniaoComDetalhes[],
   scoreMedio: number | null,
@@ -43,23 +60,37 @@ export function gerarRelatorioPDF(
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
 
+  // Load logo
+  let logoBase64: string | null = null;
+  try {
+    logoBase64 = await loadImageAsBase64('/cupola-logo.png');
+  } catch {
+    // logo not available, continue without
+  }
+
   // --- HEADER ---
   doc.setFillColor(30, 30, 40);
   doc.rect(0, 0, pageWidth, 45, 'F');
 
+  let headerTextX = 14;
+  if (logoBase64) {
+    doc.addImage(logoBase64, 'PNG', 14, 8, 30, 30);
+    headerTextX = 50;
+  }
+
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(20);
   doc.setFont('helvetica', 'bold');
-  doc.text('Relatório de Desempenho', 14, 20);
+  doc.text('Relatório de Desempenho', headerTextX, 20);
 
   doc.setFontSize(14);
   doc.setFont('helvetica', 'normal');
-  doc.text(consultor.nome, 14, 30);
+  doc.text(consultor.nome, headerTextX, 30);
 
   doc.setFontSize(9);
   doc.text(
     `Gerado em ${format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}`,
-    14,
+    headerTextX,
     38,
   );
 
@@ -119,19 +150,16 @@ export function gerarRelatorioPDF(
     doc.setTextColor(60, 60, 60);
     doc.text(criterioLabels[key], 14, y + 4);
 
-    // Bar background
     const barX = 100;
     const barW = 70;
     const barH = 5;
     doc.setFillColor(230, 230, 235);
     doc.roundedRect(barX, y, barW, barH, 2, 2, 'F');
 
-    // Bar fill
     doc.setFillColor(r, g, b);
     const fillW = Math.max(1, (nota / 10) * barW);
     doc.roundedRect(barX, y, fillW, barH, 2, 2, 'F');
 
-    // Score text
     doc.setTextColor(r, g, b);
     doc.setFont('helvetica', 'bold');
     doc.text(nota.toFixed(1), barX + barW + 5, y + 4);
@@ -140,6 +168,77 @@ export function gerarRelatorioPDF(
   }
 
   y += 8;
+
+  // --- GRÁFICO DE EVOLUÇÃO DO SCORE ---
+  const reunioesOrdenadas = [...analisadas]
+    .filter(r => r.score_ia != null)
+    .sort((a, b) => new Date(a.data_reuniao).getTime() - new Date(b.data_reuniao).getTime());
+
+  if (reunioesOrdenadas.length >= 2) {
+    y = addNewPageIfNeeded(doc, y, 80);
+
+    doc.setTextColor(30, 30, 40);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Evolução do Score', 14, y);
+    y += 8;
+
+    const chartX = 30;
+    const chartY = y;
+    const chartW = pageWidth - 60;
+    const chartH = 50;
+
+    // Background
+    doc.setFillColor(248, 248, 252);
+    doc.roundedRect(chartX - 2, chartY - 2, chartW + 4, chartH + 4, 2, 2, 'F');
+
+    // Grid lines
+    doc.setDrawColor(220, 220, 225);
+    doc.setLineWidth(0.2);
+    for (let s = 0; s <= 10; s += 2) {
+      const gy = chartY + chartH - (s / 10) * chartH;
+      doc.line(chartX, gy, chartX + chartW, gy);
+      doc.setFontSize(7);
+      doc.setTextColor(150, 150, 150);
+      doc.setFont('helvetica', 'normal');
+      doc.text(String(s), chartX - 8, gy + 2);
+    }
+
+    // Plot points and lines
+    const points = reunioesOrdenadas.map((r, i) => ({
+      x: chartX + (i / (reunioesOrdenadas.length - 1)) * chartW,
+      y: chartY + chartH - ((r.score_ia! / 10) * chartH),
+      score: r.score_ia!,
+      date: format(parseISO(r.data_reuniao), 'dd/MM/yy'),
+    }));
+
+    // Lines
+    doc.setLineWidth(0.8);
+    for (let i = 1; i < points.length; i++) {
+      const [r, g, b] = getScoreRGB(points[i].score);
+      doc.setDrawColor(r, g, b);
+      doc.line(points[i - 1].x, points[i - 1].y, points[i].x, points[i].y);
+    }
+
+    // Points and labels
+    for (const p of points) {
+      const [r, g, b] = getScoreRGB(p.score);
+      doc.setFillColor(r, g, b);
+      doc.circle(p.x, p.y, 1.5, 'F');
+
+      doc.setFontSize(6);
+      doc.setTextColor(80, 80, 80);
+      doc.text(p.date, p.x - 6, chartY + chartH + 6);
+
+      doc.setTextColor(r, g, b);
+      doc.setFont('helvetica', 'bold');
+      doc.text(p.score.toFixed(1), p.x - 3, p.y - 3);
+    }
+
+    y = chartY + chartH + 14;
+  }
+
+  y += 4;
 
   // --- DETALHAMENTO POR REUNIÃO ---
   doc.setTextColor(30, 30, 40);
@@ -154,6 +253,7 @@ export function gerarRelatorioPDF(
     const analise = r.analise_ia as Record<string, any>;
     const pontosFortes: string[] = analise?.pontos_fortes || [];
     const pontosMelhoria: string[] = analise?.pontos_melhoria || [];
+    const resumo: string = r.resumo_ia || '';
 
     const blockHeight = 40 + criterioKeys.length * 8 + pontosFortes.length * 6 + pontosMelhoria.length * 6 + 20;
     y = addNewPageIfNeeded(doc, y, Math.min(blockHeight, 100));
@@ -178,6 +278,27 @@ export function gerarRelatorioPDF(
     }
 
     y += 18;
+
+    // Resumo da reunião
+    if (resumo) {
+      y = addNewPageIfNeeded(doc, y, 16);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(60, 60, 100);
+      doc.text('Resumo:', 18, y);
+      y += 5;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(60, 60, 60);
+      doc.setFontSize(8);
+      const resumoLines = doc.splitTextToSize(resumo, pageWidth - 44);
+      for (const line of resumoLines) {
+        y = addNewPageIfNeeded(doc, y, 5);
+        doc.text(line, 22, y);
+        y += 4;
+      }
+      y += 4;
+    }
 
     // Criteria for this meeting
     for (const key of criterioKeys) {
