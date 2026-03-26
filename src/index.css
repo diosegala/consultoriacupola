@@ -128,3 +128,12 @@
     @apply bg-destructive text-destructive-foreground;
   }
 }
+
+@media print {
+  body { background: #f4f7f0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .print\:hidden { display: none !important; }
+  .print\:py-0 { padding-top: 0 !important; padding-bottom: 0 !important; }
+  .print\:px-0 { padding-left: 0 !important; padding-right: 0 !important; }
+  .print\:max-w-none { max-width: none !important; }
+  @page { size: A4; margin: 12mm; }
+}
