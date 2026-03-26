@@ -537,6 +537,63 @@ export type Database = {
           },
         ]
       }
+      projeto_tag_vinculo: {
+        Row: {
+          created_at: string
+          id: string
+          projeto_id: string
+          tag_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          projeto_id: string
+          tag_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          projeto_id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projeto_tag_vinculo_projeto_id_fkey"
+            columns: ["projeto_id"]
+            isOneToOne: false
+            referencedRelation: "projetos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projeto_tag_vinculo_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "projeto_tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projeto_tags: {
+        Row: {
+          cor: string
+          created_at: string
+          id: string
+          nome: string
+        }
+        Insert: {
+          cor?: string
+          created_at?: string
+          id?: string
+          nome: string
+        }
+        Update: {
+          cor?: string
+          created_at?: string
+          id?: string
+          nome?: string
+        }
+        Relationships: []
+      }
       projetos: {
         Row: {
           cliente_id: string
