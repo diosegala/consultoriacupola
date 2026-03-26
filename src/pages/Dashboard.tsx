@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useMRRTotal, useListaContratosMRR } from '@/hooks/useContratos';
 import { useChurnDoMes, useListaChurnMes } from '@/hooks/useEncerramentos';
-import { useAlertas, useMRRHistorico, useContratosHistorico, useMediaDespesasViagens, useDespesasViagensMensal } from '@/hooks/useDashboard';
+import { useAlertas, useMRRHistorico, useContratosHistorico, useMediaDespesasViagens, useDespesasViagensMensal, useEngajamentoClientes } from '@/hooks/useDashboard';
 import { useConsultores } from '@/hooks/useConsultores';
 import { useState } from 'react';
 import { format } from 'date-fns';
