@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ArrowLeft, Plus, Users, DollarSign, Star, Video } from 'lucide-react';
+import { Loader2, ArrowLeft, Plus, Users, DollarSign, Star, Video, FileDown } from 'lucide-react';
+import { gerarRelatorioPDF } from '@/utils/gerarRelatorioPDF';
 import { useConsultoresComStats } from '@/hooks/useConsultores';
 import { useReunioesByConsultor, useScoreConsultor } from '@/hooks/useReunioes';
 import { ReunioesList } from '@/components/consultor/ReunioesList';
@@ -126,9 +127,19 @@ export default function ConsultorDetalhe() {
       <Card className="bg-card border-border">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-foreground">Reuniões</CardTitle>
-          <Button onClick={() => setNovaReuniaoOpen(true)} className="bg-primary text-primary-foreground">
-            <Plus className="h-4 w-4 mr-2" /> Nova Reunião
-          </Button>
+          <div className="flex gap-2">
+            {reunioes?.some(r => r.status_analise === 'concluido') && (
+              <Button
+                variant="outline"
+                onClick={() => gerarRelatorioPDF(consultor, reunioes || [], scoreData?.score_medio ?? null)}
+              >
+                <FileDown className="h-4 w-4 mr-2" /> Gerar Relatório
+              </Button>
+            )}
+            <Button onClick={() => setNovaReuniaoOpen(true)} className="bg-primary text-primary-foreground">
+              <Plus className="h-4 w-4 mr-2" /> Nova Reunião
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <ReunioesList reunioes={reunioes} isLoading={loadingReunioes} />
