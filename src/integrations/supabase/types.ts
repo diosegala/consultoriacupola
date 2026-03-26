@@ -472,30 +472,46 @@ export type Database = {
       }
       projeto_checklist: {
         Row: {
+          assigned_to: string | null
           concluido: boolean
           created_at: string
+          due_date: string | null
           id: string
           ordem: number
           projeto_id: string
+          start_date: string | null
           titulo: string
         }
         Insert: {
+          assigned_to?: string | null
           concluido?: boolean
           created_at?: string
+          due_date?: string | null
           id?: string
           ordem?: number
           projeto_id: string
+          start_date?: string | null
           titulo: string
         }
         Update: {
+          assigned_to?: string | null
           concluido?: boolean
           created_at?: string
+          due_date?: string | null
           id?: string
           ordem?: number
           projeto_id?: string
+          start_date?: string | null
           titulo?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "projeto_checklist_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "consultores"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "projeto_checklist_projeto_id_fkey"
             columns: ["projeto_id"]
@@ -536,6 +552,63 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      projeto_tag_vinculo: {
+        Row: {
+          created_at: string
+          id: string
+          projeto_id: string
+          tag_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          projeto_id: string
+          tag_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          projeto_id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projeto_tag_vinculo_projeto_id_fkey"
+            columns: ["projeto_id"]
+            isOneToOne: false
+            referencedRelation: "projetos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projeto_tag_vinculo_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "projeto_tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projeto_tags: {
+        Row: {
+          cor: string
+          created_at: string
+          id: string
+          nome: string
+        }
+        Insert: {
+          cor?: string
+          created_at?: string
+          id?: string
+          nome: string
+        }
+        Update: {
+          cor?: string
+          created_at?: string
+          id?: string
+          nome?: string
+        }
+        Relationships: []
       }
       projetos: {
         Row: {

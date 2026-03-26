@@ -93,6 +93,19 @@
   }
 }
 
+/* Kanban card styles */
+@layer components {
+  .kanban-card {
+    @apply rounded-lg border border-border bg-card transition-all duration-150;
+  }
+  .kanban-card:hover {
+    @apply ring-1 ring-primary/30 shadow-md;
+  }
+  .kanban-card-dragging {
+    @apply shadow-xl ring-2 ring-primary/40 rotate-[2deg] scale-[1.02];
+  }
+}
+
 /* Custom utilities for status badges */
 @layer utilities {
   .badge-novo {

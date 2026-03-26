@@ -26,6 +26,7 @@ export interface Projeto {
   _checklist_done?: number;
   _checklist_total?: number;
   _reunioes_count?: number;
+  _tags?: Array<{ id: string; nome: string; cor: string }>;
 }
 
 export function useProjetosEtapas() {
@@ -49,7 +50,7 @@ export function useProjetos(consultorId?: string) {
     queryFn: async () => {
       let query = supabase
         .from('projetos')
-        .select('*, clientes(nome, cidade, uf), consultores(nome), contratos(tipo_consultoria_id, data_fim)')
+        .select('*, clientes(nome, cidade, uf), consultores(nome), contratos(tipo_consultoria_id, data_fim), projeto_tag_vinculo(tag_id, projeto_tags(id, nome, cor))')
         .order('ordem_na_etapa');
       
       if (consultorId) {
@@ -58,7 +59,12 @@ export function useProjetos(consultorId?: string) {
 
       const { data, error } = await query;
       if (error) throw error;
-      return data as Projeto[];
+      
+      // Flatten tags into _tags array
+      return (data ?? []).map((p: any) => ({
+        ...p,
+        _tags: (p.projeto_tag_vinculo ?? []).map((v: any) => v.projeto_tags).filter(Boolean),
+      })) as Projeto[];
     },
   });
 }
