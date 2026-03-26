@@ -6,7 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useNavigate } from 'react-router-dom';
 import { Users, DollarSign, Clock, TrendingDown, AlertTriangle, CalendarX, BookOpen, Loader2, ChevronDown, X, Plane } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend, Cell } from 'recharts';
 import { useClientesAtivos, useClientesAguardandoRenovacao, useListaClientesAtivos, useListaClientesAguardandoRenovacao } from '@/hooks/useClientes';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
