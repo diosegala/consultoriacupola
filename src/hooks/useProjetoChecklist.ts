@@ -7,6 +7,9 @@ export interface ProjetoChecklistItem {
   titulo: string;
   concluido: boolean;
   ordem: number;
+  assigned_to: string | null;
+  start_date: string | null;
+  due_date: string | null;
   created_at: string;
 }
 
@@ -57,6 +60,23 @@ export function useToggleChecklistItem() {
     onSuccess: (projeto_id) => {
       queryClient.invalidateQueries({ queryKey: ['projeto_checklist', projeto_id] });
       queryClient.invalidateQueries({ queryKey: ['projetos'] });
+    },
+  });
+}
+
+export function useUpdateChecklistItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, projeto_id, ...updates }: { id: string; projeto_id: string; assigned_to?: string | null; start_date?: string | null; due_date?: string | null }) => {
+      const { error } = await supabase
+        .from('projeto_checklist')
+        .update(updates)
+        .eq('id', id);
+      if (error) throw error;
+      return projeto_id;
+    },
+    onSuccess: (projeto_id) => {
+      queryClient.invalidateQueries({ queryKey: ['projeto_checklist', projeto_id] });
     },
   });
 }
