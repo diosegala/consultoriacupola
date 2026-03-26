@@ -48,6 +48,7 @@ export default function Dashboard() {
   const { data: contratosHistorico, isLoading: loadingContratosHist } = useContratosHistorico(consultorIdsFiltro);
   const { data: mediaDespesasViagens, isLoading: loadingMediaViagens } = useMediaDespesasViagens(consultorIdsFiltro);
   const { data: despesasViagensMensal, isLoading: loadingDespesasMensal } = useDespesasViagensMensal(consultorIdsFiltro);
+  const { data: engajamentoClientes, isLoading: loadingEngajamento } = useEngajamentoClientes(consultorIdsFiltro);
   const { data: consultores } = useConsultores();
   const { data: listaClientesAtivos } = useListaClientesAtivos(consultorIdsFiltro);
   const { data: listaContratosMRR } = useListaContratosMRR(consultorIdsFiltro);
