@@ -24,7 +24,7 @@ import { useReunioesByConsultor } from '@/hooks/useReunioes';
 import { useProjetoTags, useProjetoTagVinculos, useAddTagToProjeto, useRemoveTagFromProjeto, useCreateTag, TAG_COLORS } from '@/hooks/useProjetoTags';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import type { DateRange } from 'react-day-picker';
+
 
 interface ProjetoDetalheSheetProps {
   projeto: Projeto | null;
