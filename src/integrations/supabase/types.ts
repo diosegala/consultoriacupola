@@ -707,6 +707,7 @@ export type Database = {
       }
       reunioes: {
         Row: {
+          analise_cliente: Json | null
           analise_ia: Json | null
           cliente_id: string
           consultor_id: string
@@ -716,12 +717,14 @@ export type Database = {
           google_meet_link: string | null
           id: string
           resumo_ia: string | null
+          score_cliente: number | null
           score_ia: number | null
           status_analise: string
           transcricao: string | null
           updated_at: string
         }
         Insert: {
+          analise_cliente?: Json | null
           analise_ia?: Json | null
           cliente_id: string
           consultor_id: string
@@ -731,12 +734,14 @@ export type Database = {
           google_meet_link?: string | null
           id?: string
           resumo_ia?: string | null
+          score_cliente?: number | null
           score_ia?: number | null
           status_analise?: string
           transcricao?: string | null
           updated_at?: string
         }
         Update: {
+          analise_cliente?: Json | null
           analise_ia?: Json | null
           cliente_id?: string
           consultor_id?: string
@@ -746,6 +751,7 @@ export type Database = {
           google_meet_link?: string | null
           id?: string
           resumo_ia?: string | null
+          score_cliente?: number | null
           score_ia?: number | null
           status_analise?: string
           transcricao?: string | null
