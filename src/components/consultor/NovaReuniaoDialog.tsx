@@ -16,9 +16,10 @@ interface NovaReuniaoDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   consultorId: string;
+  clienteId?: string;
 }
 
-export function NovaReuniaoDialog({ open, onOpenChange, consultorId }: NovaReuniaoDialogProps) {
+export function NovaReuniaoDialog({ open, onOpenChange, consultorId, clienteId }: NovaReuniaoDialogProps) {
   const { toast } = useToast();
   const { data: clientes } = useClientes();
   const createReuniao = useCreateReuniao();
