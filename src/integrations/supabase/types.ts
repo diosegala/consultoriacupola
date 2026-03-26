@@ -472,30 +472,46 @@ export type Database = {
       }
       projeto_checklist: {
         Row: {
+          assigned_to: string | null
           concluido: boolean
           created_at: string
+          due_date: string | null
           id: string
           ordem: number
           projeto_id: string
+          start_date: string | null
           titulo: string
         }
         Insert: {
+          assigned_to?: string | null
           concluido?: boolean
           created_at?: string
+          due_date?: string | null
           id?: string
           ordem?: number
           projeto_id: string
+          start_date?: string | null
           titulo: string
         }
         Update: {
+          assigned_to?: string | null
           concluido?: boolean
           created_at?: string
+          due_date?: string | null
           id?: string
           ordem?: number
           projeto_id?: string
+          start_date?: string | null
           titulo?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "projeto_checklist_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "consultores"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "projeto_checklist_projeto_id_fkey"
             columns: ["projeto_id"]
