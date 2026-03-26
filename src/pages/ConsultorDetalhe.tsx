@@ -131,7 +131,7 @@ export default function ConsultorDetalhe() {
             {reunioes?.some(r => r.status_analise === 'concluido') && (
               <Button
                 variant="outline"
-                onClick={() => void gerarRelatorioPDF(consultor, reunioes || [], scoreData?.score_medio ?? null)}
+                onClick={() => navigate(`/consultores/${id}/relatorio`)}
               >
                 <FileDown className="h-4 w-4 mr-2" /> Gerar Relatório
               </Button>
