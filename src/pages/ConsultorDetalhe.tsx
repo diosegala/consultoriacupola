@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, ArrowLeft, Plus, Users, DollarSign, Star, Video, FileDown } from 'lucide-react';
-import { gerarRelatorioPDF } from '@/utils/gerarRelatorioPDF';
+
 import { useConsultoresComStats } from '@/hooks/useConsultores';
 import { useReunioesByConsultor, useScoreConsultor } from '@/hooks/useReunioes';
 import { ReunioesList } from '@/components/consultor/ReunioesList';
