@@ -13,6 +13,7 @@ import ClienteDetalhe from "./pages/ClienteDetalhe";
 import Contratos from "./pages/Contratos";
 import Consultores from "./pages/Consultores";
 import ConsultorDetalhe from "./pages/ConsultorDetalhe";
+import RelatorioConsultor from "./pages/RelatorioConsultor";
 import Configuracoes from "./pages/Configuracoes";
 import Projetos from "./pages/Projetos";
 import ResetPassword from "./pages/ResetPassword";
