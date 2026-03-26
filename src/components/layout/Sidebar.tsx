@@ -47,9 +47,9 @@ export function Sidebar() {
       {/* Logo */}
       <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
       {!collapsed ? (
-          <img src={cupolaLogo} alt="Cupola Consultoria" className="h-8 object-contain" />
+          <img src={cupolaLogoBranca} alt="Cupola Consultoria" className="h-8 object-contain" />
         ) : (
-          <img src={cupolaLogo} alt="Cupola" className="h-6 object-contain mx-auto" />
+          <img src={cupolaIcon} alt="Cupola" className="h-6 object-contain mx-auto" />
         )}
         <Button
           variant="ghost"
