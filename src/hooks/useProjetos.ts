@@ -26,6 +26,7 @@ export interface Projeto {
   _checklist_done?: number;
   _checklist_total?: number;
   _reunioes_count?: number;
+  _tags?: Array<{ id: string; nome: string; cor: string }>;
 }
 
 export function useProjetosEtapas() {
