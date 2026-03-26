@@ -65,18 +65,18 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
   const reunioesDoProjeto = reunioes?.filter(r => r.cliente_id === projeto?.cliente_id) ?? [];
   const linkedTagIds = new Set(tagVinculos?.map(v => v.tag_id) ?? []);
 
-  const handleSaveDateRange = async (range: DateRange | undefined) => {
+  const handleSaveDueDate = async (date: Date | undefined) => {
     if (!projeto) return;
     const { error } = await supabase
       .from('projetos')
       .update({
-        due_date_start: range?.from ? format(range.from, 'yyyy-MM-dd') : null,
-        due_date: range?.to ? format(range.to, 'yyyy-MM-dd') : (range?.from ? format(range.from, 'yyyy-MM-dd') : null),
+        due_date: date ? format(date, 'yyyy-MM-dd') : null,
+        due_date_start: null,
       })
       .eq('id', projeto.id);
     if (error) toast.error('Erro ao salvar data');
     else {
-      toast.success('Período atualizado');
+      toast.success('Data limite atualizada');
       queryClient.invalidateQueries({ queryKey: ['projetos'] });
     }
   };
