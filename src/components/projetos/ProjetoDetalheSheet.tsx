@@ -265,15 +265,26 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
                           ))}
                         </select>
                         {/* Due date */}
-                        <input
-                          type="date"
-                          className="text-[10px] bg-transparent border border-border/50 rounded px-1.5 py-0.5 text-muted-foreground"
-                          value={item.due_date ?? ''}
-                          onChange={e => updateCheckItem.mutate({
-                            id: item.id, projeto_id: projeto.id,
-                            due_date: e.target.value || null,
-                          })}
-                        />
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button className="text-[10px] bg-transparent border border-border/50 rounded px-1.5 py-0.5 text-muted-foreground hover:bg-accent flex items-center gap-1">
+                              <CalendarIcon className="h-3 w-3" />
+                              {item.due_date ? format(new Date(item.due_date + 'T00:00:00'), 'dd/MM/yy') : 'Prazo'}
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0 z-[9999]" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={item.due_date ? new Date(item.due_date + 'T00:00:00') : undefined}
+                              onSelect={(date) => updateCheckItem.mutate({
+                                id: item.id, projeto_id: projeto.id,
+                                due_date: date ? format(date, 'yyyy-MM-dd') : null,
+                              })}
+                              className="p-3 pointer-events-auto"
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
                       </div>
                     </div>
                   ))}
