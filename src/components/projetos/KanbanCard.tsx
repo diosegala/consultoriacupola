@@ -87,8 +87,19 @@ export function KanbanCard({ projeto, index, onRegistrarReuniao, onClick }: Kanb
                   !isOverdue && !isSoon && 'text-muted-foreground'
                 )}
               >
+              <Badge
+81:                 variant="outline"
+                className={cn(
+                  'text-[10px] font-medium gap-1',
+                  isOverdue && 'bg-destructive/15 text-destructive border-destructive/30',
+                  isSoon && 'bg-warning/15 text-yellow-600 border-yellow-600/30',
+                  !isOverdue && !isSoon && 'text-muted-foreground'
+                )}
+              >
                 <CalendarIcon className="h-3 w-3" />
-                {format(dueDate, 'dd/MM/yyyy')}
+                {dueDateStart && dueDate
+                  ? `${format(dueDateStart, 'dd/MM')} - ${format(dueDate, 'dd/MM')}`
+                  : format(dueDate!, 'dd/MM/yyyy')}
               </Badge>
             )}
 
