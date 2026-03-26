@@ -130,6 +130,7 @@ export function KanbanBoard() {
           open={reuniaoDialogOpen}
           onOpenChange={setReuniaoDialogOpen}
           consultorId={selectedProjeto.consultor_id}
+          clienteId={selectedProjeto.cliente_id}
         />
       )}
 
