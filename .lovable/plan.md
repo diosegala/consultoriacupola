@@ -1,25 +1,24 @@
 
 
-## Reverter seletor de data para data unica
+## Corrigir seletor de data do checklist
 
 ### Problema
-O seletor de periodo (range) nao esta funcionando bem -- a cada clique salva imediatamente no banco, sem esperar a selecao completa do intervalo.
 
-### Solucao
-Reverter para selecao de data unica (`mode="single"`), que e mais simples e funcional.
+O campo de data dos itens do checklist usa `<input type="date">` nativo (linha 268-276 do `ProjetoDetalheSheet.tsx`), que tem problemas de compatibilidade dentro de Dialogs do Radix -- o picker nativo pode não abrir ou não disparar o `onChange` corretamente. Além disso, visualmente fica inconsistente com o resto do sistema.
 
-### Alteracoes
+### Solução
 
-**`src/components/projetos/ProjetoDetalheSheet.tsx`**
-- Remover import de `DateRange` do react-day-picker
-- Trocar `handleSaveDateRange` por `handleSaveDueDate` que recebe `Date | undefined` e salva apenas `due_date` (seta `due_date_start` como null)
-- Trocar Calendar de `mode="range"` para `mode="single"`, `selected={dueDate}`, `onSelect={handleSaveDueDate}`
-- Remover logica de `dateRange`, `dueDateStart`; exibir apenas `dueDate` formatada
-- Remover `numberOfMonths={2}` (desnecessario para data unica)
-- Label: "Data limite" em vez de "Periodo"
+Trocar o `<input type="date">` por um **Popover + Calendar** (mesmo padrão usado para a data limite do projeto), garantindo `pointer-events-auto` no Calendar para funcionar dentro do Dialog.
 
-**`src/components/projetos/KanbanCard.tsx`**
-- Remover exibicao de periodo; mostrar apenas `due_date` formatada
+### Alteração
 
-Nenhuma migracao necessaria -- a coluna `due_date_start` pode permanecer na tabela sem impacto.
+**`src/components/projetos/ProjetoDetalheSheet.tsx`** (linhas 267-276)
+
+Substituir o `<input type="date">` por:
+- Um `<Popover>` com `<PopoverTrigger>` mostrando a data formatada ou "Prazo"
+- `<PopoverContent>` com `<Calendar mode="single">` e `pointer-events-auto`
+- No `onSelect`, chamar `updateCheckItem.mutate()` com a data formatada em `yyyy-MM-dd`
+- Botão pequeno (text-[10px]) consistente com o estilo do select de responsável
+
+Nenhuma alteração de banco de dados necessária -- o hook `useUpdateChecklistItem` já suporta `due_date`.
 
