@@ -199,7 +199,7 @@ export default function Consultores() {
                       <TableCell className="text-muted-foreground">{consultor.email || '-'}</TableCell>
                       <TableCell className="text-center text-foreground">{consultor.clientes_ativos}</TableCell>
                        <TableCell className="text-foreground">{formatCurrency(consultor.mrr_sob_gestao)}</TableCell>
-                       <TableCell className="text-center text-muted-foreground">—</TableCell>
+                       <TableCell className="text-center text-foreground">{consultor.score_medio != null ? consultor.score_medio.toFixed(1) : '—'}</TableCell>
                        <TableCell>
                          <Badge 
                            className={consultor.ativo 

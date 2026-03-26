@@ -75,10 +75,18 @@ export function useConsultoresComStats() {
           return sum + (Number(contratoAtivo?.remuneracao_mensal) || 0);
         }, 0);
 
+        const reunioesDoConsultor = (reunioes as any[]).filter(
+          r => r.consultor_id === consultor.id
+        );
+        const scoreMedio = reunioesDoConsultor.length > 0
+          ? reunioesDoConsultor.reduce((sum, r) => sum + Number(r.score_ia), 0) / reunioesDoConsultor.length
+          : null;
+
         return {
           ...consultor,
           clientes_ativos: clientesDoConsultor.length,
-          mrr_sob_gestao: mrrTotal
+          mrr_sob_gestao: mrrTotal,
+          score_medio: scoreMedio
         } as ConsultorComStats;
       });
     }
