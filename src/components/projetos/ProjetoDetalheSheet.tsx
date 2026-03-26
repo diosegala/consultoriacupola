@@ -36,6 +36,7 @@ interface ProjetoDetalheSheetProps {
 
 export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, onRegistrarReuniao }: ProjetoDetalheSheetProps) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [novoComentario, setNovoComentario] = useState('');
   const [novoCheckItem, setNovoCheckItem] = useState('');
   const [editingObs, setEditingObs] = useState(false);
