@@ -1,43 +1,45 @@
 
 
-## Relatorio PDF de Analises de Reunioes do Consultor
+## Logo na Sidebar + Logo e melhorias no PDF
 
-### O que sera feito
+### 1. Logo na Sidebar
 
-Adicionar um botao "Gerar Relatorio PDF" na pagina `/consultores/:id` que gera e baixa um PDF com:
+Copiar `user-uploads://Logo_cupola_con_H_lima_1.png` para `src/assets/cupola-logo.png`.
 
-- Cabecalho com nome do consultor, data de geracao, status
-- Score medio geral e total de reunioes analisadas
-- Media por criterio (empatia, clareza, proatividade, dominio tecnico, orientacao a resultados) com barras visuais
-- Para cada reuniao analisada: cliente, data, score geral, notas por criterio, pontos fortes e pontos de melhoria
+**`src/components/layout/Sidebar.tsx`**
+- Importar a logo: `import cupolaLogo from '@/assets/cupola-logo.png'`
+- Substituir o bloco de texto "CUPOLA / CONSULTORIA" (linhas 48-51) por `<img src={cupolaLogo}>`
+- Quando collapsed, mostrar apenas o ícone (manter o "C" ou usar versão reduzida)
 
-### Abordagem tecnica
+### 2. Logo no PDF
 
-Usar a biblioteca **jsPDF** (client-side) para gerar o PDF diretamente no navegador, sem necessidade de backend. Os dados ja estao disponiveis via `useReunioesByConsultor` (reunioes com `analise_ia`) e `useScoreConsultor`.
+**`src/utils/gerarRelatorioPDF.ts`**
+- Copiar a logo também para `public/cupola-logo.png` para uso no PDF
+- No header do PDF, adicionar a logo com `doc.addImage()` ao lado do título "Relatório de Desempenho"
+- Ajustar posicionamento do texto para acomodar a imagem
 
-### Alteracoes
+### 3. Gráfico de evolução do score no PDF
 
-| Arquivo | Acao |
+Usar a biblioteca **jspdf** pura (sem dependências extras) para desenhar um gráfico de linhas simples:
+- Eixo X: datas das reuniões (ordenadas cronologicamente)
+- Eixo Y: score de 0 a 10
+- Linha conectando os pontos com cores baseadas no score
+- Adicionar seção "Evolução do Score" entre o "Resumo Geral" e o "Detalhamento por Reunião"
+- Desenhar com `doc.line()`, `doc.circle()`, `doc.text()` nativos do jsPDF
+
+### 4. Resumo da reunião no PDF
+
+**`src/utils/gerarRelatorioPDF.ts`**
+- No bloco de detalhamento de cada reunião, adicionar o campo `resumo_ia` (já disponível em `ReuniaoComDetalhes`)
+- Exibir abaixo do header da reunião, antes dos critérios
+- Usar `doc.splitTextToSize()` para quebrar o texto longo
+
+### Arquivos
+
+| Arquivo | Ação |
 |---------|------|
-| `package.json` | Adicionar `jspdf` |
-| `src/utils/gerarRelatorioPDF.ts` | Criar -- funcao que recebe consultor + reunioes e gera o PDF |
-| `src/pages/ConsultorDetalhe.tsx` | Adicionar botao "Gerar Relatorio" que chama a funcao |
-
-### Conteudo do PDF
-
-1. **Capa/cabecalho**: "Relatorio de Desempenho — [Nome do Consultor]", data de geracao
-2. **Resumo geral**: score medio, total de reunioes, media por criterio (tabela)
-3. **Detalhamento por reuniao**: para cada reuniao com `status_analise = 'concluido'`:
-   - Cliente, data, duracao
-   - Score geral + notas por criterio
-   - Pontos fortes (lista)
-   - Pontos de melhoria (lista)
-   - Separador entre reunioes
-
-### Detalhes
-
-- O botao so aparece se houver pelo menos 1 reuniao analisada
-- Filtrar apenas reunioes com `status_analise === 'concluido'`
-- Usar cores no PDF: verde para scores >= 8, amarelo >= 6, vermelho < 6
-- O PDF e gerado e baixado instantaneamente (blob download)
+| `src/assets/cupola-logo.png` | Criar (copiar upload) |
+| `public/cupola-logo.png` | Criar (copiar upload para PDF) |
+| `src/components/layout/Sidebar.tsx` | Editar -- usar imagem da logo |
+| `src/utils/gerarRelatorioPDF.ts` | Editar -- logo, gráfico de evolução, resumo |
 
