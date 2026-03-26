@@ -9,6 +9,7 @@ export type ConsultorUpdate = TablesUpdate<'consultores'>;
 export interface ConsultorComStats extends Consultor {
   clientes_ativos: number;
   mrr_sob_gestao: number;
+  score_medio: number | null;
 }
 
 export function useConsultores(apenasAtivos = true) {
