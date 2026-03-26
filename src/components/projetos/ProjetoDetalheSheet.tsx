@@ -120,7 +120,7 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
   if (!projeto) return null;
 
   const dueDate = projeto.due_date ? new Date(projeto.due_date + 'T00:00:00') : undefined;
-  const dueDateStart = (projeto as any).due_date_start ? new Date((proyecto as any).due_date_start + 'T00:00:00') : undefined;
+  const dueDateStart = projeto.due_date_start ? new Date(projeto.due_date_start + 'T00:00:00') : undefined;
   const dateRange: DateRange | undefined = (dueDateStart || dueDate) ? { from: dueDateStart ?? dueDate, to: dueDate } : undefined;
 
   return (
