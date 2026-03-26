@@ -29,6 +29,7 @@ interface KanbanCardProps {
 
 export function KanbanCard({ projeto, index, onRegistrarReuniao, onClick }: KanbanCardProps) {
   const dueDate = projeto.due_date ? new Date(projeto.due_date + 'T00:00:00') : null;
+  const dueDateStart = (projeto as any).due_date_start ? new Date((projeto as any).due_date_start + 'T00:00:00') : null;
   const now = new Date();
   const isOverdue = dueDate && isPast(dueDate) && dueDate.toDateString() !== now.toDateString();
   const isSoon = dueDate && !isOverdue && isBefore(dueDate, addDays(now, 3));
@@ -87,7 +88,9 @@ export function KanbanCard({ projeto, index, onRegistrarReuniao, onClick }: Kanb
                 )}
               >
                 <CalendarIcon className="h-3 w-3" />
-                {format(dueDate, 'dd/MM/yyyy')}
+                {dueDateStart && dueDate
+                  ? `${format(dueDateStart, 'dd/MM')} - ${format(dueDate, 'dd/MM')}`
+                  : format(dueDate, 'dd/MM/yyyy')}
               </Badge>
             )}
 

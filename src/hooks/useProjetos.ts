@@ -17,6 +17,7 @@ export interface Projeto {
   ordem_na_etapa: number;
   observacoes: string | null;
   due_date: string | null;
+  due_date_start: string | null;
   created_at: string;
   updated_at: string;
   clientes?: { nome: string; cidade: string; uf: string };

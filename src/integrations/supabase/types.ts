@@ -617,6 +617,7 @@ export type Database = {
           contrato_id: string | null
           created_at: string
           due_date: string | null
+          due_date_start: string | null
           etapa_id: string
           id: string
           observacoes: string | null
@@ -629,6 +630,7 @@ export type Database = {
           contrato_id?: string | null
           created_at?: string
           due_date?: string | null
+          due_date_start?: string | null
           etapa_id: string
           id?: string
           observacoes?: string | null
@@ -641,6 +643,7 @@ export type Database = {
           contrato_id?: string | null
           created_at?: string
           due_date?: string | null
+          due_date_start?: string | null
           etapa_id?: string
           id?: string
           observacoes?: string | null

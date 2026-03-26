@@ -15,6 +15,7 @@ import { format, isPast } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { useQueryClient } from '@tanstack/react-query';
 import type { Projeto } from '@/hooks/useProjetos';
 import { useProjetoComentarios, useCreateComentario, useDeleteComentario } from '@/hooks/useProjetoComentarios';
 import { useProjetoChecklist, useCreateChecklistItem, useToggleChecklistItem, useDeleteChecklistItem, useUpdateChecklistItem } from '@/hooks/useProjetoChecklist';
@@ -23,6 +24,7 @@ import { useReunioesByConsultor } from '@/hooks/useReunioes';
 import { useProjetoTags, useProjetoTagVinculos, useAddTagToProjeto, useRemoveTagFromProjeto, useCreateTag, TAG_COLORS } from '@/hooks/useProjetoTags';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import type { DateRange } from 'react-day-picker';
 
 interface ProjetoDetalheSheetProps {
   projeto: Projeto | null;
@@ -34,6 +36,7 @@ interface ProjetoDetalheSheetProps {
 
 export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, onRegistrarReuniao }: ProjetoDetalheSheetProps) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [novoComentario, setNovoComentario] = useState('');
   const [novoCheckItem, setNovoCheckItem] = useState('');
   const [editingObs, setEditingObs] = useState(false);
@@ -62,14 +65,20 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
   const reunioesDoProjeto = reunioes?.filter(r => r.cliente_id === projeto?.cliente_id) ?? [];
   const linkedTagIds = new Set(tagVinculos?.map(v => v.tag_id) ?? []);
 
-  const handleSaveDueDate = async (date: Date | undefined) => {
+  const handleSaveDateRange = async (range: DateRange | undefined) => {
     if (!projeto) return;
     const { error } = await supabase
       .from('projetos')
-      .update({ due_date: date ? format(date, 'yyyy-MM-dd') : null })
+      .update({
+        due_date_start: range?.from ? format(range.from, 'yyyy-MM-dd') : null,
+        due_date: range?.to ? format(range.to, 'yyyy-MM-dd') : (range?.from ? format(range.from, 'yyyy-MM-dd') : null),
+      })
       .eq('id', projeto.id);
     if (error) toast.error('Erro ao salvar data');
-    else toast.success('Data limite atualizada');
+    else {
+      toast.success('Período atualizado');
+      queryClient.invalidateQueries({ queryKey: ['projetos'] });
+    }
   };
 
   const handleSaveObs = async () => {
@@ -111,6 +120,8 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
   if (!projeto) return null;
 
   const dueDate = projeto.due_date ? new Date(projeto.due_date + 'T00:00:00') : undefined;
+  const dueDateStart = projeto.due_date_start ? new Date(projeto.due_date_start + 'T00:00:00') : undefined;
+  const dateRange: DateRange | undefined = (dueDateStart || dueDate) ? { from: dueDateStart ?? dueDate, to: dueDate } : undefined;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -328,26 +339,31 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
               {/* Due Date */}
               <div>
                 <h4 className="text-sm font-medium mb-2 flex items-center gap-1">
-                  <CalendarIcon className="h-4 w-4" /> Data Limite
+                  <CalendarIcon className="h-4 w-4" /> Período
                 </h4>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" size="sm" className={cn(
                       "w-full justify-start text-left font-normal",
-                      !dueDate && "text-muted-foreground",
+                      !dateRange && "text-muted-foreground",
                       dueDate && isPast(dueDate) && "text-destructive border-destructive"
                     )}>
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {dueDate ? format(dueDate, "dd/MM/yyyy") : "Definir data limite"}
+                      {dateRange?.from && dateRange?.to
+                        ? `${format(dateRange.from, "dd/MM")} - ${format(dateRange.to, "dd/MM/yyyy")}`
+                        : dateRange?.from
+                        ? format(dateRange.from, "dd/MM/yyyy")
+                        : "Definir período"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
-                      mode="single"
-                      selected={dueDate}
-                      onSelect={handleSaveDueDate}
+                      mode="range"
+                      selected={dateRange}
+                      onSelect={handleSaveDateRange}
                       locale={ptBR}
                       className="p-3 pointer-events-auto"
+                      numberOfMonths={2}
                     />
                   </PopoverContent>
                 </Popover>
