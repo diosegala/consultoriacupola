@@ -139,6 +139,10 @@ export default function ClienteDetalhe() {
         <TabsContent value="ferramentas" className="mt-6">
           <FerramentasTab clienteId={cliente.id} />
         </TabsContent>
+
+        <TabsContent value="desempenho" className="mt-6">
+          <DesempenhoClienteTab clienteId={cliente.id} />
+        </TabsContent>
       </Tabs>
 
       {/* Edit Dialog */}

@@ -7,6 +7,21 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+function parseAIResponse(rawArgs: string): any {
+  let cleaned = rawArgs.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+  const jsonStart = cleaned.search(/[\{\[]/);
+  const jsonEnd = cleaned.lastIndexOf(jsonStart !== -1 && cleaned[jsonStart] === '[' ? ']' : '}');
+  if (jsonStart !== -1 && jsonEnd !== -1) {
+    cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
+  }
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    cleaned = cleaned.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']').replace(/[\x00-\x1F\x7F]/g, '');
+    return JSON.parse(cleaned);
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -32,7 +47,6 @@ serve(async (req) => {
       });
     }
 
-    // Verify user is authorized
     const supabaseAuth = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -46,7 +60,6 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Check authorization
     const { data: isAuthorized } = await supabase.rpc("is_authorized_user", { _user_id: user.id });
     if (!isAuthorized) {
       return new Response(JSON.stringify({ error: "Sem permissão" }), {
@@ -63,7 +76,6 @@ serve(async (req) => {
       });
     }
 
-    // Fetch reunião with related data
     const { data: reuniao, error: reuniaoError } = await supabase
       .from("reunioes")
       .select("*, consultores(nome), clientes(nome)")
@@ -84,16 +96,13 @@ serve(async (req) => {
       });
     }
 
-    // Update status to analyzing
     await supabase
       .from("reunioes")
       .update({ status_analise: "analisando" })
       .eq("id", reuniao_id);
 
-    // Truncate transcription to avoid token limits (keep ~30k chars)
     const maxTranscricaoLength = 30000;
     let transcricaoLimpa = reuniao.transcricao;
-    // Strip any residual HTML tags
     if (/<\s*(html|head|body|div|p|span)\b/i.test(transcricaoLimpa)) {
       transcricaoLimpa = transcricaoLimpa
         .replace(/<script[\s\S]*?<\/script>/gi, '')
@@ -110,7 +119,16 @@ serve(async (req) => {
       transcricaoLimpa = transcricaoLimpa.substring(0, maxTranscricaoLength) + '\n\n[Transcrição truncada por limite de tamanho]';
     }
 
-    const systemPrompt = `Você é um analista especializado em qualidade de atendimento de consultoria empresarial. 
+    const userPrompt = `Consultor: ${reuniao.consultores?.nome || "Desconhecido"}
+Cliente: ${reuniao.clientes?.nome || "Desconhecido"}
+Data: ${reuniao.data_reuniao}
+Duração: ${reuniao.duracao_minutos || "N/A"} minutos
+
+TRANSCRIÇÃO:
+${transcricaoLimpa}`;
+
+    // ===== 1. ANÁLISE DO CONSULTOR =====
+    const consultorSystemPrompt = `Você é um analista especializado em qualidade de atendimento de consultoria empresarial. 
 Analise a transcrição de uma reunião entre um consultor e um cliente.
 
 Avalie nos seguintes critérios (nota de 0 a 10 cada):
@@ -122,15 +140,7 @@ Avalie nos seguintes critérios (nota de 0 a 10 cada):
 
 Retorne a análise usando a função fornecida. Seja conciso nos textos.`;
 
-    const userPrompt = `Consultor: ${reuniao.consultores?.nome || "Desconhecido"}
-Cliente: ${reuniao.clientes?.nome || "Desconhecido"}
-Data: ${reuniao.data_reuniao}
-Duração: ${reuniao.duracao_minutos || "N/A"} minutos
-
-TRANSCRIÇÃO:
-${transcricaoLimpa}`;
-
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const consultorAIResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${lovableApiKey}`,
@@ -139,7 +149,7 @@ ${transcricaoLimpa}`;
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
         messages: [
-          { role: "system", content: systemPrompt },
+          { role: "system", content: consultorSystemPrompt },
           { role: "user", content: userPrompt },
         ],
         max_tokens: 8192,
@@ -152,31 +162,16 @@ ${transcricaoLimpa}`;
               parameters: {
                 type: "object",
                 properties: {
-                  resumo: {
-                    type: "string",
-                    description: "Resumo conciso da reunião (3-5 frases)",
-                  },
+                  resumo: { type: "string", description: "Resumo conciso da reunião (3-5 frases)" },
                   empatia: { type: "number", description: "Nota 0-10 para empatia e escuta ativa" },
                   clareza: { type: "number", description: "Nota 0-10 para clareza na comunicação" },
                   proatividade: { type: "number", description: "Nota 0-10 para proatividade" },
                   dominio_tecnico: { type: "number", description: "Nota 0-10 para domínio técnico" },
                   orientacao_resultados: { type: "number", description: "Nota 0-10 para orientação para resultados" },
-                  pontos_fortes: {
-                    type: "array",
-                    items: { type: "string" },
-                    description: "Lista de 3-5 pontos fortes identificados (frases curtas)",
-                  },
-                  pontos_melhoria: {
-                    type: "array",
-                    items: { type: "string" },
-                    description: "Lista de 3-5 pontos de melhoria (frases curtas)",
-                  },
+                  pontos_fortes: { type: "array", items: { type: "string" }, description: "Lista de 3-5 pontos fortes (frases curtas)" },
+                  pontos_melhoria: { type: "array", items: { type: "string" }, description: "Lista de 3-5 pontos de melhoria (frases curtas)" },
                 },
-                required: [
-                  "resumo", "empatia", "clareza", "proatividade",
-                  "dominio_tecnico", "orientacao_resultados",
-                  "pontos_fortes", "pontos_melhoria",
-                ],
+                required: ["resumo", "empatia", "clareza", "proatividade", "dominio_tecnico", "orientacao_resultados", "pontos_fortes", "pontos_melhoria"],
                 additionalProperties: false,
               },
             },
@@ -186,57 +181,35 @@ ${transcricaoLimpa}`;
       }),
     });
 
-    if (!aiResponse.ok) {
-      const statusCode = aiResponse.status;
+    if (!consultorAIResponse.ok) {
+      const statusCode = consultorAIResponse.status;
       let errorMsg = "Erro na análise IA";
       if (statusCode === 429) errorMsg = "Limite de requisições excedido, tente novamente mais tarde";
       if (statusCode === 402) errorMsg = "Créditos de IA esgotados";
-
-      await supabase
-        .from("reunioes")
-        .update({ status_analise: "erro" })
-        .eq("id", reuniao_id);
-
+      await supabase.from("reunioes").update({ status_analise: "erro" }).eq("id", reuniao_id);
       return new Response(JSON.stringify({ error: errorMsg }), {
         status: statusCode,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const aiData = await aiResponse.json();
-    const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
+    const consultorAIData = await consultorAIResponse.json();
+    const consultorToolCall = consultorAIData.choices?.[0]?.message?.tool_calls?.[0];
 
-    if (!toolCall) {
-      // Fallback: try to parse from message content
-      const content = aiData.choices?.[0]?.message?.content;
-      if (!content) {
-        await supabase.from("reunioes").update({ status_analise: "erro" }).eq("id", reuniao_id);
-        return new Response(JSON.stringify({ error: "IA não retornou análise estruturada" }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+    if (!consultorToolCall && !consultorAIData.choices?.[0]?.message?.content) {
+      await supabase.from("reunioes").update({ status_analise: "erro" }).eq("id", reuniao_id);
+      return new Response(JSON.stringify({ error: "IA não retornou análise estruturada" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     let analise: any;
     try {
-      const rawArgs = toolCall ? toolCall.function.arguments : aiData.choices[0].message.content;
-      // Clean potential markdown wrapping
-      let cleaned = rawArgs.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
-      const jsonStart = cleaned.search(/[\{\[]/);
-      const jsonEnd = cleaned.lastIndexOf(jsonStart !== -1 && cleaned[jsonStart] === '[' ? ']' : '}');
-      if (jsonStart !== -1 && jsonEnd !== -1) {
-        cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
-      }
-      try {
-        analise = JSON.parse(cleaned);
-      } catch {
-        // Fix common issues
-        cleaned = cleaned.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']').replace(/[\x00-\x1F\x7F]/g, '');
-        analise = JSON.parse(cleaned);
-      }
+      const rawArgs = consultorToolCall ? consultorToolCall.function.arguments : consultorAIData.choices[0].message.content;
+      analise = parseAIResponse(rawArgs);
     } catch (parseErr) {
-      console.error("Erro ao parsear resposta da IA:", parseErr);
+      console.error("Erro ao parsear resposta da IA (consultor):", parseErr);
       await supabase.from("reunioes").update({ status_analise: "erro" }).eq("id", reuniao_id);
       return new Response(JSON.stringify({ error: "Erro ao processar resposta da IA" }), {
         status: 500,
@@ -244,7 +217,6 @@ ${transcricaoLimpa}`;
       });
     }
 
-    // Ensure all required fields have defaults
     analise.empatia = Number(analise.empatia) || 0;
     analise.clareza = Number(analise.clareza) || 0;
     analise.proatividade = Number(analise.proatividade) || 0;
@@ -253,27 +225,129 @@ ${transcricaoLimpa}`;
     analise.pontos_fortes = Array.isArray(analise.pontos_fortes) ? analise.pontos_fortes : [];
     analise.pontos_melhoria = Array.isArray(analise.pontos_melhoria) ? analise.pontos_melhoria : [];
 
-    const analiseData = analise;
-    const scoreMedia =
-      (analiseData.empatia + analiseData.clareza + analiseData.proatividade +
-        analiseData.dominio_tecnico + analiseData.orientacao_resultados) / 5;
+    const scoreConsultor =
+      (analise.empatia + analise.clareza + analise.proatividade +
+        analise.dominio_tecnico + analise.orientacao_resultados) / 5;
+
+    // ===== 2. ANÁLISE DO CLIENTE =====
+    let analiseCliente: any = null;
+    let scoreCliente: number | null = null;
+
+    try {
+      const clienteSystemPrompt = `Você é um analista especializado em avaliar o engajamento e participação de clientes em reuniões de consultoria empresarial.
+Analise a transcrição focando exclusivamente no COMPORTAMENTO DO CLIENTE (não do consultor).
+
+Avalie nos seguintes critérios (nota de 0 a 10 cada):
+1. Participação ativa - O cliente faz perguntas, compartilha informações e contribui para a conversa?
+2. Abertura a sugestões - Demonstra receptividade a novas ideias e propostas do consultor?
+3. Comprometimento com ações - Assume responsabilidades, define prazos e se compromete com próximos passos?
+4. Clareza nas demandas - Comunica necessidades, problemas e expectativas de forma clara?
+5. Engajamento estratégico - Demonstra visão de longo prazo e interesse em resultados sustentáveis?
+
+Retorne a análise usando a função fornecida. Seja conciso nos textos.`;
+
+      const clienteAIResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${lovableApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [
+            { role: "system", content: clienteSystemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          max_tokens: 8192,
+          tools: [
+            {
+              type: "function",
+              function: {
+                name: "registrar_analise_cliente",
+                description: "Registra a análise de engajamento do cliente",
+                parameters: {
+                  type: "object",
+                  properties: {
+                    resumo: { type: "string", description: "Resumo conciso do engajamento do cliente (2-3 frases)" },
+                    participacao_ativa: { type: "number", description: "Nota 0-10 para participação ativa" },
+                    abertura_sugestoes: { type: "number", description: "Nota 0-10 para abertura a sugestões" },
+                    comprometimento_acoes: { type: "number", description: "Nota 0-10 para comprometimento com ações" },
+                    clareza_demandas: { type: "number", description: "Nota 0-10 para clareza nas demandas" },
+                    engajamento_estrategico: { type: "number", description: "Nota 0-10 para engajamento estratégico" },
+                    pontos_fortes: { type: "array", items: { type: "string" }, description: "Lista de 3-5 pontos fortes do cliente (frases curtas)" },
+                    pontos_melhoria: { type: "array", items: { type: "string" }, description: "Lista de 3-5 pontos de melhoria do cliente (frases curtas)" },
+                  },
+                  required: ["resumo", "participacao_ativa", "abertura_sugestoes", "comprometimento_acoes", "clareza_demandas", "engajamento_estrategico", "pontos_fortes", "pontos_melhoria"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          ],
+          tool_choice: { type: "function", function: { name: "registrar_analise_cliente" } },
+        }),
+      });
+
+      if (clienteAIResponse.ok) {
+        const clienteAIData = await clienteAIResponse.json();
+        const clienteToolCall = clienteAIData.choices?.[0]?.message?.tool_calls?.[0];
+        const rawArgs = clienteToolCall ? clienteToolCall.function.arguments : clienteAIData.choices?.[0]?.message?.content;
+        
+        if (rawArgs) {
+          analiseCliente = parseAIResponse(rawArgs);
+          analiseCliente.participacao_ativa = Number(analiseCliente.participacao_ativa) || 0;
+          analiseCliente.abertura_sugestoes = Number(analiseCliente.abertura_sugestoes) || 0;
+          analiseCliente.comprometimento_acoes = Number(analiseCliente.comprometimento_acoes) || 0;
+          analiseCliente.clareza_demandas = Number(analiseCliente.clareza_demandas) || 0;
+          analiseCliente.engajamento_estrategico = Number(analiseCliente.engajamento_estrategico) || 0;
+          analiseCliente.pontos_fortes = Array.isArray(analiseCliente.pontos_fortes) ? analiseCliente.pontos_fortes : [];
+          analiseCliente.pontos_melhoria = Array.isArray(analiseCliente.pontos_melhoria) ? analiseCliente.pontos_melhoria : [];
+
+          scoreCliente = Math.round(
+            ((analiseCliente.participacao_ativa + analiseCliente.abertura_sugestoes +
+              analiseCliente.comprometimento_acoes + analiseCliente.clareza_demandas +
+              analiseCliente.engajamento_estrategico) / 5) * 10
+          ) / 10;
+        }
+      } else {
+        console.error("Erro na análise do cliente:", clienteAIResponse.status);
+      }
+    } catch (clienteErr) {
+      console.error("Erro na análise do cliente (não crítico):", clienteErr);
+    }
+
+    // ===== SALVAR TUDO =====
+    const updateData: any = {
+      resumo_ia: analise.resumo || '',
+      score_ia: Math.round(scoreConsultor * 10) / 10,
+      analise_ia: {
+        empatia: analise.empatia,
+        clareza: analise.clareza,
+        proatividade: analise.proatividade,
+        dominio_tecnico: analise.dominio_tecnico,
+        orientacao_resultados: analise.orientacao_resultados,
+        pontos_fortes: analise.pontos_fortes,
+        pontos_melhoria: analise.pontos_melhoria,
+      },
+      status_analise: "concluido",
+    };
+
+    if (analiseCliente && scoreCliente !== null) {
+      updateData.score_cliente = scoreCliente;
+      updateData.analise_cliente = {
+        resumo: analiseCliente.resumo || '',
+        participacao_ativa: analiseCliente.participacao_ativa,
+        abertura_sugestoes: analiseCliente.abertura_sugestoes,
+        comprometimento_acoes: analiseCliente.comprometimento_acoes,
+        clareza_demandas: analiseCliente.clareza_demandas,
+        engajamento_estrategico: analiseCliente.engajamento_estrategico,
+        pontos_fortes: analiseCliente.pontos_fortes,
+        pontos_melhoria: analiseCliente.pontos_melhoria,
+      };
+    }
 
     const { error: updateError } = await supabase
       .from("reunioes")
-      .update({
-        resumo_ia: analiseData.resumo || '',
-        score_ia: Math.round(scoreMedia * 10) / 10,
-        analise_ia: {
-          empatia: analiseData.empatia,
-          clareza: analiseData.clareza,
-          proatividade: analiseData.proatividade,
-          dominio_tecnico: analiseData.dominio_tecnico,
-          orientacao_resultados: analiseData.orientacao_resultados,
-          pontos_fortes: analiseData.pontos_fortes,
-          pontos_melhoria: analiseData.pontos_melhoria,
-        },
-        status_analise: "concluido",
-      })
+      .update(updateData)
       .eq("id", reuniao_id);
 
     if (updateError) {
@@ -285,7 +359,7 @@ ${transcricaoLimpa}`;
     }
 
     return new Response(
-      JSON.stringify({ success: true, score: Math.round(scoreMedia * 10) / 10 }),
+      JSON.stringify({ success: true, score: Math.round(scoreConsultor * 10) / 10, score_cliente: scoreCliente }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
