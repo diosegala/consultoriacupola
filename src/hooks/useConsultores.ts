@@ -9,6 +9,7 @@ export type ConsultorUpdate = TablesUpdate<'consultores'>;
 export interface ConsultorComStats extends Consultor {
   clientes_ativos: number;
   mrr_sob_gestao: number;
+  score_medio: number | null;
 }
 
 export function useConsultores(apenasAtivos = true) {
@@ -54,6 +55,15 @@ export function useConsultoresComStats() {
 
       if (clientesError) throw clientesError;
 
+      // Buscar reuniões analisadas com score
+      const { data: reunioes, error: reunioesError } = await supabase
+        .from('reunioes')
+        .select('consultor_id, score_ia')
+        .eq('status_analise', 'concluido')
+        .not('score_ia', 'is', null);
+
+      if (reunioesError) throw reunioesError;
+
       // Calcular stats para cada consultor
       return consultores.map(consultor => {
         const clientesDoConsultor = (clientes as any[]).filter(
@@ -65,10 +75,18 @@ export function useConsultoresComStats() {
           return sum + (Number(contratoAtivo?.remuneracao_mensal) || 0);
         }, 0);
 
+        const reunioesDoConsultor = (reunioes as any[]).filter(
+          r => r.consultor_id === consultor.id
+        );
+        const scoreMedio = reunioesDoConsultor.length > 0
+          ? reunioesDoConsultor.reduce((sum, r) => sum + Number(r.score_ia), 0) / reunioesDoConsultor.length
+          : null;
+
         return {
           ...consultor,
           clientes_ativos: clientesDoConsultor.length,
-          mrr_sob_gestao: mrrTotal
+          mrr_sob_gestao: mrrTotal,
+          score_medio: scoreMedio
         } as ConsultorComStats;
       });
     }

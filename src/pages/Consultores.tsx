@@ -180,7 +180,7 @@ export default function Consultores() {
                   <TableHead className="text-muted-foreground">Email</TableHead>
                   <TableHead className="text-muted-foreground text-center">Clientes Ativos</TableHead>
                    <TableHead className="text-muted-foreground">MRR sob Gestão</TableHead>
-                   <TableHead className="text-muted-foreground text-center">Score IA</TableHead>
+                   <TableHead className="text-muted-foreground text-center">Score</TableHead>
                    <TableHead className="text-muted-foreground">Status</TableHead>
                    <TableHead className="w-[200px] text-muted-foreground text-right">Ações</TableHead>
                 </TableRow>
@@ -199,7 +199,7 @@ export default function Consultores() {
                       <TableCell className="text-muted-foreground">{consultor.email || '-'}</TableCell>
                       <TableCell className="text-center text-foreground">{consultor.clientes_ativos}</TableCell>
                        <TableCell className="text-foreground">{formatCurrency(consultor.mrr_sob_gestao)}</TableCell>
-                       <TableCell className="text-center text-muted-foreground">—</TableCell>
+                       <TableCell className="text-center text-foreground">{consultor.score_medio != null ? consultor.score_medio.toFixed(1) : '—'}</TableCell>
                        <TableCell>
                          <Badge 
                            className={consultor.ativo 
