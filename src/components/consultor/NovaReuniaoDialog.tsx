@@ -122,7 +122,7 @@ export function NovaReuniaoDialog({ open, onOpenChange, consultorId, clienteId }
 
   const resetForm = () => {
     setFormData({
-      cliente_id: '',
+      cliente_id: clienteId ?? '',
       data_reuniao: format(new Date(), 'yyyy-MM-dd'),
       duracao_minutos: '',
       google_meet_link: '',
