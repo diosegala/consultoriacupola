@@ -11,6 +11,8 @@ export interface Reuniao {
   resumo_ia: string | null;
   score_ia: number | null;
   analise_ia: Record<string, any> | null;
+  score_cliente: number | null;
+  analise_cliente: Record<string, any> | null;
   google_meet_link: string | null;
   status_analise: string;
   created_at: string;

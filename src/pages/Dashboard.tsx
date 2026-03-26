@@ -6,13 +6,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useNavigate } from 'react-router-dom';
 import { Users, DollarSign, Clock, TrendingDown, AlertTriangle, CalendarX, BookOpen, Loader2, ChevronDown, X, Plane } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend, Cell } from 'recharts';
 import { useClientesAtivos, useClientesAguardandoRenovacao, useListaClientesAtivos, useListaClientesAguardandoRenovacao } from '@/hooks/useClientes';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useMRRTotal, useListaContratosMRR } from '@/hooks/useContratos';
 import { useChurnDoMes, useListaChurnMes } from '@/hooks/useEncerramentos';
-import { useAlertas, useMRRHistorico, useContratosHistorico, useMediaDespesasViagens, useDespesasViagensMensal } from '@/hooks/useDashboard';
+import { useAlertas, useMRRHistorico, useContratosHistorico, useMediaDespesasViagens, useDespesasViagensMensal, useEngajamentoClientes } from '@/hooks/useDashboard';
 import { useConsultores } from '@/hooks/useConsultores';
 import { useState } from 'react';
 import { format } from 'date-fns';
@@ -48,6 +48,7 @@ export default function Dashboard() {
   const { data: contratosHistorico, isLoading: loadingContratosHist } = useContratosHistorico(consultorIdsFiltro);
   const { data: mediaDespesasViagens, isLoading: loadingMediaViagens } = useMediaDespesasViagens(consultorIdsFiltro);
   const { data: despesasViagensMensal, isLoading: loadingDespesasMensal } = useDespesasViagensMensal(consultorIdsFiltro);
+  const { data: engajamentoClientes, isLoading: loadingEngajamento } = useEngajamentoClientes(consultorIdsFiltro);
   const { data: consultores } = useConsultores();
   const { data: listaClientesAtivos } = useListaClientesAtivos(consultorIdsFiltro);
   const { data: listaContratosMRR } = useListaContratosMRR(consultorIdsFiltro);
@@ -436,6 +437,72 @@ export default function Dashboard() {
                 />
               </BarChart>
             </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Gráfico de Engajamento dos Clientes */}
+      <Card className="bg-card border-border">
+        <CardHeader>
+          <CardTitle className="text-foreground">Engajamento dos Clientes</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loadingEngajamento ? (
+            <div className="h-[300px] flex items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          ) : engajamentoClientes && engajamentoClientes.length > 0 ? (
+            <ResponsiveContainer width="100%" height={Math.max(200, engajamentoClientes.length * 45)}>
+              <BarChart data={engajamentoClientes} layout="vertical" margin={{ left: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+                <XAxis 
+                  type="number" 
+                  domain={[0, 10]}
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={12}
+                />
+                <YAxis 
+                  type="category" 
+                  dataKey="cliente_nome" 
+                  width={150}
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={12}
+                  tick={{ fill: 'hsl(var(--foreground))' }}
+                />
+                <Tooltip 
+                  formatter={(value: number) => [value.toFixed(1), 'Score']}
+                  contentStyle={{
+                    backgroundColor: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px'
+                  }}
+                  labelStyle={{ color: 'hsl(var(--foreground))' }}
+                />
+                <Bar 
+                  dataKey="score_medio" 
+                  name="Score" 
+                  radius={[0, 4, 4, 0]}
+                  fill="hsl(var(--primary))"
+                >
+                  {engajamentoClientes.map((entry, index) => (
+                    <Cell 
+                      key={`cell-${index}`}
+                      fill={
+                        entry.score_medio >= 8 
+                          ? 'hsl(142, 71%, 45%)' 
+                          : entry.score_medio >= 6 
+                            ? 'hsl(48, 96%, 53%)' 
+                            : 'hsl(0, 84%, 60%)'
+                      }
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              Nenhuma avaliação de engajamento disponível
+            </div>
           )}
         </CardContent>
       </Card>
