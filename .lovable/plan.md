@@ -1,46 +1,25 @@
 
 
-## Melhorias no Kanban: Data Limite, Periodo e Reuniao Pre-selecionada
+## Reverter seletor de data para data unica
 
-### Problema 1: Data limite nao persiste
-
-A funcao `handleSaveDueDate` salva no banco mas nao invalida o cache do React Query, entao o card nao atualiza. Alem disso, a tabela `projetos` so tem `due_date` (data unica) -- precisa de `due_date_start` para suportar periodo.
-
-### Problema 2: Reuniao sem cliente pre-selecionado
-
-O `NovaReuniaoDialog` recebe apenas `consultorId` mas nao recebe `clienteId`. Quando aberto a partir de um card, o cliente deveria vir pre-preenchido.
+### Problema
+O seletor de periodo (range) nao esta funcionando bem -- a cada clique salva imediatamente no banco, sem esperar a selecao completa do intervalo.
 
 ### Solucao
+Reverter para selecao de data unica (`mode="single"`), que e mais simples e funcional.
 
-**Migracao SQL**
-- Adicionar coluna `due_date_start` (date, nullable) na tabela `projetos` para suportar periodo (inicio-fim)
+### Alteracoes
 
-**`ProjetoDetalheSheet.tsx`**
-- Apos salvar due date, invalidar queries `['projetos']` e `['projeto_checklist', ...]` via queryClient para o card refletir a mudanca
-- Trocar Calendar de `mode="single"` para `mode="range"`, salvando `due_date_start` e `due_date` (fim)
-- Exibir o periodo selecionado no botao
+**`src/components/projetos/ProjetoDetalheSheet.tsx`**
+- Remover import de `DateRange` do react-day-picker
+- Trocar `handleSaveDateRange` por `handleSaveDueDate` que recebe `Date | undefined` e salva apenas `due_date` (seta `due_date_start` como null)
+- Trocar Calendar de `mode="range"` para `mode="single"`, `selected={dueDate}`, `onSelect={handleSaveDueDate}`
+- Remover logica de `dateRange`, `dueDateStart`; exibir apenas `dueDate` formatada
+- Remover `numberOfMonths={2}` (desnecessario para data unica)
+- Label: "Data limite" em vez de "Periodo"
 
-**`KanbanCard.tsx`**
-- Atualizar para exibir periodo (ex: "15/04 - 30/04") quando ambas as datas existirem
+**`src/components/projetos/KanbanCard.tsx`**
+- Remover exibicao de periodo; mostrar apenas `due_date` formatada
 
-**`NovaReuniaoDialog.tsx`**
-- Adicionar prop opcional `clienteId?: string`
-- Quando recebido, pre-preencher `formData.cliente_id` com esse valor
-
-**`KanbanBoard.tsx`**
-- Passar `clienteId={selectedProjeto?.cliente_id}` para o `NovaReuniaoDialog`
-
-**`useProjetos.ts`**
-- Incluir `due_date_start` no tipo `Projeto`
-
-### Arquivos
-
-| Arquivo | Acao |
-|---------|------|
-| Migracao SQL | Adicionar `due_date_start` em projetos |
-| `src/components/projetos/ProjetoDetalheSheet.tsx` | Invalidar cache + calendar range |
-| `src/components/projetos/KanbanCard.tsx` | Exibir periodo |
-| `src/components/consultor/NovaReuniaoDialog.tsx` | Aceitar `clienteId` prop |
-| `src/components/projetos/KanbanBoard.tsx` | Passar clienteId ao dialog |
-| `src/hooks/useProjetos.ts` | Adicionar `due_date_start` ao tipo |
+Nenhuma migracao necessaria -- a coluna `due_date_start` pode permanecer na tabela sem impacto.
 
