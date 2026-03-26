@@ -44,6 +44,21 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
   const [showTagPicker, setShowTagPicker] = useState(false);
   const [newTagName, setNewTagName] = useState('');
   const [newTagColor, setNewTagColor] = useState(TAG_COLORS[0]);
+  const [authUsers, setAuthUsers] = useState<{ id: string; email: string }[]>([]);
+
+  useEffect(() => {
+    if (open) {
+      supabase.functions.invoke('list-auth-users').then(({ data }) => {
+        if (Array.isArray(data)) setAuthUsers(data);
+      });
+    }
+  }, [open]);
+
+  const userMap = useMemo(() => {
+    const map = new Map<string, string>();
+    authUsers.forEach(u => map.set(u.id, u.email));
+    return map;
+  }, [authUsers]);
 
   const { data: comentarios } = useProjetoComentarios(projeto?.id);
   const { data: checklist } = useProjetoChecklist(projeto?.id);
