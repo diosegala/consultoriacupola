@@ -57,6 +57,17 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        // Cupola report tokens
+        cupola: {
+          green: '#B0F90A',
+          dark: '#0d1f0d',
+          mid: '#1a2e1a',
+          teal: '#0d4a3a',
+          surface: '#f4f7f0',
+          card: '#ffffff',
+          border: '#dce8d0',
+          muted: '#6a8a5a',
+        },
         // Status colors
         success: {
           DEFAULT: "hsl(var(--success))",
