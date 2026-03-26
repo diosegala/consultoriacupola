@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -44,6 +44,21 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
   const [showTagPicker, setShowTagPicker] = useState(false);
   const [newTagName, setNewTagName] = useState('');
   const [newTagColor, setNewTagColor] = useState(TAG_COLORS[0]);
+  const [authUsers, setAuthUsers] = useState<{ id: string; email: string }[]>([]);
+
+  useEffect(() => {
+    if (open) {
+      supabase.functions.invoke('list-auth-users').then(({ data }) => {
+        if (Array.isArray(data)) setAuthUsers(data);
+      });
+    }
+  }, [open]);
+
+  const userMap = useMemo(() => {
+    const map = new Map<string, string>();
+    authUsers.forEach(u => map.set(u.id, u.email));
+    return map;
+  }, [authUsers]);
 
   const { data: comentarios } = useProjetoComentarios(projeto?.id);
   const { data: checklist } = useProjetoChecklist(projeto?.id);
@@ -311,22 +326,29 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
                   <MessageSquare className="h-4 w-4" /> Comentários ({comentarios?.length ?? 0})
                 </h4>
                 <div className="space-y-2">
-                  {comentarios?.map(c => (
-                    <div key={c.id} className="p-2 rounded-md bg-muted/50 group">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-muted-foreground">
-                          {format(new Date(c.created_at), "dd/MM/yyyy HH:mm")}
-                        </span>
-                        <Button
-                          variant="ghost" size="icon" className="h-5 w-5 opacity-0 group-hover:opacity-100"
-                          onClick={() => deleteComentario.mutate({ id: c.id, projeto_id: projeto.id })}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
+                  {comentarios?.map(c => {
+                    const email = userMap.get(c.user_id);
+                    const displayName = email ? email.split('@')[0] : 'Usuário';
+                    return (
+                      <div key={c.id} className="p-2 rounded-md bg-muted/50 group">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-semibold text-foreground">{displayName}</span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {format(new Date(c.created_at), "dd/MM/yyyy HH:mm")}
+                            </span>
+                          </div>
+                          <Button
+                            variant="ghost" size="icon" className="h-5 w-5 opacity-0 group-hover:opacity-100"
+                            onClick={() => deleteComentario.mutate({ id: c.id, projeto_id: projeto.id })}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                        <p className="text-sm mt-1">{c.texto}</p>
                       </div>
-                      <p className="text-sm mt-1">{c.texto}</p>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 <div className="flex gap-2 mt-2">
                   <Input
