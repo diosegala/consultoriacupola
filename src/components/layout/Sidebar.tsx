@@ -12,7 +12,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
-import cupolaLogo from '@/assets/cupola-logo.png';
+import cupolaLogoBranca from '@/assets/cupola-logo-branca.png';
+import cupolaIcon from '@/assets/cupola-icon.png';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 
