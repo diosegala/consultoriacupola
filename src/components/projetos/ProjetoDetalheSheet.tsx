@@ -53,6 +53,8 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
   const createCheckItem = useCreateChecklistItem();
   const toggleCheckItem = useToggleChecklistItem();
   const deleteCheckItem = useDeleteChecklistItem();
+  const updateCheckItem = useUpdateChecklistItem();
+  const { data: consultoresList } = useConsultores();
   const addTag = useAddTagToProjeto();
   const removeTag = useRemoveTagFromProjeto();
   const createTag = useCreateTag();
