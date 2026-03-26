@@ -339,26 +339,31 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
               {/* Due Date */}
               <div>
                 <h4 className="text-sm font-medium mb-2 flex items-center gap-1">
-                  <CalendarIcon className="h-4 w-4" /> Data Limite
+                  <CalendarIcon className="h-4 w-4" /> Período
                 </h4>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" size="sm" className={cn(
                       "w-full justify-start text-left font-normal",
-                      !dueDate && "text-muted-foreground",
+                      !dateRange && "text-muted-foreground",
                       dueDate && isPast(dueDate) && "text-destructive border-destructive"
                     )}>
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {dueDate ? format(dueDate, "dd/MM/yyyy") : "Definir data limite"}
+                      {dateRange?.from && dateRange?.to
+                        ? `${format(dateRange.from, "dd/MM")} - ${format(dateRange.to, "dd/MM/yyyy")}`
+                        : dateRange?.from
+                        ? format(dateRange.from, "dd/MM/yyyy")
+                        : "Definir período"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
-                      mode="single"
-                      selected={dueDate}
-                      onSelect={handleSaveDueDate}
+                      mode="range"
+                      selected={dateRange}
+                      onSelect={handleSaveDateRange}
                       locale={ptBR}
                       className="p-3 pointer-events-auto"
+                      numberOfMonths={2}
                     />
                   </PopoverContent>
                 </Popover>
