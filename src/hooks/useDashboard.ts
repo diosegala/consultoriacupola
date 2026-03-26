@@ -281,3 +281,55 @@ export function useDespesasViagensMensal(consultorIds?: string[]) {
     }
   });
 }
+
+export interface EngajamentoCliente {
+  cliente_id: string;
+  cliente_nome: string;
+  score_medio: number;
+  total_reunioes: number;
+}
+
+export function useEngajamentoClientes(consultorIds?: string[]) {
+  return useQuery({
+    queryKey: ['dashboard', 'engajamento-clientes', consultorIds],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('reunioes')
+        .select(`
+          cliente_id, score_cliente,
+          clientes(nome, consultor_id)
+        `)
+        .eq('status_analise', 'concluido')
+        .not('score_cliente', 'is', null);
+
+      if (error) throw error;
+
+      const filtrados = consultorIds?.length
+        ? (data as any[])?.filter(r => consultorIds.includes(r.clientes?.consultor_id))
+        : data;
+
+      // Group by client
+      const grouped = new Map<string, { nome: string; scores: number[] }>();
+      (filtrados || []).forEach((r: any) => {
+        const id = r.cliente_id;
+        if (!grouped.has(id)) {
+          grouped.set(id, { nome: r.clientes?.nome || 'Cliente', scores: [] });
+        }
+        grouped.get(id)!.scores.push(Number(r.score_cliente));
+      });
+
+      const result: EngajamentoCliente[] = [];
+      grouped.forEach((v, k) => {
+        const avg = v.scores.reduce((a, b) => a + b, 0) / v.scores.length;
+        result.push({
+          cliente_id: k,
+          cliente_nome: v.nome,
+          score_medio: Math.round(avg * 10) / 10,
+          total_reunioes: v.scores.length,
+        });
+      });
+
+      return result.sort((a, b) => b.score_medio - a.score_medio);
+    },
+  });
+}
