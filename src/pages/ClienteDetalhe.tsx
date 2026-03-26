@@ -118,6 +118,10 @@ export default function ClienteDetalhe() {
             <Wrench className="h-4 w-4" />
             Ferramentas
           </TabsTrigger>
+          <TabsTrigger value="desempenho" className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Desempenho
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="contrato" className="mt-6">
