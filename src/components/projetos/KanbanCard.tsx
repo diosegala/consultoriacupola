@@ -87,9 +87,7 @@ export function KanbanCard({ projeto, index, onRegistrarReuniao, onClick }: Kanb
                 )}
               >
                 <CalendarIcon className="h-3 w-3" />
-                {dueDateStart && dueDate
-                  ? `${format(dueDateStart, 'dd/MM')} - ${format(dueDate, 'dd/MM')}`
-                  : format(dueDate, 'dd/MM/yyyy')}
+                {format(dueDate, 'dd/MM/yyyy')}
               </Badge>
             )}
 
