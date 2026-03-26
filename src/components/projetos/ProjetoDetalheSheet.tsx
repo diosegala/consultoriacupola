@@ -220,24 +220,52 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
                 {checklistTotal > 0 && (
                   <Progress value={checkPercent} className="h-2 mb-3" />
                 )}
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   {checklist?.map(item => (
-                    <div key={item.id} className="flex items-center gap-2 group">
-                      <Checkbox
-                        checked={item.concluido}
-                        onCheckedChange={(checked) =>
-                          toggleCheckItem.mutate({ id: item.id, concluido: !!checked, projeto_id: projeto.id })
-                        }
-                      />
-                      <span className={cn("text-sm flex-1", item.concluido && "line-through text-muted-foreground")}>
-                        {item.titulo}
-                      </span>
-                      <Button
-                        variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                        onClick={() => deleteCheckItem.mutate({ id: item.id, projeto_id: projeto.id })}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+                    <div key={item.id} className="rounded-md border border-border/50 p-2 group space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          checked={item.concluido}
+                          onCheckedChange={(checked) =>
+                            toggleCheckItem.mutate({ id: item.id, concluido: !!checked, projeto_id: projeto.id })
+                          }
+                        />
+                        <span className={cn("text-sm flex-1", item.concluido && "line-through text-muted-foreground")}>
+                          {item.titulo}
+                        </span>
+                        <Button
+                          variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                          onClick={() => deleteCheckItem.mutate({ id: item.id, projeto_id: projeto.id })}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-2 pl-6 flex-wrap">
+                        {/* Assigned to */}
+                        <select
+                          className="text-[10px] bg-transparent border border-border/50 rounded px-1.5 py-0.5 text-muted-foreground"
+                          value={item.assigned_to ?? ''}
+                          onChange={e => updateCheckItem.mutate({
+                            id: item.id, projeto_id: projeto.id,
+                            assigned_to: e.target.value || null,
+                          })}
+                        >
+                          <option value="">Sem responsável</option>
+                          {consultoresList?.filter(c => c.ativo).map(c => (
+                            <option key={c.id} value={c.id}>{c.nome}</option>
+                          ))}
+                        </select>
+                        {/* Due date */}
+                        <input
+                          type="date"
+                          className="text-[10px] bg-transparent border border-border/50 rounded px-1.5 py-0.5 text-muted-foreground"
+                          value={item.due_date ?? ''}
+                          onChange={e => updateCheckItem.mutate({
+                            id: item.id, projeto_id: projeto.id,
+                            due_date: e.target.value || null,
+                          })}
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
