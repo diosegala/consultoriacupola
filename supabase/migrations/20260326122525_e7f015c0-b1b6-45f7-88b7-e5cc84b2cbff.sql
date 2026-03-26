@@ -1,0 +1,1 @@
+ALTER TABLE public.projetos ADD COLUMN due_date_start date;
