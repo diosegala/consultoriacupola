@@ -15,6 +15,7 @@ import { format, isPast } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { useQueryClient } from '@tanstack/react-query';
 import type { Projeto } from '@/hooks/useProjetos';
 import { useProjetoComentarios, useCreateComentario, useDeleteComentario } from '@/hooks/useProjetoComentarios';
 import { useProjetoChecklist, useCreateChecklistItem, useToggleChecklistItem, useDeleteChecklistItem, useUpdateChecklistItem } from '@/hooks/useProjetoChecklist';
@@ -23,6 +24,7 @@ import { useReunioesByConsultor } from '@/hooks/useReunioes';
 import { useProjetoTags, useProjetoTagVinculos, useAddTagToProjeto, useRemoveTagFromProjeto, useCreateTag, TAG_COLORS } from '@/hooks/useProjetoTags';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import type { DateRange } from 'react-day-picker';
 
 interface ProjetoDetalheSheetProps {
   projeto: Projeto | null;
