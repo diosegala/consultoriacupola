@@ -484,6 +484,46 @@ export default function Configuracoes() {
             </CardContent>
           </Card>
         </TabsContent>
+        {/* Agentes IA (admin only) */}
+        {isAdmin && (
+          <TabsContent value="agentes" className="mt-6 space-y-4">
+            {loadingPrompts ? (
+              <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin" /></div>
+            ) : (
+              ['diagnostico', 'okrs', 'briefing_cliente_oculto'].map(tipo => {
+                const hasChanges = editedPrompts[tipo] !== undefined;
+                return (
+                  <Card key={tipo} className="bg-card border-border">
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <CardTitle className="flex items-center gap-2 text-foreground text-base">
+                        <Bot className="h-5 w-5 text-primary" />
+                        {TIPO_LABELS[tipo]}
+                      </CardTitle>
+                      <Button
+                        size="sm"
+                        disabled={!hasChanges || updatePrompt.isPending}
+                        onClick={() => handleSavePrompt(tipo)}
+                        className="bg-primary text-primary-foreground hover:bg-primary/90"
+                      >
+                        {updatePrompt.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                        Salvar
+                      </Button>
+                    </CardHeader>
+                    <CardContent>
+                      <Textarea
+                        className="bg-input border-border min-h-[200px] font-mono text-sm"
+                        value={getPromptValue(tipo)}
+                        onChange={(e) => setEditedPrompts(prev => ({ ...prev, [tipo]: e.target.value }))}
+                        placeholder="Insira o prompt do agente..."
+                      />
+                    </CardContent>
+                  </Card>
+                );
+              })
+            )}
+          </TabsContent>
+        )}
+
       </Tabs>
 
       {/* Dialog Tipo de Consultoria */}
