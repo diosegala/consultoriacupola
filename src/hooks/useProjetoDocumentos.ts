@@ -30,9 +30,9 @@ export function useProjetoDocumentos(projetoId: string | undefined) {
 export function useGerarDocumento() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ tipo, projeto_id }: { tipo: string; projeto_id: string }) => {
+    mutationFn: async ({ tipo, projeto_id, contexto_usuario }: { tipo: string; projeto_id: string; contexto_usuario?: string }) => {
       const { data, error } = await supabase.functions.invoke('agente-projeto', {
-        body: { tipo, projeto_id },
+        body: { tipo, projeto_id, contexto_usuario },
       });
 
       if (error) {
