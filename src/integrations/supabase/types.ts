@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      agente_prompts: {
+        Row: {
+          id: string
+          prompt: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          prompt: string
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          prompt?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       atendimentos: {
         Row: {
           cliente_id: string
