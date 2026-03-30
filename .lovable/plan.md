@@ -1,51 +1,42 @@
 
 
-## Transformar agentes em interface conversacional com input de contexto
+## Gerenciar Prompts dos Agentes via Configurações (admin only)
 
-### Problema atual
-Os botoes de agente geram documentos automaticamente usando apenas os dados ja salvos no projeto. O usuario precisa poder fornecer suas proprias anotacoes, transcricoes e gravacoes como contexto antes de gerar.
+### Abordagem
 
-### Solucao
+Mover os prompts dos 3 agentes (hoje hardcoded na edge function) para uma tabela no banco. A página Configurações ganha uma nova aba "Agentes IA" (visível apenas para admin) com 3 textareas editáveis — um por agente. A edge function passa a buscar os prompts do banco antes de chamar o Gemini.
 
-Ao clicar em "Gerar Diagnostico" (ou OKRs, ou Briefing), em vez de disparar a geracao direto, abre um **dialog de input** onde o consultor pode:
-- Colar anotacoes de imersao (textarea)
-- Colar transcricoes de reunioes (textarea)
-- Opcionalmente anexar arquivos (futuro)
-- Ver que dados do projeto ja serao incluidos automaticamente (observacoes, checklist, reunioes)
-- Clicar em "Gerar" so quando estiver satisfeito com o contexto
+### Alterações
 
-### Alteracoes
+#### 1. Migração SQL — tabela `agente_prompts`
+- `id` uuid PK
+- `tipo` text UNIQUE NOT NULL (diagnostico, okrs, briefing_cliente_oculto)
+- `prompt` text NOT NULL
+- `updated_at` timestamptz DEFAULT now()
+- RLS: SELECT/UPDATE apenas para admin (`has_role(auth.uid(), 'admin')`)
+- Seed inicial com os 3 prompts atuais via INSERT
 
-**`src/components/projetos/ProjetoDetalheSheet.tsx`**
-- Substituir o onClick dos botoes de agente: em vez de chamar `gerarDocumento.mutate()` direto, abrir um novo state `agentDialog` com o tipo selecionado
-- Novo dialog com:
-  - Titulo: "Gerar [Diagnostico/OKRs/Briefing]"
-  - Texto explicativo: "Insira as informacoes que o agente deve considerar"
-  - Textarea grande para "Anotacoes / Transcricoes" (placeholder contextual por tipo)
-  - Indicador de contexto automatico: "Dados do projeto (observacoes, checklist, reunioes) serao incluidos automaticamente"
-  - Botao "Gerar" que envia o texto do usuario junto com o tipo
+#### 2. Edge function `agente-projeto/index.ts`
+- Remover o objeto `PROMPTS` hardcoded
+- Buscar o prompt da tabela `agente_prompts` filtrando por `tipo` (usando service role client)
+- Fallback: se não encontrar no banco, usar prompt padrão inline
 
-**`src/hooks/useProjetoDocumentos.ts`**
-- Alterar mutation para aceitar campo opcional `contexto_usuario: string`
+#### 3. Hook `useAgentePrompts.ts` (novo)
+- `useAgentePrompts()` — lista os 3 prompts
+- `useUpdateAgentePrompt()` — mutation para atualizar o texto de um prompt
 
-**`supabase/functions/agente-projeto/index.ts`**
-- Aceitar campo `contexto_usuario` no body
-- Concatenar o contexto fornecido pelo usuario ao contexto automatico do projeto, dando prioridade ao input do usuario no prompt
-
-### Fluxo revisado
-
-1. Consultor abre card do projeto
-2. Clica em "Gerar Diagnostico"
-3. Abre dialog com textarea para colar anotacoes/transcricoes
-4. Consultor cola seu conteudo e clica "Gerar"
-5. Edge function combina input do usuario + dados do projeto e envia ao Gemini
-6. Resultado exibido no modal de visualizacao
+#### 4. Página `Configuracoes.tsx`
+- Nova aba "Agentes IA" (condicional: `isAdmin`)
+- 3 cards, cada um com label (Diagnóstico / OKRs / Briefing Cliente Oculto) e um textarea grande com o prompt atual
+- Botão "Salvar" por card que chama o mutation de update
+- Toast de confirmação
 
 ### Arquivos
 
-| Arquivo | Acao |
+| Arquivo | Ação |
 |---------|------|
-| `src/components/projetos/ProjetoDetalheSheet.tsx` | Dialog de input antes da geracao |
-| `src/hooks/useProjetoDocumentos.ts` | Aceitar `contexto_usuario` |
-| `supabase/functions/agente-projeto/index.ts` | Processar `contexto_usuario` |
+| Migração SQL | Criar tabela `agente_prompts` + seed com prompts atuais |
+| `supabase/functions/agente-projeto/index.ts` | Buscar prompt do banco em vez de hardcoded |
+| `src/hooks/useAgentePrompts.ts` | Criar — CRUD dos prompts |
+| `src/pages/Configuracoes.tsx` | Nova aba "Agentes IA" com textareas editáveis |
 
