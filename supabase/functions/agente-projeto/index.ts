@@ -56,11 +56,12 @@ serve(async (req) => {
     const serviceClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const { data: promptData } = await serviceClient
       .from("agente_prompts")
-      .select("prompt")
+      .select("prompt, documento_modelo")
       .eq("tipo", tipo)
       .single();
 
     const promptBase = promptData?.prompt || FALLBACK_PROMPTS[tipo];
+    const documentoModelo = promptData?.documento_modelo;
 
     // Fetch project context
     const { data: projeto, error: projetoError } = await supabase
