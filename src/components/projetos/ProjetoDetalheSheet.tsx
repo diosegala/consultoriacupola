@@ -10,7 +10,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
-import { CalendarIcon, Plus, Trash2, MessageSquare, CheckSquare, Video, Send, Tag, X } from 'lucide-react';
+import { CalendarIcon, Plus, Trash2, MessageSquare, CheckSquare, Video, Send, Tag, X, FileText, Target, ClipboardList, Loader2, Eye, Sparkles } from 'lucide-react';
 import { format, isPast } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -22,9 +22,9 @@ import { useProjetoChecklist, useCreateChecklistItem, useToggleChecklistItem, us
 import { useConsultores } from '@/hooks/useConsultores';
 import { useReunioesByConsultor } from '@/hooks/useReunioes';
 import { useProjetoTags, useProjetoTagVinculos, useAddTagToProjeto, useRemoveTagFromProjeto, useCreateTag, TAG_COLORS } from '@/hooks/useProjetoTags';
+import { useProjetoDocumentos, useGerarDocumento } from '@/hooks/useProjetoDocumentos';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-
 
 interface ProjetoDetalheSheetProps {
   projeto: Projeto | null;
