@@ -1,0 +1,1 @@
+ALTER TABLE public.agente_prompts ADD COLUMN documento_modelo text;

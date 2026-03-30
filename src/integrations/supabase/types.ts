@@ -16,18 +16,21 @@ export type Database = {
     Tables: {
       agente_prompts: {
         Row: {
+          documento_modelo: string | null
           id: string
           prompt: string
           tipo: string
           updated_at: string
         }
         Insert: {
+          documento_modelo?: string | null
           id?: string
           prompt: string
           tipo: string
           updated_at?: string
         }
         Update: {
+          documento_modelo?: string | null
           id?: string
           prompt?: string
           tipo?: string
