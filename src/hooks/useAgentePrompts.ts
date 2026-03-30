@@ -5,6 +5,7 @@ interface AgentePrompt {
   id: string;
   tipo: string;
   prompt: string;
+  documento_modelo: string | null;
   updated_at: string;
 }
 
@@ -25,10 +26,10 @@ export function useAgentePrompts() {
 export function useUpdateAgentePrompt() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, prompt }: { id: string; prompt: string }) => {
+    mutationFn: async ({ id, prompt, documento_modelo }: { id: string; prompt: string; documento_modelo?: string | null }) => {
       const { error } = await supabase
         .from('agente_prompts')
-        .update({ prompt, updated_at: new Date().toISOString() })
+        .update({ prompt, documento_modelo: documento_modelo ?? null, updated_at: new Date().toISOString() })
         .eq('id', id);
       if (error) throw error;
     },

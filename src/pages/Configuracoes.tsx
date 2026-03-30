@@ -83,19 +83,30 @@ export default function Configuracoes() {
   const { data: agentePrompts, isLoading: loadingPrompts } = useAgentePrompts();
   const updatePrompt = useUpdateAgentePrompt();
   const [editedPrompts, setEditedPrompts] = useState<Record<string, string>>({});
+  const [editedModelos, setEditedModelos] = useState<Record<string, string>>({});
 
   const getPromptValue = (tipo: string) => {
     if (editedPrompts[tipo] !== undefined) return editedPrompts[tipo];
     return agentePrompts?.find(p => p.tipo === tipo)?.prompt || '';
   };
 
+  const getModeloValue = (tipo: string) => {
+    if (editedModelos[tipo] !== undefined) return editedModelos[tipo];
+    return agentePrompts?.find(p => p.tipo === tipo)?.documento_modelo || '';
+  };
+
   const handleSavePrompt = async (tipo: string) => {
     const prompt = agentePrompts?.find(p => p.tipo === tipo);
     if (!prompt) return;
     try {
-      await updatePrompt.mutateAsync({ id: prompt.id, prompt: editedPrompts[tipo] ?? prompt.prompt });
+      await updatePrompt.mutateAsync({
+        id: prompt.id,
+        prompt: editedPrompts[tipo] ?? prompt.prompt,
+        documento_modelo: editedModelos[tipo] ?? prompt.documento_modelo,
+      });
       toast({ title: 'Sucesso', description: 'Prompt atualizado com sucesso' });
       setEditedPrompts(prev => { const n = { ...prev }; delete n[tipo]; return n; });
+      setEditedModelos(prev => { const n = { ...prev }; delete n[tipo]; return n; });
     } catch (error: any) {
       toast({ title: 'Erro', description: error.message, variant: 'destructive' });
     }
@@ -491,7 +502,7 @@ export default function Configuracoes() {
               <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin" /></div>
             ) : (
               ['diagnostico', 'okrs', 'briefing_cliente_oculto'].map(tipo => {
-                const hasChanges = editedPrompts[tipo] !== undefined;
+                const hasChanges = editedPrompts[tipo] !== undefined || editedModelos[tipo] !== undefined;
                 return (
                   <Card key={tipo} className="bg-card border-border">
                     <CardHeader className="flex flex-row items-center justify-between">
@@ -509,13 +520,25 @@ export default function Configuracoes() {
                         Salvar
                       </Button>
                     </CardHeader>
-                    <CardContent>
-                      <Textarea
-                        className="bg-input border-border min-h-[200px] font-mono text-sm"
-                        value={getPromptValue(tipo)}
-                        onChange={(e) => setEditedPrompts(prev => ({ ...prev, [tipo]: e.target.value }))}
-                        placeholder="Insira o prompt do agente..."
-                      />
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <Label className="text-muted-foreground text-xs uppercase tracking-wider">Prompt do Agente</Label>
+                        <Textarea
+                          className="bg-input border-border min-h-[200px] font-mono text-sm"
+                          value={getPromptValue(tipo)}
+                          onChange={(e) => setEditedPrompts(prev => ({ ...prev, [tipo]: e.target.value }))}
+                          placeholder="Insira o prompt do agente..."
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-muted-foreground text-xs uppercase tracking-wider">Documento Modelo (opcional)</Label>
+                        <Textarea
+                          className="bg-input border-border min-h-[150px] font-mono text-sm"
+                          value={getModeloValue(tipo)}
+                          onChange={(e) => setEditedModelos(prev => ({ ...prev, [tipo]: e.target.value }))}
+                          placeholder="Cole aqui um exemplo de documento já produzido para servir de referência de estilo, tom e estrutura..."
+                        />
+                      </div>
                     </CardContent>
                   </Card>
                 );

@@ -56,11 +56,12 @@ serve(async (req) => {
     const serviceClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const { data: promptData } = await serviceClient
       .from("agente_prompts")
-      .select("prompt")
+      .select("prompt, documento_modelo")
       .eq("tipo", tipo)
       .single();
 
     const promptBase = promptData?.prompt || FALLBACK_PROMPTS[tipo];
+    const documentoModelo = promptData?.documento_modelo;
 
     // Fetch project context
     const { data: projeto, error: projetoError } = await supabase
@@ -121,7 +122,11 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
       ? `\n\n## Anotações e Transcrições do Consultor\n${contexto_usuario}`
       : '';
 
-    const promptCompleto = `${promptBase}\n\n---\n\nINFORMAÇÕES DO CLIENTE:\n\n${contexto}${contextoUsuarioSection}`;
+    const documentoModeloSection = documentoModelo
+      ? `\n\n## Documento Modelo de Referência\n${documentoModelo}\n\nUse o documento acima como referência de estilo, tom e estrutura.`
+      : '';
+
+    const promptCompleto = `${promptBase}\n\n---\n\nINFORMAÇÕES DO CLIENTE:\n\n${contexto}${contextoUsuarioSection}${documentoModeloSection}`;
     const candidateModels = ["gemini-2.5-pro", "gemini-2.5-flash"];
 
     let conteudo = "";
