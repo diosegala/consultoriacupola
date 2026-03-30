@@ -34,7 +34,21 @@ export function useGerarDocumento() {
       const { data, error } = await supabase.functions.invoke('agente-projeto', {
         body: { tipo, projeto_id },
       });
-      if (error) throw error;
+
+      if (error) {
+        const message = typeof error.message === 'string' && error.message.includes('{')
+          ? (() => {
+              try {
+                const parsed = JSON.parse(error.message.slice(error.message.indexOf('{')));
+                return parsed.error ?? error.message;
+              } catch {
+                return error.message;
+              }
+            })()
+          : error.message;
+        throw new Error(message);
+      }
+
       if (data?.error) throw new Error(data.error);
       return data.conteudo as string;
     },
