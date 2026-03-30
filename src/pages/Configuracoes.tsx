@@ -83,19 +83,30 @@ export default function Configuracoes() {
   const { data: agentePrompts, isLoading: loadingPrompts } = useAgentePrompts();
   const updatePrompt = useUpdateAgentePrompt();
   const [editedPrompts, setEditedPrompts] = useState<Record<string, string>>({});
+  const [editedModelos, setEditedModelos] = useState<Record<string, string>>({});
 
   const getPromptValue = (tipo: string) => {
     if (editedPrompts[tipo] !== undefined) return editedPrompts[tipo];
     return agentePrompts?.find(p => p.tipo === tipo)?.prompt || '';
   };
 
+  const getModeloValue = (tipo: string) => {
+    if (editedModelos[tipo] !== undefined) return editedModelos[tipo];
+    return agentePrompts?.find(p => p.tipo === tipo)?.documento_modelo || '';
+  };
+
   const handleSavePrompt = async (tipo: string) => {
     const prompt = agentePrompts?.find(p => p.tipo === tipo);
     if (!prompt) return;
     try {
-      await updatePrompt.mutateAsync({ id: prompt.id, prompt: editedPrompts[tipo] ?? prompt.prompt });
+      await updatePrompt.mutateAsync({
+        id: prompt.id,
+        prompt: editedPrompts[tipo] ?? prompt.prompt,
+        documento_modelo: editedModelos[tipo] ?? prompt.documento_modelo,
+      });
       toast({ title: 'Sucesso', description: 'Prompt atualizado com sucesso' });
       setEditedPrompts(prev => { const n = { ...prev }; delete n[tipo]; return n; });
+      setEditedModelos(prev => { const n = { ...prev }; delete n[tipo]; return n; });
     } catch (error: any) {
       toast({ title: 'Erro', description: error.message, variant: 'destructive' });
     }
