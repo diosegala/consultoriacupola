@@ -151,39 +151,66 @@ ${r.resumo_ia ? `- Resumo: ${r.resumo_ia}` : ""}
 ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observações: ${onboarding[0].observacoes ?? "N/A"}` : "Sem dados de onboarding."}
 `.trim();
 
-    // Call Gemini API
-    const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${GOOGLE_GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                { text: `${PROMPTS[tipo]}\n\n---\n\nINFORMAÇÕES DO CLIENTE:\n\n${contexto}` },
-              ],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 4096,
-          },
-        }),
-      }
-    );
+    const promptCompleto = `${PROMPTS[tipo]}\n\n---\n\nINFORMAÇÕES DO CLIENTE:\n\n${contexto}`;
+    const candidateModels = ["gemini-2.5-pro", "gemini-2.5-flash"];
 
-    if (!geminiResponse.ok) {
+    let conteudo = "";
+    let lastStatus = 500;
+    let lastErrorMessage = "Erro na API do Gemini";
+
+    for (const model of candidateModels) {
+      const geminiResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GOOGLE_GEMINI_API_KEY}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [{ text: promptCompleto }],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 4096,
+            },
+          }),
+        }
+      );
+
+      if (geminiResponse.ok) {
+        const geminiData = await geminiResponse.json();
+        conteudo = geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+        if (conteudo) break;
+        lastStatus = 500;
+        lastErrorMessage = `O modelo ${model} não retornou conteúdo.`;
+        continue;
+      }
+
       const errText = await geminiResponse.text();
-      console.error("Gemini API error:", geminiResponse.status, errText);
-      return new Response(JSON.stringify({ error: "Erro na API do Gemini" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      console.error("Gemini API error:", geminiResponse.status, model, errText);
+      lastStatus = geminiResponse.status;
+
+      if (geminiResponse.status === 429) {
+        lastErrorMessage = model === "gemini-2.5-pro"
+          ? "Sua chave do Google está sem cota disponível para Gemini Pro no momento. Tentando fallback automaticamente."
+          : "Sua chave do Google está sem cota disponível no momento. Verifique billing e limites da API Gemini.";
+        continue;
+      }
+
+      if (geminiResponse.status === 404) {
+        lastErrorMessage = `O modelo ${model} não está disponível para esta chave/API version.`;
+        continue;
+      }
+
+      lastErrorMessage = `Erro do Gemini (${geminiResponse.status}).`;
     }
 
-    const geminiData = await geminiResponse.json();
-    const conteudo = geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-
     if (!conteudo) {
-      return new Response(JSON.stringify({ error: "Gemini não retornou conteúdo" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: lastErrorMessage }), {
+        status: lastStatus,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Save to projeto_documentos
