@@ -5,6 +5,7 @@ interface AgentePrompt {
   id: string;
   tipo: string;
   prompt: string;
+  documento_modelo: string | null;
   updated_at: string;
 }
 
