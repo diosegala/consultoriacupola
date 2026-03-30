@@ -77,7 +77,7 @@ serve(async (req) => {
     }
     const userId = claimsData.claims.sub;
 
-    const { tipo, projeto_id } = await req.json();
+    const { tipo, projeto_id, contexto_usuario } = await req.json();
 
     if (!tipo || !projeto_id) {
       return new Response(JSON.stringify({ error: "tipo e projeto_id são obrigatórios" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -151,7 +151,11 @@ ${r.resumo_ia ? `- Resumo: ${r.resumo_ia}` : ""}
 ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observações: ${onboarding[0].observacoes ?? "N/A"}` : "Sem dados de onboarding."}
 `.trim();
 
-    const promptCompleto = `${PROMPTS[tipo]}\n\n---\n\nINFORMAÇÕES DO CLIENTE:\n\n${contexto}`;
+    const contextoUsuarioSection = contexto_usuario
+      ? `\n\n## Anotações e Transcrições do Consultor\n${contexto_usuario}`
+      : '';
+
+    const promptCompleto = `${PROMPTS[tipo]}\n\n---\n\nINFORMAÇÕES DO CLIENTE:\n\n${contexto}${contextoUsuarioSection}`;
     const candidateModels = ["gemini-2.5-pro", "gemini-2.5-flash"];
 
     let conteudo = "";

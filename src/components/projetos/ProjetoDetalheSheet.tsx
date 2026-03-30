@@ -46,6 +46,8 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
   const [newTagColor, setNewTagColor] = useState(TAG_COLORS[0]);
   const [authUsers, setAuthUsers] = useState<{ id: string; email: string }[]>([]);
   const [viewingDoc, setViewingDoc] = useState<{ tipo: string; conteudo: string } | null>(null);
+  const [agentDialog, setAgentDialog] = useState<{ tipo: string; label: string } | null>(null);
+  const [contextoUsuario, setContextoUsuario] = useState('');
   useEffect(() => {
     if (open) {
       supabase.functions.invoke('list-auth-users').then(({ data }) => {
@@ -435,9 +437,9 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
                 </h4>
                 <div className="space-y-2">
                   {[
-                    { tipo: 'diagnostico', label: 'Diagnóstico', icon: FileText },
-                    { tipo: 'okrs', label: 'OKRs', icon: Target },
-                    { tipo: 'briefing_cliente_oculto', label: 'Briefing Cliente Oculto', icon: ClipboardList },
+                    { tipo: 'diagnostico', label: 'Diagnóstico', icon: FileText, placeholder: 'Cole aqui suas anotações da imersão, transcrições de reuniões, observações sobre o cliente, dados relevantes...' },
+                    { tipo: 'okrs', label: 'OKRs', icon: Target, placeholder: 'Cole aqui o diagnóstico, anotações de reuniões, metas discutidas com o cliente, contexto estratégico...' },
+                    { tipo: 'briefing_cliente_oculto', label: 'Briefing Cliente Oculto', icon: ClipboardList, placeholder: 'Cole aqui informações sobre o estabelecimento, tipo de atendimento, pontos críticos observados na imersão...' },
                   ].map(agent => {
                     const isLoading = gerarDocumento.isPending && gerarDocumento.variables?.tipo === agent.tipo;
                     const existingDoc = documentos?.find(d => d.tipo === agent.tipo);
@@ -450,15 +452,8 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
                             className="h-7 text-xs flex-1 justify-start"
                             disabled={gerarDocumento.isPending}
                             onClick={() => {
-                              gerarDocumento.mutate(
-                                { tipo: agent.tipo, projeto_id: projeto.id },
-                                {
-                                  onSuccess: (conteudo) => {
-                                    setViewingDoc({ tipo: agent.label, conteudo });
-                                    toast.success(`${agent.label} gerado com sucesso!`);
-                                  },
-                                }
-                              );
+                              setContextoUsuario('');
+                              setAgentDialog({ tipo: agent.tipo, label: agent.label });
                             }}
                           >
                             {isLoading ? (
@@ -492,6 +487,78 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
             </div>
           </div>
         </ScrollArea>
+
+        {/* Dialog de input de contexto do agente */}
+        {agentDialog && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60" onClick={() => setAgentDialog(null)}>
+            <div
+              className="bg-background rounded-lg shadow-lg max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-6 py-4 border-b">
+                <div>
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <Sparkles className="h-4 w-4" /> Gerar {agentDialog.label}
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Insira as informações que o agente deve considerar para gerar o documento.
+                  </p>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setAgentDialog(null)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="px-6 py-4 space-y-4 flex-1 overflow-auto">
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Anotações / Transcrições</label>
+                  <Textarea
+                    value={contextoUsuario}
+                    onChange={e => setContextoUsuario(e.target.value)}
+                    placeholder={
+                      [
+                        { tipo: 'diagnostico', placeholder: 'Cole aqui suas anotações da imersão, transcrições de reuniões, observações sobre o cliente, dados relevantes...' },
+                        { tipo: 'okrs', placeholder: 'Cole aqui o diagnóstico, anotações de reuniões, metas discutidas com o cliente, contexto estratégico...' },
+                        { tipo: 'briefing_cliente_oculto', placeholder: 'Cole aqui informações sobre o estabelecimento, tipo de atendimento, pontos críticos observados na imersão...' },
+                      ].find(a => a.tipo === agentDialog.tipo)?.placeholder ?? 'Cole aqui suas anotações...'
+                    }
+                    rows={10}
+                    className="resize-none"
+                  />
+                </div>
+                <div className="rounded-md bg-muted/50 p-3">
+                  <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <CheckSquare className="h-3.5 w-3.5" />
+                    Dados do projeto (observações, checklist, reuniões) serão incluídos automaticamente.
+                  </p>
+                </div>
+              </div>
+              <div className="px-6 py-4 border-t flex justify-end gap-2">
+                <Button variant="ghost" onClick={() => setAgentDialog(null)}>Cancelar</Button>
+                <Button
+                  disabled={gerarDocumento.isPending}
+                  onClick={() => {
+                    gerarDocumento.mutate(
+                      { tipo: agentDialog.tipo, projeto_id: projeto.id, contexto_usuario: contextoUsuario.trim() || undefined },
+                      {
+                        onSuccess: (conteudo) => {
+                          setAgentDialog(null);
+                          setViewingDoc({ tipo: agentDialog.label, conteudo });
+                          toast.success(`${agentDialog.label} gerado com sucesso!`);
+                        },
+                      }
+                    );
+                  }}
+                >
+                  {gerarDocumento.isPending ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Gerando...</>
+                  ) : (
+                    <><Sparkles className="h-4 w-4 mr-2" /> Gerar</>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Modal de visualização do documento gerado */}
         {viewingDoc && (
