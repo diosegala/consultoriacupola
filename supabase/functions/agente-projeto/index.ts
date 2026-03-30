@@ -77,7 +77,7 @@ serve(async (req) => {
     }
     const userId = claimsData.claims.sub;
 
-    const { tipo, projeto_id } = await req.json();
+    const { tipo, projeto_id, contexto_usuario } = await req.json();
 
     if (!tipo || !projeto_id) {
       return new Response(JSON.stringify({ error: "tipo e projeto_id são obrigatórios" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
