@@ -25,6 +25,7 @@ import {
   TipoConsultoriaComContratos, CRM
 } from '@/hooks/useDadosAuxiliares';
 import { useUserRoles, useAuthUsers, useAddUserRole, useDeleteUserRole } from '@/hooks/useUserRoles';
+import { useAgentePrompts, useUpdateAgentePrompt } from '@/hooks/useAgentePrompts';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
