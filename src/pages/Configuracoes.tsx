@@ -502,7 +502,7 @@ export default function Configuracoes() {
               <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin" /></div>
             ) : (
               ['diagnostico', 'okrs', 'briefing_cliente_oculto'].map(tipo => {
-                const hasChanges = editedPrompts[tipo] !== undefined;
+                const hasChanges = editedPrompts[tipo] !== undefined || editedModelos[tipo] !== undefined;
                 return (
                   <Card key={tipo} className="bg-card border-border">
                     <CardHeader className="flex flex-row items-center justify-between">
