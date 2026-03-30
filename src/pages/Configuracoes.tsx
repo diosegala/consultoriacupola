@@ -16,7 +16,8 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Plus, Pencil, Trash2, Loader2, ShieldCheck, KeyRound } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, ShieldCheck, KeyRound, Bot, Save } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   useTiposConsultoriaComContratos, useCreateTipoConsultoria, useUpdateTipoConsultoria,
@@ -24,6 +25,7 @@ import {
   TipoConsultoriaComContratos, CRM
 } from '@/hooks/useDadosAuxiliares';
 import { useUserRoles, useAuthUsers, useAddUserRole, useDeleteUserRole } from '@/hooks/useUserRoles';
+import { useAgentePrompts, useUpdateAgentePrompt } from '@/hooks/useAgentePrompts';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
@@ -76,6 +78,34 @@ export default function Configuracoes() {
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserRole, setNewUserRole] = useState<'consultor' | 'director'>('consultor');
   const [creatingUser, setCreatingUser] = useState(false);
+
+  // Agente prompts (admin only)
+  const { data: agentePrompts, isLoading: loadingPrompts } = useAgentePrompts();
+  const updatePrompt = useUpdateAgentePrompt();
+  const [editedPrompts, setEditedPrompts] = useState<Record<string, string>>({});
+
+  const getPromptValue = (tipo: string) => {
+    if (editedPrompts[tipo] !== undefined) return editedPrompts[tipo];
+    return agentePrompts?.find(p => p.tipo === tipo)?.prompt || '';
+  };
+
+  const handleSavePrompt = async (tipo: string) => {
+    const prompt = agentePrompts?.find(p => p.tipo === tipo);
+    if (!prompt) return;
+    try {
+      await updatePrompt.mutateAsync({ id: prompt.id, prompt: editedPrompts[tipo] ?? prompt.prompt });
+      toast({ title: 'Sucesso', description: 'Prompt atualizado com sucesso' });
+      setEditedPrompts(prev => { const n = { ...prev }; delete n[tipo]; return n; });
+    } catch (error: any) {
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  const TIPO_LABELS: Record<string, string> = {
+    diagnostico: 'Diagnóstico',
+    okrs: 'OKRs',
+    briefing_cliente_oculto: 'Briefing Cliente Oculto',
+  };
 
   // Password change
   const [novaSenha, setNovaSenha] = useState('');
@@ -249,6 +279,7 @@ export default function Configuracoes() {
         <TabsList className="bg-secondary">
           <TabsTrigger value="conta">Minha Conta</TabsTrigger>
           {isAdmin && <TabsTrigger value="usuarios">Usuários</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="agentes">Agentes IA</TabsTrigger>}
           <TabsTrigger value="tipos">Tipos de Consultoria</TabsTrigger>
           <TabsTrigger value="crms">CRMs</TabsTrigger>
         </TabsList>
@@ -453,6 +484,46 @@ export default function Configuracoes() {
             </CardContent>
           </Card>
         </TabsContent>
+        {/* Agentes IA (admin only) */}
+        {isAdmin && (
+          <TabsContent value="agentes" className="mt-6 space-y-4">
+            {loadingPrompts ? (
+              <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin" /></div>
+            ) : (
+              ['diagnostico', 'okrs', 'briefing_cliente_oculto'].map(tipo => {
+                const hasChanges = editedPrompts[tipo] !== undefined;
+                return (
+                  <Card key={tipo} className="bg-card border-border">
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <CardTitle className="flex items-center gap-2 text-foreground text-base">
+                        <Bot className="h-5 w-5 text-primary" />
+                        {TIPO_LABELS[tipo]}
+                      </CardTitle>
+                      <Button
+                        size="sm"
+                        disabled={!hasChanges || updatePrompt.isPending}
+                        onClick={() => handleSavePrompt(tipo)}
+                        className="bg-primary text-primary-foreground hover:bg-primary/90"
+                      >
+                        {updatePrompt.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                        Salvar
+                      </Button>
+                    </CardHeader>
+                    <CardContent>
+                      <Textarea
+                        className="bg-input border-border min-h-[200px] font-mono text-sm"
+                        value={getPromptValue(tipo)}
+                        onChange={(e) => setEditedPrompts(prev => ({ ...prev, [tipo]: e.target.value }))}
+                        placeholder="Insira o prompt do agente..."
+                      />
+                    </CardContent>
+                  </Card>
+                );
+              })
+            )}
+          </TabsContent>
+        )}
+
       </Tabs>
 
       {/* Dialog Tipo de Consultoria */}

@@ -6,51 +6,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const PROMPTS: Record<string, string> = {
-  diagnostico: `Você é um consultor sênior especializado em diagnóstico empresarial. Com base nas informações fornecidas sobre o cliente (observações de imersão, reuniões realizadas, checklist e dados gerais), elabore um diagnóstico completo e estruturado em markdown.
-
-O diagnóstico deve conter:
-1. **Resumo Executivo** — visão geral da situação do cliente
-2. **Pontos Fortes Identificados** — o que o cliente faz bem
-3. **Problemas e Gargalos** — principais dificuldades encontradas
-4. **Oportunidades de Melhoria** — ações que podem ser implementadas
-5. **Prioridades Recomendadas** — ranking das ações mais urgentes
-6. **Próximos Passos** — sugestões de ações imediatas
-
-Seja objetivo, use bullet points quando apropriado e mantenha um tom profissional.`,
-
-  okrs: `Você é um especialista em planejamento estratégico e metodologia OKR (Objectives and Key Results). Com base nas informações fornecidas sobre o cliente (observações, reuniões, diagnóstico prévio), crie um conjunto de OKRs para o próximo trimestre.
-
-Gere entre 3 e 5 Objetivos, cada um com 2 a 4 Resultados-Chave mensuráveis. Use o formato:
-
-**Objetivo 1: [Descrição clara do objetivo]**
-- KR1: [Resultado-chave mensurável com meta numérica]
-- KR2: [Resultado-chave mensurável com meta numérica]
-- KR3: [Resultado-chave mensurável com meta numérica]
-
-Os OKRs devem ser:
-- Alinhados com os problemas e oportunidades do cliente
-- Mensuráveis e com prazo definido
-- Ambiciosos mas alcançáveis
-- Focados em resultados, não em tarefas`,
-
-  briefing_cliente_oculto: `Você é um especialista em customer experience e cliente oculto. Com base nas informações fornecidas sobre o cliente (tipo de negócio, localização, observações da imersão, reuniões), elabore um briefing completo para a equipe de backoffice realizar a avaliação de cliente oculto.
-
-O briefing deve conter em markdown:
-
-1. **Dados do Estabelecimento** — nome, cidade, UF, segmento
-2. **Objetivo da Avaliação** — o que queremos avaliar especificamente
-3. **Pontos de Atenção Prioritários** — baseados nas observações e reuniões
-4. **Critérios de Avaliação** — lista de itens a serem observados:
-   - Atendimento (cordialidade, tempo de espera, proatividade)
-   - Ambiente (limpeza, organização, sinalização)
-   - Produto/Serviço (qualidade, apresentação, preço)
-   - Processos (fluxo de atendimento, follow-up, pós-venda)
-5. **Roteiro Sugerido** — passo a passo do que o cliente oculto deve fazer
-6. **Perguntas-Chave** — questões que o avaliador deve tentar responder
-7. **Observações Específicas** — qualquer particularidade a considerar
-
-Seja detalhado e prático para que a equipe consiga executar sem dúvidas.`,
+const FALLBACK_PROMPTS: Record<string, string> = {
+  diagnostico: "Você é um consultor sênior. Elabore um diagnóstico empresarial completo em markdown.",
+  okrs: "Você é um especialista em OKRs. Crie OKRs para o próximo trimestre em markdown.",
+  briefing_cliente_oculto: "Você é um especialista em cliente oculto. Elabore um briefing completo em markdown.",
 };
 
 serve(async (req) => {
@@ -83,7 +42,8 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "tipo e projeto_id são obrigatórios" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    if (!PROMPTS[tipo]) {
+    const validTypes = ["diagnostico", "okrs", "briefing_cliente_oculto"];
+    if (!validTypes.includes(tipo)) {
       return new Response(JSON.stringify({ error: "Tipo inválido. Use: diagnostico, okrs, briefing_cliente_oculto" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
@@ -91,6 +51,16 @@ serve(async (req) => {
     if (!GOOGLE_GEMINI_API_KEY) {
       return new Response(JSON.stringify({ error: "GOOGLE_GEMINI_API_KEY não configurada" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+
+    // Fetch prompt from database using service role
+    const serviceClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const { data: promptData } = await serviceClient
+      .from("agente_prompts")
+      .select("prompt")
+      .eq("tipo", tipo)
+      .single();
+
+    const promptBase = promptData?.prompt || FALLBACK_PROMPTS[tipo];
 
     // Fetch project context
     const { data: projeto, error: projetoError } = await supabase
@@ -103,7 +73,6 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Projeto não encontrado" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Fetch reuniões do cliente
     const { data: reunioes } = await supabase
       .from("reunioes")
       .select("data_reuniao, duracao_minutos, resumo_ia, score_ia, analise_ia, score_cliente, analise_cliente")
@@ -112,21 +81,18 @@ serve(async (req) => {
       .order("data_reuniao", { ascending: false })
       .limit(10);
 
-    // Fetch checklist
     const { data: checklist } = await supabase
       .from("projeto_checklist")
       .select("titulo, concluido")
       .eq("projeto_id", projeto_id)
       .order("ordem");
 
-    // Fetch onboarding
     const { data: onboarding } = await supabase
       .from("onboarding")
       .select("*")
       .eq("cliente_id", projeto.cliente_id)
       .limit(1);
 
-    // Build context
     const contexto = `
 ## Dados do Cliente
 - Nome: ${projeto.clientes?.nome ?? "N/A"}
@@ -155,7 +121,7 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
       ? `\n\n## Anotações e Transcrições do Consultor\n${contexto_usuario}`
       : '';
 
-    const promptCompleto = `${PROMPTS[tipo]}\n\n---\n\nINFORMAÇÕES DO CLIENTE:\n\n${contexto}${contextoUsuarioSection}`;
+    const promptCompleto = `${promptBase}\n\n---\n\nINFORMAÇÕES DO CLIENTE:\n\n${contexto}${contextoUsuarioSection}`;
     const candidateModels = ["gemini-2.5-pro", "gemini-2.5-flash"];
 
     let conteudo = "";
@@ -169,15 +135,8 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            contents: [
-              {
-                parts: [{ text: promptCompleto }],
-              },
-            ],
-            generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 4096,
-            },
+            contents: [{ parts: [{ text: promptCompleto }] }],
+            generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
           }),
         }
       );
@@ -186,7 +145,6 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
         const geminiData = await geminiResponse.json();
         conteudo = geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
         if (conteudo) break;
-        lastStatus = 500;
         lastErrorMessage = `O modelo ${model} não retornou conteúdo.`;
         continue;
       }
@@ -197,16 +155,14 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
 
       if (geminiResponse.status === 429) {
         lastErrorMessage = model === "gemini-2.5-pro"
-          ? "Sua chave do Google está sem cota disponível para Gemini Pro no momento. Tentando fallback automaticamente."
-          : "Sua chave do Google está sem cota disponível no momento. Verifique billing e limites da API Gemini.";
+          ? "Cota indisponível para Gemini Pro. Tentando fallback."
+          : "Cota indisponível. Verifique billing da API Gemini.";
         continue;
       }
-
       if (geminiResponse.status === 404) {
-        lastErrorMessage = `O modelo ${model} não está disponível para esta chave/API version.`;
+        lastErrorMessage = `Modelo ${model} não disponível.`;
         continue;
       }
-
       lastErrorMessage = `Erro do Gemini (${geminiResponse.status}).`;
     }
 
@@ -217,20 +173,11 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
       });
     }
 
-    // Save to projeto_documentos
-    const serviceClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const { error: insertError } = await serviceClient
       .from("projeto_documentos")
-      .insert({
-        projeto_id,
-        tipo,
-        conteudo,
-        created_by: userId,
-      });
+      .insert({ projeto_id, tipo, conteudo, created_by: userId });
 
-    if (insertError) {
-      console.error("Insert error:", insertError);
-    }
+    if (insertError) console.error("Insert error:", insertError);
 
     return new Response(JSON.stringify({ conteudo }), {
       status: 200,
