@@ -279,6 +279,7 @@ export default function Configuracoes() {
         <TabsList className="bg-secondary">
           <TabsTrigger value="conta">Minha Conta</TabsTrigger>
           {isAdmin && <TabsTrigger value="usuarios">Usuários</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="agentes">Agentes IA</TabsTrigger>}
           <TabsTrigger value="tipos">Tipos de Consultoria</TabsTrigger>
           <TabsTrigger value="crms">CRMs</TabsTrigger>
         </TabsList>
