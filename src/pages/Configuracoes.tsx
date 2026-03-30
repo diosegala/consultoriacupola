@@ -79,6 +79,34 @@ export default function Configuracoes() {
   const [newUserRole, setNewUserRole] = useState<'consultor' | 'director'>('consultor');
   const [creatingUser, setCreatingUser] = useState(false);
 
+  // Agente prompts (admin only)
+  const { data: agentePrompts, isLoading: loadingPrompts } = useAgentePrompts();
+  const updatePrompt = useUpdateAgentePrompt();
+  const [editedPrompts, setEditedPrompts] = useState<Record<string, string>>({});
+
+  const getPromptValue = (tipo: string) => {
+    if (editedPrompts[tipo] !== undefined) return editedPrompts[tipo];
+    return agentePrompts?.find(p => p.tipo === tipo)?.prompt || '';
+  };
+
+  const handleSavePrompt = async (tipo: string) => {
+    const prompt = agentePrompts?.find(p => p.tipo === tipo);
+    if (!prompt) return;
+    try {
+      await updatePrompt.mutateAsync({ id: prompt.id, prompt: editedPrompts[tipo] ?? prompt.prompt });
+      toast({ title: 'Sucesso', description: 'Prompt atualizado com sucesso' });
+      setEditedPrompts(prev => { const n = { ...prev }; delete n[tipo]; return n; });
+    } catch (error: any) {
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  const TIPO_LABELS: Record<string, string> = {
+    diagnostico: 'Diagnóstico',
+    okrs: 'OKRs',
+    briefing_cliente_oculto: 'Briefing Cliente Oculto',
+  };
+
   // Password change
   const [novaSenha, setNovaSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
