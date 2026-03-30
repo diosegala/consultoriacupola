@@ -1,86 +1,51 @@
 
 
-## Agentes de IA no Kanban de Projetos
+## Transformar agentes em interface conversacional com input de contexto
 
-### O que sera feito
+### Problema atual
+Os botoes de agente geram documentos automaticamente usando apenas os dados ja salvos no projeto. O usuario precisa poder fornecer suas proprias anotacoes, transcricoes e gravacoes como contexto antes de gerar.
 
-Criar 3 agentes de IA acessiveis dentro do card de detalhe do projeto (ProjetoDetalheSheet), cada um com um botao dedicado. Os agentes usam a API do Google Gemini via edge function com a chave do usuario.
+### Solucao
 
-**Agentes:**
-1. **Gerar Diagnostico** -- produz diagnostico do cliente com base nas observacoes/anotacoes de imersao do projeto
-2. **Gerar OKRs** -- cria objetivos e resultados-chave para o cliente
-3. **Gerar Briefing Cliente Oculto** -- produz briefing para a equipe de backoffice iniciar o cliente oculto
-
-### Arquitetura
-
-```text
-ProjetoDetalheSheet
-  └─ Botoes "Diagnostico" / "OKRs" / "Briefing"
-       │
-       ▼
-  supabase.functions.invoke('agente-projeto', { tipo, contexto })
-       │
-       ▼
-  Edge Function "agente-projeto"
-       │  (prompts especificos por tipo)
-       ▼
-  Google Gemini API (chave do usuario)
-       │
-       ▼
-  Retorna documento gerado → salvo na tabela projeto_documentos
-```
+Ao clicar em "Gerar Diagnostico" (ou OKRs, ou Briefing), em vez de disparar a geracao direto, abre um **dialog de input** onde o consultor pode:
+- Colar anotacoes de imersao (textarea)
+- Colar transcricoes de reunioes (textarea)
+- Opcionalmente anexar arquivos (futuro)
+- Ver que dados do projeto ja serao incluidos automaticamente (observacoes, checklist, reunioes)
+- Clicar em "Gerar" so quando estiver satisfeito com o contexto
 
 ### Alteracoes
 
-#### 1. Secret: GOOGLE_GEMINI_API_KEY
-- Solicitar ao usuario a chave da API do Google via `add_secret`
+**`src/components/projetos/ProjetoDetalheSheet.tsx`**
+- Substituir o onClick dos botoes de agente: em vez de chamar `gerarDocumento.mutate()` direto, abrir um novo state `agentDialog` com o tipo selecionado
+- Novo dialog com:
+  - Titulo: "Gerar [Diagnostico/OKRs/Briefing]"
+  - Texto explicativo: "Insira as informacoes que o agente deve considerar"
+  - Textarea grande para "Anotacoes / Transcricoes" (placeholder contextual por tipo)
+  - Indicador de contexto automatico: "Dados do projeto (observacoes, checklist, reunioes) serao incluidos automaticamente"
+  - Botao "Gerar" que envia o texto do usuario junto com o tipo
 
-#### 2. Banco de dados (migracao)
-Nova tabela `projeto_documentos`:
-- `id` uuid PK
-- `projeto_id` uuid NOT NULL
-- `tipo` text NOT NULL (diagnostico, okrs, briefing_cliente_oculto)
-- `conteudo` text NOT NULL (markdown gerado pela IA)
-- `created_at` timestamptz
-- `created_by` uuid (user_id)
-- RLS: mesmas politicas dos projetos (authorized_user OR consultor do projeto)
+**`src/hooks/useProjetoDocumentos.ts`**
+- Alterar mutation para aceitar campo opcional `contexto_usuario: string`
 
-#### 3. Edge function `agente-projeto/index.ts` (nova)
-- Recebe `{ tipo, projeto_id }`
-- Busca contexto do projeto: observacoes, cliente (nome, cidade, uf), reunioes, checklist
-- Seleciona prompt especializado por tipo:
-  - **diagnostico**: analisa anotacoes de imersao, identifica problemas, oportunidades, prioridades
-  - **okrs**: gera objetivos e key results baseados no contexto do cliente
-  - **briefing_cliente_oculto**: gera briefing estruturado para equipe de backoffice
-- Chama Google Gemini API (`generativelanguage.googleapis.com`) com a GOOGLE_GEMINI_API_KEY
-- Salva resultado em `projeto_documentos`
-- Retorna o conteudo gerado
+**`supabase/functions/agente-projeto/index.ts`**
+- Aceitar campo `contexto_usuario` no body
+- Concatenar o contexto fornecido pelo usuario ao contexto automatico do projeto, dando prioridade ao input do usuario no prompt
 
-#### 4. Hook `useProjetoDocumentos.ts` (novo)
-- `useProjetoDocumentos(projetoId)` -- lista documentos do projeto
-- `useGerarDocumento()` -- mutation que invoca a edge function
+### Fluxo revisado
 
-#### 5. UI: `ProjetoDetalheSheet.tsx`
-- Adicionar secao "Agentes IA" com 3 botoes (icones: FileText, Target, ClipboardList)
-- Ao clicar, chama a edge function e mostra loading
-- Resultado exibido em um dialog/modal com o conteudo em markdown renderizado
-- Lista de documentos ja gerados abaixo dos botoes, com data e tipo
-- Botao para re-gerar (sobrescreve ou cria novo)
-
-### Fluxo do usuario
-
-1. Abre o card do projeto no Kanban
-2. Ve secao "Agentes IA" com 3 botoes
-3. Clica em "Gerar Diagnostico" → loading → resultado aparece em modal
-4. Documento fica salvo e acessivel na lista do card
-5. Pode gerar novamente ou gerar outros tipos
+1. Consultor abre card do projeto
+2. Clica em "Gerar Diagnostico"
+3. Abre dialog com textarea para colar anotacoes/transcricoes
+4. Consultor cola seu conteudo e clica "Gerar"
+5. Edge function combina input do usuario + dados do projeto e envia ao Gemini
+6. Resultado exibido no modal de visualizacao
 
 ### Arquivos
 
 | Arquivo | Acao |
 |---------|------|
-| Migracao SQL | Criar tabela `projeto_documentos` com RLS |
-| `supabase/functions/agente-projeto/index.ts` | Criar -- edge function com 3 prompts |
-| `src/hooks/useProjetoDocumentos.ts` | Criar -- hook para documentos |
-| `src/components/projetos/ProjetoDetalheSheet.tsx` | Editar -- adicionar botoes e modal de resultado |
+| `src/components/projetos/ProjetoDetalheSheet.tsx` | Dialog de input antes da geracao |
+| `src/hooks/useProjetoDocumentos.ts` | Aceitar `contexto_usuario` |
+| `supabase/functions/agente-projeto/index.ts` | Processar `contexto_usuario` |
 
