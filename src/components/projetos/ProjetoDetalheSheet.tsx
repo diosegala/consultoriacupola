@@ -425,9 +425,95 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
                   ))}
                 </div>
               </div>
+
+              <Separator />
+
+              {/* Agentes IA */}
+              <div>
+                <h4 className="text-sm font-medium mb-2 flex items-center gap-1">
+                  <Sparkles className="h-4 w-4" /> Agentes IA
+                </h4>
+                <div className="space-y-2">
+                  {[
+                    { tipo: 'diagnostico', label: 'Diagnóstico', icon: FileText },
+                    { tipo: 'okrs', label: 'OKRs', icon: Target },
+                    { tipo: 'briefing_cliente_oculto', label: 'Briefing Cliente Oculto', icon: ClipboardList },
+                  ].map(agent => {
+                    const isLoading = gerarDocumento.isPending && gerarDocumento.variables?.tipo === agent.tipo;
+                    const existingDoc = documentos?.find(d => d.tipo === agent.tipo);
+                    return (
+                      <div key={agent.tipo} className="space-y-1">
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs flex-1 justify-start"
+                            disabled={gerarDocumento.isPending}
+                            onClick={() => {
+                              gerarDocumento.mutate(
+                                { tipo: agent.tipo, projeto_id: projeto.id },
+                                {
+                                  onSuccess: (conteudo) => {
+                                    setViewingDoc({ tipo: agent.label, conteudo });
+                                    toast.success(`${agent.label} gerado com sucesso!`);
+                                  },
+                                }
+                              );
+                            }}
+                          >
+                            {isLoading ? (
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            ) : (
+                              <agent.icon className="h-3 w-3 mr-1" />
+                            )}
+                            {isLoading ? 'Gerando...' : `Gerar ${agent.label}`}
+                          </Button>
+                          {existingDoc && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0"
+                              onClick={() => setViewingDoc({ tipo: agent.label, conteudo: existingDoc.conteudo })}
+                            >
+                              <Eye className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                        {existingDoc && (
+                          <p className="text-[10px] text-muted-foreground pl-1">
+                            Último: {format(new Date(existingDoc.created_at), 'dd/MM/yy HH:mm')}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         </ScrollArea>
+
+        {/* Modal de visualização do documento gerado */}
+        {viewingDoc && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60" onClick={() => setViewingDoc(null)}>
+            <div
+              className="bg-background rounded-lg shadow-lg max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-6 py-4 border-b">
+                <h3 className="font-semibold">{viewingDoc.tipo}</h3>
+                <Button variant="ghost" size="icon" onClick={() => setViewingDoc(null)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <ScrollArea className="flex-1 px-6 py-4">
+                <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
+                  {viewingDoc.conteudo}
+                </div>
+              </ScrollArea>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
