@@ -16,7 +16,8 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Plus, Pencil, Trash2, Loader2, ShieldCheck, KeyRound } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, ShieldCheck, KeyRound, Bot, Save } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   useTiposConsultoriaComContratos, useCreateTipoConsultoria, useUpdateTipoConsultoria,
