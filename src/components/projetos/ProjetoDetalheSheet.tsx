@@ -45,7 +45,7 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
   const [newTagName, setNewTagName] = useState('');
   const [newTagColor, setNewTagColor] = useState(TAG_COLORS[0]);
   const [authUsers, setAuthUsers] = useState<{ id: string; email: string }[]>([]);
-
+  const [viewingDoc, setViewingDoc] = useState<{ tipo: string; conteudo: string } | null>(null);
   useEffect(() => {
     if (open) {
       supabase.functions.invoke('list-auth-users').then(({ data }) => {
