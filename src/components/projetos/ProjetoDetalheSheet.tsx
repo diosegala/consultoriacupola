@@ -437,9 +437,9 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
                 </h4>
                 <div className="space-y-2">
                   {[
-                    { tipo: 'diagnostico', label: 'Diagnóstico', icon: FileText },
-                    { tipo: 'okrs', label: 'OKRs', icon: Target },
-                    { tipo: 'briefing_cliente_oculto', label: 'Briefing Cliente Oculto', icon: ClipboardList },
+                    { tipo: 'diagnostico', label: 'Diagnóstico', icon: FileText, placeholder: 'Cole aqui suas anotações da imersão, transcrições de reuniões, observações sobre o cliente, dados relevantes...' },
+                    { tipo: 'okrs', label: 'OKRs', icon: Target, placeholder: 'Cole aqui o diagnóstico, anotações de reuniões, metas discutidas com o cliente, contexto estratégico...' },
+                    { tipo: 'briefing_cliente_oculto', label: 'Briefing Cliente Oculto', icon: ClipboardList, placeholder: 'Cole aqui informações sobre o estabelecimento, tipo de atendimento, pontos críticos observados na imersão...' },
                   ].map(agent => {
                     const isLoading = gerarDocumento.isPending && gerarDocumento.variables?.tipo === agent.tipo;
                     const existingDoc = documentos?.find(d => d.tipo === agent.tipo);
@@ -452,15 +452,8 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
                             className="h-7 text-xs flex-1 justify-start"
                             disabled={gerarDocumento.isPending}
                             onClick={() => {
-                              gerarDocumento.mutate(
-                                { tipo: agent.tipo, projeto_id: projeto.id },
-                                {
-                                  onSuccess: (conteudo) => {
-                                    setViewingDoc({ tipo: agent.label, conteudo });
-                                    toast.success(`${agent.label} gerado com sucesso!`);
-                                  },
-                                }
-                              );
+                              setContextoUsuario('');
+                              setAgentDialog({ tipo: agent.tipo, label: agent.label });
                             }}
                           >
                             {isLoading ? (
