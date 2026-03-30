@@ -65,6 +65,8 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
   const { data: reunioes } = useReunioesByConsultor(projeto?.consultor_id);
   const { data: allTags } = useProjetoTags();
   const { data: tagVinculos } = useProjetoTagVinculos(projeto?.id);
+  const { data: documentos } = useProjetoDocumentos(projeto?.id);
+  const gerarDocumento = useGerarDocumento();
 
   const createComentario = useCreateComentario();
   const deleteComentario = useDeleteComentario();
