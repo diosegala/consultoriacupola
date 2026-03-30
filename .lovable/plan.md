@@ -1,65 +1,86 @@
 
 
-## Avaliacao de Engajamento do Cliente + Grafico no Dashboard
+## Agentes de IA no Kanban de Projetos
 
-### Conceito
+### O que sera feito
 
-A avaliacao do cliente fica separada da do consultor. Na pagina de detalhe do cliente (`/clientes/:id`), uma nova aba "Desempenho" mostra as reunioes do cliente com scores de engajamento, no mesmo formato visual usado para o consultor. No Dashboard, um grafico de barras horizontais mostra ranking de clientes por engajamento.
+Criar 3 agentes de IA acessiveis dentro do card de detalhe do projeto (ProjetoDetalheSheet), cada um com um botao dedicado. Os agentes usam a API do Google Gemini via edge function com a chave do usuario.
+
+**Agentes:**
+1. **Gerar Diagnostico** -- produz diagnostico do cliente com base nas observacoes/anotacoes de imersao do projeto
+2. **Gerar OKRs** -- cria objetivos e resultados-chave para o cliente
+3. **Gerar Briefing Cliente Oculto** -- produz briefing para a equipe de backoffice iniciar o cliente oculto
+
+### Arquitetura
+
+```text
+ProjetoDetalheSheet
+  └─ Botoes "Diagnostico" / "OKRs" / "Briefing"
+       │
+       ▼
+  supabase.functions.invoke('agente-projeto', { tipo, contexto })
+       │
+       ▼
+  Edge Function "agente-projeto"
+       │  (prompts especificos por tipo)
+       ▼
+  Google Gemini API (chave do usuario)
+       │
+       ▼
+  Retorna documento gerado → salvo na tabela projeto_documentos
+```
 
 ### Alteracoes
 
-#### 1. Banco de dados (migracao)
-- Adicionar `score_cliente` (numeric, nullable) e `analise_cliente` (jsonb, nullable) na tabela `reunioes`
+#### 1. Secret: GOOGLE_GEMINI_API_KEY
+- Solicitar ao usuario a chave da API do Google via `add_secret`
 
-#### 2. Edge function `analisar-reuniao/index.ts`
-- Apos a analise do consultor, fazer uma segunda chamada de IA com prompt focado no cliente
-- 5 criterios: Participacao Ativa, Abertura a Sugestoes, Comprometimento com Acoes, Clareza nas Demandas, Engajamento Estrategico
-- Salvar em `score_cliente` e `analise_cliente` (mesmo formato: criterios + pontos fortes/melhoria + resumo)
+#### 2. Banco de dados (migracao)
+Nova tabela `projeto_documentos`:
+- `id` uuid PK
+- `projeto_id` uuid NOT NULL
+- `tipo` text NOT NULL (diagnostico, okrs, briefing_cliente_oculto)
+- `conteudo` text NOT NULL (markdown gerado pela IA)
+- `created_at` timestamptz
+- `created_by` uuid (user_id)
+- RLS: mesmas politicas dos projetos (authorized_user OR consultor do projeto)
 
-#### 3. Nova aba "Desempenho" na pagina do cliente
-**`src/components/cliente/DesempenhoClienteTab.tsx`** (novo)
-- Recebe `clienteId` como prop
-- Busca reunioes do cliente que tenham `analise_cliente` preenchida
-- Exibe: score medio de engajamento, lista de reunioes com notas por criterio, pontos fortes e de melhoria
-- Formato visual similar ao `ReuniaoAnalise.tsx` (barras de progresso, badges)
+#### 3. Edge function `agente-projeto/index.ts` (nova)
+- Recebe `{ tipo, projeto_id }`
+- Busca contexto do projeto: observacoes, cliente (nome, cidade, uf), reunioes, checklist
+- Seleciona prompt especializado por tipo:
+  - **diagnostico**: analisa anotacoes de imersao, identifica problemas, oportunidades, prioridades
+  - **okrs**: gera objetivos e key results baseados no contexto do cliente
+  - **briefing_cliente_oculto**: gera briefing estruturado para equipe de backoffice
+- Chama Google Gemini API (`generativelanguage.googleapis.com`) com a GOOGLE_GEMINI_API_KEY
+- Salva resultado em `projeto_documentos`
+- Retorna o conteudo gerado
 
-**`src/pages/ClienteDetalhe.tsx`**
-- Adicionar quinta aba "Desempenho" com icone BarChart3
+#### 4. Hook `useProjetoDocumentos.ts` (novo)
+- `useProjetoDocumentos(projetoId)` -- lista documentos do projeto
+- `useGerarDocumento()` -- mutation que invoca a edge function
 
-#### 4. Relatorio PDF do cliente
-**`src/pages/RelatorioCliente.tsx`** (novo)
-- Mesmo design system Cupola (Barlow Condensed, paleta cupola) usado no relatorio do consultor
-- Secoes: header, score hero, media por criterio, evolucao do score, cards de reuniao com analise do cliente
-- Botao "Gerar Relatorio" na aba Desempenho
+#### 5. UI: `ProjetoDetalheSheet.tsx`
+- Adicionar secao "Agentes IA" com 3 botoes (icones: FileText, Target, ClipboardList)
+- Ao clicar, chama a edge function e mostra loading
+- Resultado exibido em um dialog/modal com o conteudo em markdown renderizado
+- Lista de documentos ja gerados abaixo dos botoes, com data e tipo
+- Botao para re-gerar (sobrescreve ou cria novo)
 
-**`src/App.tsx`**
-- Adicionar rota `/clientes/:id/relatorio`
+### Fluxo do usuario
 
-#### 5. Grafico de engajamento no Dashboard
-**`src/hooks/useDashboard.ts`**
-- Novo hook `useEngajamentoClientes` que busca reunioes com `score_cliente` nao nulo, agrupa por cliente e calcula media
-
-**`src/pages/Dashboard.tsx`**
-- Novo card "Engajamento dos Clientes" com grafico de barras horizontais (Recharts)
-- Barras ordenadas do mais engajado ao menos engajado
-- Cores: verde para score >= 8, amarelo >= 6, vermelho < 6
-- Mostra nome do cliente + score medio
-
-#### 6. Tipos
-**`src/hooks/useReunioes.ts`**
-- Adicionar `score_cliente` e `analise_cliente` ao tipo `Reuniao`
+1. Abre o card do projeto no Kanban
+2. Ve secao "Agentes IA" com 3 botoes
+3. Clica em "Gerar Diagnostico" → loading → resultado aparece em modal
+4. Documento fica salvo e acessivel na lista do card
+5. Pode gerar novamente ou gerar outros tipos
 
 ### Arquivos
 
 | Arquivo | Acao |
 |---------|------|
-| Migracao SQL | Adicionar `score_cliente`, `analise_cliente` em reunioes |
-| `supabase/functions/analisar-reuniao/index.ts` | Segunda chamada de IA para cliente |
-| `src/components/cliente/DesempenhoClienteTab.tsx` | Criar -- aba de desempenho |
-| `src/pages/ClienteDetalhe.tsx` | Adicionar aba Desempenho |
-| `src/pages/RelatorioCliente.tsx` | Criar -- relatorio PDF do cliente |
-| `src/App.tsx` | Rota `/clientes/:id/relatorio` |
-| `src/hooks/useReunioes.ts` | Atualizar tipos |
-| `src/hooks/useDashboard.ts` | Hook `useEngajamentoClientes` |
-| `src/pages/Dashboard.tsx` | Grafico de engajamento |
+| Migracao SQL | Criar tabela `projeto_documentos` com RLS |
+| `supabase/functions/agente-projeto/index.ts` | Criar -- edge function com 3 prompts |
+| `src/hooks/useProjetoDocumentos.ts` | Criar -- hook para documentos |
+| `src/components/projetos/ProjetoDetalheSheet.tsx` | Editar -- adicionar botoes e modal de resultado |
 
