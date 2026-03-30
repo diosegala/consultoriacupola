@@ -122,7 +122,11 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
       ? `\n\n## Anotações e Transcrições do Consultor\n${contexto_usuario}`
       : '';
 
-    const promptCompleto = `${promptBase}\n\n---\n\nINFORMAÇÕES DO CLIENTE:\n\n${contexto}${contextoUsuarioSection}`;
+    const documentoModeloSection = documentoModelo
+      ? `\n\n## Documento Modelo de Referência\n${documentoModelo}\n\nUse o documento acima como referência de estilo, tom e estrutura.`
+      : '';
+
+    const promptCompleto = `${promptBase}\n\n---\n\nINFORMAÇÕES DO CLIENTE:\n\n${contexto}${contextoUsuarioSection}${documentoModeloSection}`;
     const candidateModels = ["gemini-2.5-pro", "gemini-2.5-flash"];
 
     let conteudo = "";

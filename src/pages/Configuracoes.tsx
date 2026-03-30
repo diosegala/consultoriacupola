@@ -520,13 +520,25 @@ export default function Configuracoes() {
                         Salvar
                       </Button>
                     </CardHeader>
-                    <CardContent>
-                      <Textarea
-                        className="bg-input border-border min-h-[200px] font-mono text-sm"
-                        value={getPromptValue(tipo)}
-                        onChange={(e) => setEditedPrompts(prev => ({ ...prev, [tipo]: e.target.value }))}
-                        placeholder="Insira o prompt do agente..."
-                      />
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <Label className="text-muted-foreground text-xs uppercase tracking-wider">Prompt do Agente</Label>
+                        <Textarea
+                          className="bg-input border-border min-h-[200px] font-mono text-sm"
+                          value={getPromptValue(tipo)}
+                          onChange={(e) => setEditedPrompts(prev => ({ ...prev, [tipo]: e.target.value }))}
+                          placeholder="Insira o prompt do agente..."
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-muted-foreground text-xs uppercase tracking-wider">Documento Modelo (opcional)</Label>
+                        <Textarea
+                          className="bg-input border-border min-h-[150px] font-mono text-sm"
+                          value={getModeloValue(tipo)}
+                          onChange={(e) => setEditedModelos(prev => ({ ...prev, [tipo]: e.target.value }))}
+                          placeholder="Cole aqui um exemplo de documento já produzido para servir de referência de estilo, tom e estrutura..."
+                        />
+                      </div>
                     </CardContent>
                   </Card>
                 );
