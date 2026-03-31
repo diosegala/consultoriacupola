@@ -465,6 +465,8 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
                             disabled={gerarDocumento.isPending}
                             onClick={() => {
                               setContextoUsuario('');
+                              setUploadedFiles([]);
+                              setGdriveUrl('');
                               setAgentDialog({ tipo: agent.tipo, label: agent.label });
                             }}
                           >
