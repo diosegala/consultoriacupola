@@ -80,6 +80,7 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
   const { data: tagVinculos } = useProjetoTagVinculos(projeto?.id);
   const { data: documentos } = useProjetoDocumentos(projeto?.id);
   const gerarDocumento = useGerarDocumento();
+  const parseDocumento = useParseDocumento();
 
   const createComentario = useCreateComentario();
   const deleteComentario = useDeleteComentario();
