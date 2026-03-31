@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
-import { CalendarIcon, Plus, Trash2, MessageSquare, CheckSquare, Video, Send, Tag, X, FileText, Target, ClipboardList, Loader2, Eye, Sparkles } from 'lucide-react';
+import { CalendarIcon, Plus, Trash2, MessageSquare, CheckSquare, Video, Send, Tag, X, FileText, Target, ClipboardList, Loader2, Eye, Sparkles, Upload, Link as LinkIcon } from 'lucide-react';
 import { format, isPast } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -22,7 +22,7 @@ import { useProjetoChecklist, useCreateChecklistItem, useToggleChecklistItem, us
 import { useConsultores } from '@/hooks/useConsultores';
 import { useReunioesByConsultor } from '@/hooks/useReunioes';
 import { useProjetoTags, useProjetoTagVinculos, useAddTagToProjeto, useRemoveTagFromProjeto, useCreateTag, TAG_COLORS } from '@/hooks/useProjetoTags';
-import { useProjetoDocumentos, useGerarDocumento } from '@/hooks/useProjetoDocumentos';
+import { useProjetoDocumentos, useGerarDocumento, useParseDocumento } from '@/hooks/useProjetoDocumentos';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -32,6 +32,13 @@ interface ProjetoDetalheSheetProps {
   onOpenChange: (open: boolean) => void;
   etapaNome?: string;
   onRegistrarReuniao: (projeto: Projeto) => void;
+}
+
+interface UploadedFile {
+  file: File;
+  name: string;
+  status: 'pending' | 'parsing' | 'done' | 'error';
+  texto?: string;
 }
 
 export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, onRegistrarReuniao }: ProjetoDetalheSheetProps) {
@@ -48,6 +55,10 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
   const [viewingDoc, setViewingDoc] = useState<{ tipo: string; conteudo: string } | null>(null);
   const [agentDialog, setAgentDialog] = useState<{ tipo: string; label: string } | null>(null);
   const [contextoUsuario, setContextoUsuario] = useState('');
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [gdriveUrl, setGdriveUrl] = useState('');
+  const [isParsing, setIsParsing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (open) {
       supabase.functions.invoke('list-auth-users').then(({ data }) => {
@@ -69,6 +80,7 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
   const { data: tagVinculos } = useProjetoTagVinculos(projeto?.id);
   const { data: documentos } = useProjetoDocumentos(projeto?.id);
   const gerarDocumento = useGerarDocumento();
+  const parseDocumento = useParseDocumento();
 
   const createComentario = useCreateComentario();
   const deleteComentario = useDeleteComentario();
@@ -453,6 +465,8 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
                             disabled={gerarDocumento.isPending}
                             onClick={() => {
                               setContextoUsuario('');
+                              setUploadedFiles([]);
+                              setGdriveUrl('');
                               setAgentDialog({ tipo: agent.tipo, label: agent.label });
                             }}
                           >
@@ -521,10 +535,96 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
                         { tipo: 'briefing_cliente_oculto', placeholder: 'Cole aqui informações sobre o estabelecimento, tipo de atendimento, pontos críticos observados na imersão...' },
                       ].find(a => a.tipo === agentDialog.tipo)?.placeholder ?? 'Cole aqui suas anotações...'
                     }
-                    rows={10}
+                    rows={6}
                     className="resize-none"
                   />
                 </div>
+
+                {/* Upload de arquivos */}
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block flex items-center gap-1.5">
+                    <Upload className="h-3.5 w-3.5" /> Arquivos (.pdf, .docx)
+                  </label>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      const newFiles: UploadedFile[] = files.map(f => ({
+                        file: f,
+                        name: f.name,
+                        status: 'pending' as const,
+                      }));
+                      setUploadedFiles(prev => [...prev, ...newFiles]);
+                      e.target.value = '';
+                    }}
+                  />
+                  <div
+                    className={cn(
+                      "border-2 border-dashed rounded-md p-4 text-center cursor-pointer transition-colors",
+                      "hover:border-primary/50 hover:bg-muted/30"
+                    )}
+                    onClick={() => fileInputRef.current?.click()}
+                    onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const files = Array.from(e.dataTransfer.files).filter(f =>
+                        f.name.endsWith('.pdf') || f.name.endsWith('.docx')
+                      );
+                      const newFiles: UploadedFile[] = files.map(f => ({
+                        file: f,
+                        name: f.name,
+                        status: 'pending' as const,
+                      }));
+                      setUploadedFiles(prev => [...prev, ...newFiles]);
+                    }}
+                  >
+                    <Upload className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground">
+                      Arraste arquivos ou clique para selecionar
+                    </p>
+                  </div>
+                  {uploadedFiles.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {uploadedFiles.map((f, i) => (
+                        <div key={i} className="flex items-center gap-2 text-xs p-1.5 rounded bg-muted/50">
+                          <FileText className="h-3.5 w-3.5 shrink-0" />
+                          <span className="flex-1 truncate">{f.name}</span>
+                          {f.status === 'parsing' && <Loader2 className="h-3 w-3 animate-spin" />}
+                          {f.status === 'done' && <span className="text-green-600 text-[10px]">✓</span>}
+                          {f.status === 'error' && <span className="text-destructive text-[10px]">✗</span>}
+                          <button
+                            className="text-muted-foreground hover:text-destructive"
+                            onClick={() => setUploadedFiles(prev => prev.filter((_, idx) => idx !== i))}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Link do Google Drive */}
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block flex items-center gap-1.5">
+                    <LinkIcon className="h-3.5 w-3.5" /> Link do Google Drive (opcional)
+                  </label>
+                  <Input
+                    value={gdriveUrl}
+                    onChange={e => setGdriveUrl(e.target.value)}
+                    placeholder="https://docs.google.com/document/d/..."
+                    className="h-8 text-sm"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    O arquivo deve estar compartilhado com "Qualquer pessoa com o link".
+                  </p>
+                </div>
+
                 <div className="rounded-md bg-muted/50 p-3">
                   <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                     <CheckSquare className="h-3.5 w-3.5" />
@@ -535,10 +635,62 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
               <div className="px-6 py-4 border-t flex justify-end gap-2">
                 <Button variant="ghost" onClick={() => setAgentDialog(null)}>Cancelar</Button>
                 <Button
-                  disabled={gerarDocumento.isPending}
-                  onClick={() => {
+                  disabled={gerarDocumento.isPending || isParsing}
+                  onClick={async () => {
+                    let contextoFinal = contextoUsuario.trim();
+
+                    // Parse files and GDrive URL
+                    const filesToParse = uploadedFiles.filter(f => f.status !== 'done');
+                    const hasWork = filesToParse.length > 0 || gdriveUrl.trim();
+
+                    if (hasWork) {
+                      setIsParsing(true);
+                      try {
+                        // Parse uploaded files
+                        for (let i = 0; i < uploadedFiles.length; i++) {
+                          const uf = uploadedFiles[i];
+                          if (uf.status === 'done' && uf.texto) {
+                            contextoFinal += `\n\n--- Arquivo: ${uf.name} ---\n${uf.texto}`;
+                            continue;
+                          }
+                          setUploadedFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'parsing' } : f));
+                          try {
+                            const buffer = await uf.file.arrayBuffer();
+                            const base64 = btoa(
+                              new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+                            );
+                            const tipo = uf.name.endsWith('.pdf') ? 'pdf' : 'docx';
+                            const result = await parseDocumento.mutateAsync({ tipo, conteudo_base64: base64, nome_arquivo: uf.name });
+                            setUploadedFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'done', texto: result } : f));
+                            contextoFinal += `\n\n--- Arquivo: ${uf.name} ---\n${result}`;
+                          } catch {
+                            setUploadedFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'error' } : f));
+                          }
+                        }
+
+                        // Parse GDrive URL
+                        if (gdriveUrl.trim()) {
+                          try {
+                            const result = await parseDocumento.mutateAsync({ gdrive_url: gdriveUrl.trim() });
+                            contextoFinal += `\n\n--- Google Drive ---\n${result}`;
+                          } catch {
+                            toast.error('Erro ao processar link do Google Drive');
+                          }
+                        }
+                      } finally {
+                        setIsParsing(false);
+                      }
+                    } else {
+                      // Include already-parsed files
+                      for (const uf of uploadedFiles) {
+                        if (uf.status === 'done' && uf.texto) {
+                          contextoFinal += `\n\n--- Arquivo: ${uf.name} ---\n${uf.texto}`;
+                        }
+                      }
+                    }
+
                     gerarDocumento.mutate(
-                      { tipo: agentDialog.tipo, projeto_id: projeto.id, contexto_usuario: contextoUsuario.trim() || undefined },
+                      { tipo: agentDialog.tipo, projeto_id: projeto.id, contexto_usuario: contextoFinal || undefined },
                       {
                         onSuccess: (conteudo) => {
                           setAgentDialog(null);
@@ -549,8 +701,8 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
                     );
                   }}
                 >
-                  {gerarDocumento.isPending ? (
-                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Gerando...</>
+                  {(gerarDocumento.isPending || isParsing) ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {isParsing ? 'Processando arquivos...' : 'Gerando...'}</>
                   ) : (
                     <><Sparkles className="h-4 w-4 mr-2" /> Gerar</>
                   )}

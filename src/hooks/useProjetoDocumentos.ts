@@ -27,6 +27,22 @@ export function useProjetoDocumentos(projetoId: string | undefined) {
   });
 }
 
+export function useParseDocumento() {
+  return useMutation({
+    mutationFn: async (params: { tipo?: string; conteudo_base64?: string; nome_arquivo?: string; gdrive_url?: string }) => {
+      const { data, error } = await supabase.functions.invoke('parse-documento', {
+        body: params,
+      });
+      if (error) throw new Error(error.message || 'Erro ao processar documento');
+      if (data?.error) throw new Error(data.error);
+      return data.texto as string;
+    },
+    onError: (err: Error) => {
+      toast.error(`Erro ao processar arquivo: ${err.message}`);
+    },
+  });
+}
+
 export function useGerarDocumento() {
   const queryClient = useQueryClient();
   return useMutation({
