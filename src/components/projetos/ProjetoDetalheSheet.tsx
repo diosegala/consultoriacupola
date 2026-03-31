@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
-import { CalendarIcon, Plus, Trash2, MessageSquare, CheckSquare, Video, Send, Tag, X, FileText, Target, ClipboardList, Loader2, Eye, Sparkles } from 'lucide-react';
+import { CalendarIcon, Plus, Trash2, MessageSquare, CheckSquare, Video, Send, Tag, X, FileText, Target, ClipboardList, Loader2, Eye, Sparkles, Upload, Link as LinkIcon } from 'lucide-react';
 import { format, isPast } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -22,7 +22,7 @@ import { useProjetoChecklist, useCreateChecklistItem, useToggleChecklistItem, us
 import { useConsultores } from '@/hooks/useConsultores';
 import { useReunioesByConsultor } from '@/hooks/useReunioes';
 import { useProjetoTags, useProjetoTagVinculos, useAddTagToProjeto, useRemoveTagFromProjeto, useCreateTag, TAG_COLORS } from '@/hooks/useProjetoTags';
-import { useProjetoDocumentos, useGerarDocumento } from '@/hooks/useProjetoDocumentos';
+import { useProjetoDocumentos, useGerarDocumento, useParseDocumento } from '@/hooks/useProjetoDocumentos';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -32,6 +32,13 @@ interface ProjetoDetalheSheetProps {
   onOpenChange: (open: boolean) => void;
   etapaNome?: string;
   onRegistrarReuniao: (projeto: Projeto) => void;
+}
+
+interface UploadedFile {
+  file: File;
+  name: string;
+  status: 'pending' | 'parsing' | 'done' | 'error';
+  texto?: string;
 }
 
 export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, onRegistrarReuniao }: ProjetoDetalheSheetProps) {
@@ -48,6 +55,10 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
   const [viewingDoc, setViewingDoc] = useState<{ tipo: string; conteudo: string } | null>(null);
   const [agentDialog, setAgentDialog] = useState<{ tipo: string; label: string } | null>(null);
   const [contextoUsuario, setContextoUsuario] = useState('');
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [gdriveUrl, setGdriveUrl] = useState('');
+  const [isParsing, setIsParsing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (open) {
       supabase.functions.invoke('list-auth-users').then(({ data }) => {
