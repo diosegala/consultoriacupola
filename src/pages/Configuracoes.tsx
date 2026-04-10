@@ -138,7 +138,11 @@ export default function Configuracoes() {
     try {
       const buffer = await file.arrayBuffer();
       const bytes = new Uint8Array(buffer);
-      const base64 = btoa(String.fromCharCode(...bytes));
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const base64 = btoa(binary);
       const texto = await parseDocumento.mutateAsync({ tipo: ext, conteudo_base64: base64 });
       setEditedModelos(prev => ({ ...prev, [tipo]: texto }));
       toast({ title: 'Sucesso', description: 'Texto extraído do arquivo com sucesso' });
