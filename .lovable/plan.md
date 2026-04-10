@@ -1,42 +1,33 @@
 
 
-## Adicionar OpenAI como provedor alternativo nos agentes
-
-### Contexto
-GPTs customizados não possuem API externa. A solução é usar a API Chat Completions da OpenAI com as mesmas instruções e documentos modelo que o usuário já configurou no builder de GPTs.
+## Upload de arquivos modelo (.pdf/.docx) na aba Agentes IA
 
 ### O que muda
 
-#### 1. Migração SQL — novo campo `provedor` na tabela `agente_prompts`
-- Adicionar coluna `provedor text NOT NULL DEFAULT 'gemini'`
-- Valores aceitos: `gemini`, `openai`
+Na aba "Agentes IA" em Configurações, cada card de agente ganha um botão de upload ao lado da textarea de "Documento Modelo". O admin pode:
+- Continuar colando texto manualmente na textarea (como já funciona)
+- **OU** clicar em "Enviar arquivo" para selecionar um .pdf ou .docx
+- O arquivo é enviado à edge function `parse-documento` (já existente) para extração de texto
+- O texto extraído é inserido automaticamente na textarea de documento modelo
+- O admin pode revisar/editar antes de salvar
 
-#### 2. Edge function `agente-projeto/index.ts`
-- Ler o campo `provedor` do prompt
-- Se `openai`: chamar `https://api.openai.com/v1/chat/completions` com modelo `gpt-4o` usando a chave `OPENAI_API_KEY`
-- Se `gemini`: manter comportamento atual
-- Fallback entre provedores se um falhar
+### Fluxo
+1. Admin clica no botão de upload (.pdf, .docx)
+2. Frontend converte para base64 e chama `parse-documento`
+3. Texto extraído preenche a textarea de documento modelo
+4. Admin salva normalmente
 
-#### 3. Secret `OPENAI_API_KEY`
-- Solicitar ao usuário sua API key da OpenAI (não é a mesma do ChatGPT Plus — é obtida em platform.openai.com)
-
-#### 4. UI — Configurações > Agentes IA
-- Adicionar um seletor (Select) em cada card de agente: "Provedor de IA" com opções Gemini / OpenAI
-- O seletor é salvo junto com o prompt
-
-### Fluxo do usuário
-1. Acesse Configurações > Agentes IA
-2. No agente "Diagnóstico", selecione "OpenAI" como provedor
-3. Cole as instruções do seu GPT no campo Prompt
-4. Cole documentos de referência no campo Documento Modelo
-5. Salve — a partir de agora o agente usa a OpenAI
-
-### Arquivos
+### Alterações
 
 | Arquivo | Ação |
 |---------|------|
-| Migração SQL | `ALTER TABLE agente_prompts ADD COLUMN provedor text NOT NULL DEFAULT 'gemini'` |
-| `supabase/functions/agente-projeto/index.ts` | Branch condicional Gemini vs OpenAI |
-| `src/hooks/useAgentePrompts.ts` | Incluir campo `provedor` |
-| `src/pages/Configuracoes.tsx` | Select de provedor por agente |
+| `src/pages/Configuracoes.tsx` | Adicionar botão de upload + lógica de parsing por agente |
+
+Nenhuma mudança de banco ou edge function — tudo já existe.
+
+### Detalhes técnicos
+- Reutiliza o hook `useParseDocumento` de `src/hooks/useProjetoDocumentos.ts`
+- Aceita `.pdf` e `.docx` (input file com accept)
+- Loading spinner durante o parsing
+- O texto extraído substitui o conteúdo atual da textarea (com confirmação se já houver texto)
 
