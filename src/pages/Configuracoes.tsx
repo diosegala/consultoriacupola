@@ -29,7 +29,6 @@ import { useAgentePrompts, useUpdateAgentePrompt } from '@/hooks/useAgentePrompt
 import { useParseDocumento } from '@/hooks/useProjetoDocumentos';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { useRef } from 'react';
 
 export default function Configuracoes() {
   const { toast } = useToast();
