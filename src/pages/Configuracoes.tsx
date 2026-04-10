@@ -510,7 +510,7 @@ export default function Configuracoes() {
               <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin" /></div>
             ) : (
               ['diagnostico', 'okrs', 'briefing_cliente_oculto'].map(tipo => {
-                const hasChanges = editedPrompts[tipo] !== undefined || editedModelos[tipo] !== undefined;
+                const hasChanges = editedPrompts[tipo] !== undefined || editedModelos[tipo] !== undefined || editedProvedores[tipo] !== undefined;
                 return (
                   <Card key={tipo} className="bg-card border-border">
                     <CardHeader className="flex flex-row items-center justify-between">
@@ -529,6 +529,18 @@ export default function Configuracoes() {
                       </Button>
                     </CardHeader>
                     <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <Label className="text-muted-foreground text-xs uppercase tracking-wider">Provedor de IA</Label>
+                        <Select value={getProvedorValue(tipo)} onValueChange={(v) => setEditedProvedores(prev => ({ ...prev, [tipo]: v }))}>
+                          <SelectTrigger className="bg-input border-border w-[200px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="gemini">Gemini (Google)</SelectItem>
+                            <SelectItem value="openai">OpenAI (GPT-4o)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                       <div className="space-y-2">
                         <Label className="text-muted-foreground text-xs uppercase tracking-wider">Prompt do Agente</Label>
                         <Textarea
