@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -16,7 +16,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Plus, Pencil, Trash2, Loader2, ShieldCheck, KeyRound, Bot, Save } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, ShieldCheck, KeyRound, Bot, Save, Upload } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -26,6 +26,7 @@ import {
 } from '@/hooks/useDadosAuxiliares';
 import { useUserRoles, useAuthUsers, useAddUserRole, useDeleteUserRole } from '@/hooks/useUserRoles';
 import { useAgentePrompts, useUpdateAgentePrompt } from '@/hooks/useAgentePrompts';
+import { useParseDocumento } from '@/hooks/useProjetoDocumentos';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
@@ -82,9 +83,12 @@ export default function Configuracoes() {
   // Agente prompts (admin only)
   const { data: agentePrompts, isLoading: loadingPrompts } = useAgentePrompts();
   const updatePrompt = useUpdateAgentePrompt();
+  const parseDocumento = useParseDocumento();
   const [editedPrompts, setEditedPrompts] = useState<Record<string, string>>({});
   const [editedModelos, setEditedModelos] = useState<Record<string, string>>({});
   const [editedProvedores, setEditedProvedores] = useState<Record<string, string>>({});
+  const [parsingTipo, setParsingTipo] = useState<string | null>(null);
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const getPromptValue = (tipo: string) => {
     if (editedPrompts[tipo] !== undefined) return editedPrompts[tipo];
@@ -117,6 +121,36 @@ export default function Configuracoes() {
       setEditedProvedores(prev => { const n = { ...prev }; delete n[tipo]; return n; });
     } catch (error: any) {
       toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  const handleFileUploadModelo = async (tipo: string, file: File) => {
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (ext !== 'pdf' && ext !== 'docx') {
+      toast({ title: 'Erro', description: 'Apenas arquivos .pdf e .docx são suportados', variant: 'destructive' });
+      return;
+    }
+    const currentValue = getModeloValue(tipo);
+    if (currentValue && currentValue.trim().length > 0) {
+      if (!window.confirm('O conteúdo atual do Documento Modelo será substituído pelo texto extraído do arquivo. Continuar?')) return;
+    }
+    setParsingTipo(tipo);
+    try {
+      const buffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const base64 = btoa(binary);
+      const texto = await parseDocumento.mutateAsync({ tipo: ext, conteudo_base64: base64 });
+      setEditedModelos(prev => ({ ...prev, [tipo]: texto }));
+      toast({ title: 'Sucesso', description: 'Texto extraído do arquivo com sucesso' });
+    } catch {
+      // error already handled by hook
+    } finally {
+      setParsingTipo(null);
+      if (fileInputRefs.current[tipo]) fileInputRefs.current[tipo]!.value = '';
     }
   };
 
@@ -551,7 +585,32 @@ export default function Configuracoes() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-muted-foreground text-xs uppercase tracking-wider">Documento Modelo (opcional)</Label>
+                        <div className="flex items-center justify-between">
+                          <Label className="text-muted-foreground text-xs uppercase tracking-wider">Documento Modelo (opcional)</Label>
+                          <div>
+                            <input
+                              type="file"
+                              accept=".pdf,.docx"
+                              className="hidden"
+                              ref={el => { fileInputRefs.current[tipo] = el; }}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleFileUploadModelo(tipo, file);
+                              }}
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={parsingTipo === tipo}
+                              onClick={() => fileInputRefs.current[tipo]?.click()}
+                              className="border-border"
+                            >
+                              {parsingTipo === tipo ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+                              {parsingTipo === tipo ? 'Extraindo texto...' : 'Enviar arquivo'}
+                            </Button>
+                          </div>
+                        </div>
                         <Textarea
                           className="bg-input border-border min-h-[150px] font-mono text-sm"
                           value={getModeloValue(tipo)}
