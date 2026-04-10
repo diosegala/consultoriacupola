@@ -581,7 +581,32 @@ export default function Configuracoes() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-muted-foreground text-xs uppercase tracking-wider">Documento Modelo (opcional)</Label>
+                        <div className="flex items-center justify-between">
+                          <Label className="text-muted-foreground text-xs uppercase tracking-wider">Documento Modelo (opcional)</Label>
+                          <div>
+                            <input
+                              type="file"
+                              accept=".pdf,.docx"
+                              className="hidden"
+                              ref={el => { fileInputRefs.current[tipo] = el; }}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleFileUploadModelo(tipo, file);
+                              }}
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={parsingTipo === tipo}
+                              onClick={() => fileInputRefs.current[tipo]?.click()}
+                              className="border-border"
+                            >
+                              {parsingTipo === tipo ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+                              {parsingTipo === tipo ? 'Extraindo texto...' : 'Enviar arquivo'}
+                            </Button>
+                          </div>
+                        </div>
                         <Textarea
                           className="bg-input border-border min-h-[150px] font-mono text-sm"
                           value={getModeloValue(tipo)}
