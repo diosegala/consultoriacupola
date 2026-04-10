@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -16,7 +16,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Plus, Pencil, Trash2, Loader2, ShieldCheck, KeyRound, Bot, Save } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, ShieldCheck, KeyRound, Bot, Save, Upload } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -26,8 +26,10 @@ import {
 } from '@/hooks/useDadosAuxiliares';
 import { useUserRoles, useAuthUsers, useAddUserRole, useDeleteUserRole } from '@/hooks/useUserRoles';
 import { useAgentePrompts, useUpdateAgentePrompt } from '@/hooks/useAgentePrompts';
+import { useParseDocumento } from '@/hooks/useProjetoDocumentos';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useRef } from 'react';
 
 export default function Configuracoes() {
   const { toast } = useToast();
