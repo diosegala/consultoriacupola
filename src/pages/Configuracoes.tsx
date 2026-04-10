@@ -84,6 +84,7 @@ export default function Configuracoes() {
   const updatePrompt = useUpdateAgentePrompt();
   const [editedPrompts, setEditedPrompts] = useState<Record<string, string>>({});
   const [editedModelos, setEditedModelos] = useState<Record<string, string>>({});
+  const [editedProvedores, setEditedProvedores] = useState<Record<string, string>>({});
 
   const getPromptValue = (tipo: string) => {
     if (editedPrompts[tipo] !== undefined) return editedPrompts[tipo];
@@ -95,6 +96,11 @@ export default function Configuracoes() {
     return agentePrompts?.find(p => p.tipo === tipo)?.documento_modelo || '';
   };
 
+  const getProvedorValue = (tipo: string) => {
+    if (editedProvedores[tipo] !== undefined) return editedProvedores[tipo];
+    return agentePrompts?.find(p => p.tipo === tipo)?.provedor || 'gemini';
+  };
+
   const handleSavePrompt = async (tipo: string) => {
     const prompt = agentePrompts?.find(p => p.tipo === tipo);
     if (!prompt) return;
@@ -103,10 +109,12 @@ export default function Configuracoes() {
         id: prompt.id,
         prompt: editedPrompts[tipo] ?? prompt.prompt,
         documento_modelo: editedModelos[tipo] ?? prompt.documento_modelo,
+        provedor: editedProvedores[tipo] ?? prompt.provedor,
       });
       toast({ title: 'Sucesso', description: 'Prompt atualizado com sucesso' });
       setEditedPrompts(prev => { const n = { ...prev }; delete n[tipo]; return n; });
       setEditedModelos(prev => { const n = { ...prev }; delete n[tipo]; return n; });
+      setEditedProvedores(prev => { const n = { ...prev }; delete n[tipo]; return n; });
     } catch (error: any) {
       toast({ title: 'Erro', description: error.message, variant: 'destructive' });
     }
