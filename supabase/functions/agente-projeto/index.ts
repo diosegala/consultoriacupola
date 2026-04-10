@@ -47,21 +47,17 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Tipo inválido. Use: diagnostico, okrs, briefing_cliente_oculto" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const GOOGLE_GEMINI_API_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
-    if (!GOOGLE_GEMINI_API_KEY) {
-      return new Response(JSON.stringify({ error: "GOOGLE_GEMINI_API_KEY não configurada" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
     // Fetch prompt from database using service role
     const serviceClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const { data: promptData } = await serviceClient
       .from("agente_prompts")
-      .select("prompt, documento_modelo")
+      .select("prompt, documento_modelo, provedor")
       .eq("tipo", tipo)
       .single();
 
     const promptBase = promptData?.prompt || FALLBACK_PROMPTS[tipo];
     const documentoModelo = promptData?.documento_modelo;
+    const provedor = promptData?.provedor || "gemini";
 
     // Fetch project context
     const { data: projeto, error: projetoError } = await supabase
@@ -127,48 +123,91 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
       : '';
 
     const promptCompleto = `${promptBase}\n\n---\n\nINFORMAÇÕES DO CLIENTE:\n\n${contexto}${contextoUsuarioSection}${documentoModeloSection}`;
-    const candidateModels = ["gemini-2.5-pro", "gemini-2.5-flash"];
 
     let conteudo = "";
     let lastStatus = 500;
-    let lastErrorMessage = "Erro na API do Gemini";
+    let lastErrorMessage = "Erro na API de IA";
 
-    for (const model of candidateModels) {
-      const geminiResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GOOGLE_GEMINI_API_KEY}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: promptCompleto }] }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
-          }),
+    if (provedor === "openai") {
+      const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+      if (!OPENAI_API_KEY) {
+        return new Response(JSON.stringify({ error: "OPENAI_API_KEY não configurada. Adicione a chave nas configurações." }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-4o",
+          messages: [
+            { role: "system", content: promptBase },
+            { role: "user", content: `${contexto}${contextoUsuarioSection}${documentoModeloSection}` },
+          ],
+          temperature: 0.7,
+          max_tokens: 4096,
+        }),
+      });
+
+      if (openaiResponse.ok) {
+        const openaiData = await openaiResponse.json();
+        conteudo = openaiData.choices?.[0]?.message?.content ?? "";
+      } else {
+        const errText = await openaiResponse.text();
+        console.error("OpenAI API error:", openaiResponse.status, errText);
+        lastStatus = openaiResponse.status;
+        lastErrorMessage = openaiResponse.status === 429
+          ? "Limite de requisições da OpenAI atingido. Tente novamente em alguns minutos."
+          : `Erro da OpenAI (${openaiResponse.status}).`;
+      }
+    } else {
+      // Gemini provider
+      const GOOGLE_GEMINI_API_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
+      if (!GOOGLE_GEMINI_API_KEY) {
+        return new Response(JSON.stringify({ error: "GOOGLE_GEMINI_API_KEY não configurada" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      const candidateModels = ["gemini-2.5-pro", "gemini-2.5-flash"];
+
+      for (const model of candidateModels) {
+        const geminiResponse = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GOOGLE_GEMINI_API_KEY}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: promptCompleto }] }],
+              generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
+            }),
+          }
+        );
+
+        if (geminiResponse.ok) {
+          const geminiData = await geminiResponse.json();
+          conteudo = geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+          if (conteudo) break;
+          lastErrorMessage = `O modelo ${model} não retornou conteúdo.`;
+          continue;
         }
-      );
 
-      if (geminiResponse.ok) {
-        const geminiData = await geminiResponse.json();
-        conteudo = geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-        if (conteudo) break;
-        lastErrorMessage = `O modelo ${model} não retornou conteúdo.`;
-        continue;
-      }
+        const errText = await geminiResponse.text();
+        console.error("Gemini API error:", geminiResponse.status, model, errText);
+        lastStatus = geminiResponse.status;
 
-      const errText = await geminiResponse.text();
-      console.error("Gemini API error:", geminiResponse.status, model, errText);
-      lastStatus = geminiResponse.status;
-
-      if (geminiResponse.status === 429) {
-        lastErrorMessage = model === "gemini-2.5-pro"
-          ? "Cota indisponível para Gemini Pro. Tentando fallback."
-          : "Cota indisponível. Verifique billing da API Gemini.";
-        continue;
+        if (geminiResponse.status === 429) {
+          lastErrorMessage = model === "gemini-2.5-pro"
+            ? "Cota indisponível para Gemini Pro. Tentando fallback."
+            : "Cota indisponível. Verifique billing da API Gemini.";
+          continue;
+        }
+        if (geminiResponse.status === 404) {
+          lastErrorMessage = `Modelo ${model} não disponível.`;
+          continue;
+        }
+        lastErrorMessage = `Erro do Gemini (${geminiResponse.status}).`;
       }
-      if (geminiResponse.status === 404) {
-        lastErrorMessage = `Modelo ${model} não disponível.`;
-        continue;
-      }
-      lastErrorMessage = `Erro do Gemini (${geminiResponse.status}).`;
     }
 
     if (!conteudo) {
