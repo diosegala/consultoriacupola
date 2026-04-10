@@ -124,6 +124,32 @@ export default function Configuracoes() {
     }
   };
 
+  const handleFileUploadModelo = async (tipo: string, file: File) => {
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (ext !== 'pdf' && ext !== 'docx') {
+      toast({ title: 'Erro', description: 'Apenas arquivos .pdf e .docx são suportados', variant: 'destructive' });
+      return;
+    }
+    const currentValue = getModeloValue(tipo);
+    if (currentValue && currentValue.trim().length > 0) {
+      if (!window.confirm('O conteúdo atual do Documento Modelo será substituído pelo texto extraído do arquivo. Continuar?')) return;
+    }
+    setParsingTipo(tipo);
+    try {
+      const buffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      const base64 = btoa(String.fromCharCode(...bytes));
+      const texto = await parseDocumento.mutateAsync({ tipo: ext, conteudo_base64: base64 });
+      setEditedModelos(prev => ({ ...prev, [tipo]: texto }));
+      toast({ title: 'Sucesso', description: 'Texto extraído do arquivo com sucesso' });
+    } catch {
+      // error already handled by hook
+    } finally {
+      setParsingTipo(null);
+      if (fileInputRefs.current[tipo]) fileInputRefs.current[tipo]!.value = '';
+    }
+  };
+
   const TIPO_LABELS: Record<string, string> = {
     diagnostico: 'Diagnóstico',
     okrs: 'OKRs',
