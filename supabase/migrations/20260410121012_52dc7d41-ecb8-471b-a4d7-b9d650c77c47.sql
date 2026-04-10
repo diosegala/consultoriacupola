@@ -1,0 +1,1 @@
+ALTER TABLE public.agente_prompts ADD COLUMN provedor text NOT NULL DEFAULT 'gemini';

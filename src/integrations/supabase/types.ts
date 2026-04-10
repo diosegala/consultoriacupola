@@ -19,6 +19,7 @@ export type Database = {
           documento_modelo: string | null
           id: string
           prompt: string
+          provedor: string
           tipo: string
           updated_at: string
         }
@@ -26,6 +27,7 @@ export type Database = {
           documento_modelo?: string | null
           id?: string
           prompt: string
+          provedor?: string
           tipo: string
           updated_at?: string
         }
@@ -33,6 +35,7 @@ export type Database = {
           documento_modelo?: string | null
           id?: string
           prompt?: string
+          provedor?: string
           tipo?: string
           updated_at?: string
         }
