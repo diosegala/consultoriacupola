@@ -83,9 +83,12 @@ export default function Configuracoes() {
   // Agente prompts (admin only)
   const { data: agentePrompts, isLoading: loadingPrompts } = useAgentePrompts();
   const updatePrompt = useUpdateAgentePrompt();
+  const parseDocumento = useParseDocumento();
   const [editedPrompts, setEditedPrompts] = useState<Record<string, string>>({});
   const [editedModelos, setEditedModelos] = useState<Record<string, string>>({});
   const [editedProvedores, setEditedProvedores] = useState<Record<string, string>>({});
+  const [parsingTipo, setParsingTipo] = useState<string | null>(null);
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const getPromptValue = (tipo: string) => {
     if (editedPrompts[tipo] !== undefined) return editedPrompts[tipo];
