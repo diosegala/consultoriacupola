@@ -1,85 +1,42 @@
 
 
-## Upload de arquivos e links do Google Drive nos agentes de IA
+## Adicionar OpenAI como provedor alternativo nos agentes
 
-### Abordagem
+### Contexto
+GPTs customizados não possuem API externa. A solução é usar a API Chat Completions da OpenAI com as mesmas instruções e documentos modelo que o usuário já configurou no builder de GPTs.
 
-Transformar o dialog de contexto dos agentes para aceitar 3 formas de input:
+### O que muda
 
-1. **Texto colado** (como ja funciona)
-2. **Upload de arquivos** (.docx, .pdf) -- extraidos no backend via edge function
-3. **Link do Google Drive** -- buscado via API publica (arquivos com compartilhamento publico) ou futuramente via OAuth
+#### 1. Migração SQL — novo campo `provedor` na tabela `agente_prompts`
+- Adicionar coluna `provedor text NOT NULL DEFAULT 'gemini'`
+- Valores aceitos: `gemini`, `openai`
 
-### Fluxo
+#### 2. Edge function `agente-projeto/index.ts`
+- Ler o campo `provedor` do prompt
+- Se `openai`: chamar `https://api.openai.com/v1/chat/completions` com modelo `gpt-4o` usando a chave `OPENAI_API_KEY`
+- Se `gemini`: manter comportamento atual
+- Fallback entre provedores se um falhar
 
-1. Consultor abre o dialog do agente
-2. Pode colar texto na textarea E/OU arrastar/selecionar arquivos E/OU colar um link do Google Drive
-3. Ao clicar "Gerar", os arquivos sao enviados primeiro para uma edge function de parsing que extrai o texto
-4. O texto extraido e concatenado com o texto colado e enviado ao agente
+#### 3. Secret `OPENAI_API_KEY`
+- Solicitar ao usuário sua API key da OpenAI (não é a mesma do ChatGPT Plus — é obtida em platform.openai.com)
 
-### Arquitetura
+#### 4. UI — Configurações > Agentes IA
+- Adicionar um seletor (Select) em cada card de agente: "Provedor de IA" com opções Gemini / OpenAI
+- O seletor é salvo junto com o prompt
 
-```text
-┌─────────────────────────────┐
-│  Dialog do Agente (UI)      │
-│  - Textarea (texto livre)   │
-│  - Input de arquivos        │
-│  - Campo de link GDrive     │
-└────────────┬────────────────┘
-             │
-             ▼
-┌─────────────────────────────┐
-│  Edge Function              │
-│  parse-documento            │
-│  - Recebe arquivo (base64)  │
-│  - PDF: pdfparse            │
-│  - DOCX: mammoth            │
-│  - GDrive: fetch export     │
-│  - Retorna texto extraido   │
-└────────────┬────────────────┘
-             │ texto
-             ▼
-┌─────────────────────────────┐
-│  Edge Function              │
-│  agente-projeto             │
-│  (ja existente, sem mudanca)│
-└─────────────────────────────┘
-```
-
-### Alteracoes
-
-#### 1. Nova edge function `parse-documento`
-- Recebe arquivo em base64 + tipo (pdf/docx) OU url do Google Drive
-- Para PDF: usa `pdf-parse` (npm) para extrair texto
-- Para DOCX: usa `mammoth` (npm) para converter para texto
-- Para Google Drive: extrai o file ID do link, faz fetch para `https://docs.google.com/document/d/{id}/export?format=txt` (funciona para docs publicos/com link)
-- Retorna o texto extraido
-- Auth: requer JWT valido
-
-#### 2. UI -- `ProjetoDetalheSheet.tsx`
-- Adicionar ao dialog do agente:
-  - Zona de upload de arquivos (aceita .pdf, .docx) com drag-and-drop
-  - Campo de texto para link do Google Drive
-  - Lista de arquivos adicionados com botao de remover
-  - Indicador de progresso durante parsing
-- Ao clicar "Gerar":
-  1. Se houver arquivos/links, chama `parse-documento` para cada um
-  2. Concatena os textos extraidos + texto da textarea
-  3. Envia tudo como `contexto_usuario` ao `agente-projeto`
-
-#### 3. Hook `useProjetoDocumentos.ts`
-- Adicionar mutation `useParseDocumento` que chama a edge function `parse-documento`
-
-### Limitacoes e proximos passos
-- Google Drive: funciona apenas com arquivos compartilhados publicamente (com link). Para acesso privado, seria necessario integrar OAuth (ja mapeado no roadmap)
-- Tamanho maximo de arquivo: ~10MB (limite da edge function)
-- Formatos suportados inicialmente: .pdf e .docx
+### Fluxo do usuário
+1. Acesse Configurações > Agentes IA
+2. No agente "Diagnóstico", selecione "OpenAI" como provedor
+3. Cole as instruções do seu GPT no campo Prompt
+4. Cole documentos de referência no campo Documento Modelo
+5. Salve — a partir de agora o agente usa a OpenAI
 
 ### Arquivos
 
-| Arquivo | Acao |
+| Arquivo | Ação |
 |---------|------|
-| `supabase/functions/parse-documento/index.ts` | Criar -- parsing de PDF/DOCX/GDrive |
-| `src/components/projetos/ProjetoDetalheSheet.tsx` | Editar -- upload + link GDrive no dialog |
-| `src/hooks/useProjetoDocumentos.ts` | Editar -- mutation de parsing |
+| Migração SQL | `ALTER TABLE agente_prompts ADD COLUMN provedor text NOT NULL DEFAULT 'gemini'` |
+| `supabase/functions/agente-projeto/index.ts` | Branch condicional Gemini vs OpenAI |
+| `src/hooks/useAgentePrompts.ts` | Incluir campo `provedor` |
+| `src/pages/Configuracoes.tsx` | Select de provedor por agente |
 
