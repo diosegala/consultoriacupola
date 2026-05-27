@@ -91,6 +91,27 @@ export type Database = {
           },
         ]
       }
+      cliente_aliases: {
+        Row: {
+          alias: string
+          cliente_id: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          alias: string
+          cliente_id: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          alias?: string
+          cliente_id?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: []
+      }
       clientes: {
         Row: {
           cidade: string
@@ -134,6 +155,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      consultor_google_tokens: {
+        Row: {
+          access_token: string
+          ativo: boolean
+          consultor_id: string
+          created_at: string
+          email_google: string
+          escopo: string
+          expires_at: string
+          id: string
+          pasta_meet_id: string | null
+          refresh_token: string
+          ultima_sincronizacao: string | null
+          updated_at: string
+        }
+        Insert: {
+          access_token: string
+          ativo?: boolean
+          consultor_id: string
+          created_at?: string
+          email_google: string
+          escopo: string
+          expires_at: string
+          id?: string
+          pasta_meet_id?: string | null
+          refresh_token: string
+          ultima_sincronizacao?: string | null
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string
+          ativo?: boolean
+          consultor_id?: string
+          created_at?: string
+          email_google?: string
+          escopo?: string
+          expires_at?: string
+          id?: string
+          pasta_meet_id?: string | null
+          refresh_token?: string
+          ultima_sincronizacao?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       consultor_user: {
         Row: {
@@ -835,6 +901,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      reunioes_importadas_log: {
+        Row: {
+          cliente_id: string | null
+          consultor_id: string
+          data_importacao: string
+          erro: string | null
+          google_file_id: string
+          id: string
+          nome_arquivo: string | null
+          reuniao_id: string | null
+          status: string
+        }
+        Insert: {
+          cliente_id?: string | null
+          consultor_id: string
+          data_importacao?: string
+          erro?: string | null
+          google_file_id: string
+          id?: string
+          nome_arquivo?: string | null
+          reuniao_id?: string | null
+          status?: string
+        }
+        Update: {
+          cliente_id?: string | null
+          consultor_id?: string
+          data_importacao?: string
+          erro?: string | null
+          google_file_id?: string
+          id?: string
+          nome_arquivo?: string | null
+          reuniao_id?: string | null
+          status?: string
+        }
+        Relationships: []
       }
       tipos_consultoria: {
         Row: {
