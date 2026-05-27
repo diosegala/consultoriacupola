@@ -6,11 +6,12 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, FileText, Link as LinkIcon } from 'lucide-react';
+import { Loader2, FileText, Link as LinkIcon, Cloud } from 'lucide-react';
 import { useClientes } from '@/hooks/useClientes';
 import { useCreateReuniao, useAnalisarReuniao } from '@/hooks/useReunioes';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { ImportarDriveDialog } from './ImportarDriveDialog';
 
 interface NovaReuniaoDialogProps {
   open: boolean;
@@ -28,6 +29,7 @@ export function NovaReuniaoDialog({ open, onOpenChange, consultorId, clienteId }
   const [transcricaoMode, setTranscricaoMode] = useState<'colar' | 'link'>('colar');
   const [linkTranscricao, setLinkTranscricao] = useState('');
   const [loadingLink, setLoadingLink] = useState(false);
+  const [driveOpen, setDriveOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     cliente_id: clienteId ?? '',
@@ -138,7 +140,18 @@ export function NovaReuniaoDialog({ open, onOpenChange, consultorId, clienteId }
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-foreground">Nova Reunião</DialogTitle>
+          <DialogTitle className="text-foreground flex items-center justify-between">
+            Nova Reunião
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="border-border mr-6"
+              onClick={() => setDriveOpen(true)}
+            >
+              <Cloud className="h-4 w-4 mr-2" /> Importar do Google Drive
+            </Button>
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
@@ -264,6 +277,11 @@ export function NovaReuniaoDialog({ open, onOpenChange, consultorId, clienteId }
           </Button>
         </DialogFooter>
       </DialogContent>
+      <ImportarDriveDialog
+        open={driveOpen}
+        onOpenChange={setDriveOpen}
+        onImported={() => onOpenChange(false)}
+      />
     </Dialog>
   );
 }
