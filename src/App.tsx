@@ -19,6 +19,8 @@ import Configuracoes from "./pages/Configuracoes";
 import Projetos from "./pages/Projetos";
 import ResetPassword from "./pages/ResetPassword";
 import TrocarSenha from "./pages/TrocarSenha";
+import MinhasIntegracoes from "./pages/MinhasIntegracoes";
+import GoogleCallback from "./pages/GoogleCallback";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +36,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/trocar-senha" element={<TrocarSenha />} />
+            <Route path="/google-callback" element={<GoogleCallback />} />
             <Route element={<AppLayout />}>
               <Route path="/" element={<Dashboard />} />
               <Route path="/clientes" element={<Clientes />} />
@@ -44,6 +47,7 @@ const App = () => (
               <Route path="/consultores/:id" element={<ConsultorDetalhe />} />
               <Route path="/configuracoes" element={<Configuracoes />} />
               <Route path="/projetos" element={<Projetos />} />
+              <Route path="/integracoes" element={<MinhasIntegracoes />} />
             </Route>
             <Route path="*" element={<NotFound />} />
             <Route path="/consultores/:id/relatorio" element={<RelatorioConsultor />} />
