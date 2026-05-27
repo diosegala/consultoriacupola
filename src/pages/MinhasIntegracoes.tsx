@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -45,10 +46,29 @@ export default function MinhasIntegracoes() {
 
   if (!consultorId) {
     return (
-      <div className="p-6">
+      <div className="p-6 max-w-3xl">
         <Card className="bg-card border-border">
-          <CardContent className="p-6 text-muted-foreground">
-            Esta página é exclusiva para usuários vinculados a um consultor.
+          <CardHeader>
+            <CardTitle className="text-foreground">Minhas Integrações</CardTitle>
+            <CardDescription>
+              Seu usuário ainda não está vinculado a um consultor.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            <p>
+              A conexão com o Google Drive é feita por consultor — cada conta Google é
+              associada a um registro em <strong>Consultores</strong>. Para usar esta página,
+              vincule seu usuário a um consultor em{' '}
+              <Link to="/configuracoes" className="text-primary underline">
+                Configurações &gt; Usuários
+              </Link>
+              .
+            </p>
+            <p>
+              Se você é apenas administrador e não atua como consultor, não precisa conectar
+              o Drive aqui — a sincronização automática noturna roda para todos os consultores
+              já conectados.
+            </p>
           </CardContent>
         </Card>
       </div>
