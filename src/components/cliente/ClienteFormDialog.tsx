@@ -10,8 +10,11 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useCreateCliente, useUpdateCliente, Cliente } from '@/hooks/useClientes';
 import { useConsultores } from '@/hooks/useConsultores';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, X, Plus } from 'lucide-react';
 import { Database } from '@/integrations/supabase/types';
+import { useClienteAliases, useCreateAlias, useDeleteAlias } from '@/hooks/useGoogleDrive';
+import { useState } from 'react';
+import { Badge } from '@/components/ui/badge';
 
 type StatusCliente = Database['public']['Enums']['status_cliente'];
 
@@ -51,6 +54,10 @@ export function ClienteFormDialog({ open, onOpenChange, cliente, onSuccess }: Cl
   const { data: consultores } = useConsultores();
   const createCliente = useCreateCliente();
   const updateCliente = useUpdateCliente();
+  const { data: aliases } = useClienteAliases(cliente?.id);
+  const createAlias = useCreateAlias();
+  const deleteAlias = useDeleteAlias();
+  const [newAlias, setNewAlias] = useState('');
   
   const isEditing = !!cliente;
   const isLoading = createCliente.isPending || updateCliente.isPending;
@@ -275,6 +282,66 @@ export function ClienteFormDialog({ open, onOpenChange, cliente, onSuccess }: Cl
                 </FormItem>
               )}
             />
+
+            {isEditing && cliente && (
+              <div className="space-y-2 pt-2 border-t border-border">
+                <FormLabel>Apelidos / Iniciais (para matching automático do Google Drive)</FormLabel>
+                <p className="text-xs text-muted-foreground">
+                  Cadastre variações do nome do cliente (ex.: "ACME", "ACM"). Usadas para casar transcrições do Google Meet automaticamente.
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    value={newAlias}
+                    onChange={(e) => setNewAlias(e.target.value)}
+                    placeholder="Ex: ACME"
+                    className="bg-input border-border"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && newAlias.trim()) {
+                        e.preventDefault();
+                        createAlias.mutate(
+                          { cliente_id: cliente.id, alias: newAlias.trim() },
+                          {
+                            onSuccess: () => setNewAlias(''),
+                            onError: (err: any) => toast({ title: 'Erro', description: err.message, variant: 'destructive' }),
+                          }
+                        );
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-border"
+                    disabled={!newAlias.trim() || createAlias.isPending}
+                    onClick={() => {
+                      createAlias.mutate(
+                        { cliente_id: cliente.id, alias: newAlias.trim() },
+                        {
+                          onSuccess: () => setNewAlias(''),
+                          onError: (err: any) => toast({ title: 'Erro', description: err.message, variant: 'destructive' }),
+                        }
+                      );
+                    }}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {(aliases || []).map((a) => (
+                    <Badge key={a.id} variant="secondary" className="gap-1">
+                      {a.alias}
+                      <button
+                        type="button"
+                        onClick={() => deleteAlias.mutate(a.id)}
+                        className="hover:text-destructive"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <DialogFooter className="pt-4">
               <Button 
