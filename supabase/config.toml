@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.pipedrive-webhook]
 verify_jwt = false
+
+[functions.google-drive-sync-diario]
+verify_jwt = false
