@@ -17,7 +17,7 @@ import { useCreateContrato, useUpdateContrato, useRenovarContrato, ContratoComTi
 import { useTiposConsultoria } from '@/hooks/useDadosAuxiliares';
 import { useConsultores } from '@/hooks/useConsultores';
 import { useUpdateCliente } from '@/hooks/useClientes';
-import { useEncerrarContrato } from '@/hooks/useEncerramentos';
+import { useEncerrarContrato, calcularDataFimPagamento } from '@/hooks/useEncerramentos';
 import { toast } from '@/hooks/use-toast';
 
 const contratoSchema = z.object({
