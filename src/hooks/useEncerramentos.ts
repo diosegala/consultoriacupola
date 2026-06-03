@@ -1,7 +1,22 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables, TablesInsert } from '@/integrations/supabase/types';
-import { startOfMonth, endOfMonth, format } from 'date-fns';
+import { startOfMonth, endOfMonth, format, addMonths } from 'date-fns';
+
+/**
+ * Calcula a data em que a última parcela do contrato é (ou foi) paga.
+ * antecipado: pagamento no início → última parcela em data_inicio + (parcelas - 1) meses
+ * postecipado: pagamento no fim → última parcela em data_inicio + parcelas meses
+ */
+export function calcularDataFimPagamento(
+  dataInicio: string,
+  parcelas: number,
+  tipoVencimento: 'antecipado' | 'postecipado'
+): Date {
+  const inicio = new Date(dataInicio + 'T00:00:00');
+  const meses = tipoVencimento === 'antecipado' ? Math.max(parcelas - 1, 0) : parcelas;
+  return addMonths(inicio, meses);
+}
 
 export type Encerramento = Tables<'encerramentos'>;
 export type EncerramentoInsert = TablesInsert<'encerramentos'>;
@@ -68,32 +83,61 @@ export function useEncerrarContrato() {
 
       if (encError) throw encError;
 
-      // Desativar contrato
-      const { error: contratoError } = await supabase
-        .from('contratos')
-        .update({ ativo: false })
-        .eq('id', contratoId);
+      // Para 'fim_contrato', se ainda há parcelas a vencer, mantemos o contrato
+      // ATIVO até a data da última parcela (continua compondo MRR).
+      // Apenas marcamos `encerrado_em` para identificar o estado de "rabicho financeiro".
+      let manterAtivo = false;
+      if (classificacao === 'fim_contrato') {
+        const { data: contratoData, error: contratoFetchError } = await supabase
+          .from('contratos')
+          .select('data_inicio, parcelas, tipo_vencimento, data_fim_pagamento')
+          .eq('id', contratoId)
+          .single();
+        if (contratoFetchError) throw contratoFetchError;
 
-      if (contratoError) throw contratoError;
+        const dataFimPagamento = contratoData.data_fim_pagamento
+          ? new Date(contratoData.data_fim_pagamento + 'T00:00:00')
+          : calcularDataFimPagamento(
+              contratoData.data_inicio,
+              contratoData.parcelas,
+              contratoData.tipo_vencimento as 'antecipado' | 'postecipado'
+            );
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+        manterAtivo = dataFimPagamento >= hoje;
+      }
 
-      // Verificar se há outros contratos ativos do cliente
-      const { data: outrosContratosAtivos, error: checkError } = await supabase
-        .from('contratos')
-        .select('id')
-        .eq('cliente_id', clienteId)
-        .eq('ativo', true)
-        .neq('id', contratoId);
+      if (manterAtivo) {
+        // Só marca encerramento — contrato permanece ativo até a última parcela
+        const { error: contratoError } = await supabase
+          .from('contratos')
+          .update({ encerrado_em: new Date().toISOString() })
+          .eq('id', contratoId);
+        if (contratoError) throw contratoError;
+      } else {
+        // Desativa contrato imediatamente (comportamento original)
+        const { error: contratoError } = await supabase
+          .from('contratos')
+          .update({ ativo: false, encerrado_em: new Date().toISOString() })
+          .eq('id', contratoId);
+        if (contratoError) throw contratoError;
 
-      if (checkError) throw checkError;
+        // Atualizar status do cliente para encerrado se não houver outros ativos
+        const { data: outrosContratosAtivos, error: checkError } = await supabase
+          .from('contratos')
+          .select('id')
+          .eq('cliente_id', clienteId)
+          .eq('ativo', true)
+          .neq('id', contratoId);
+        if (checkError) throw checkError;
 
-      // Só alterar status do cliente para encerrado se não houver outros contratos ativos
-      if (!outrosContratosAtivos || outrosContratosAtivos.length === 0) {
-        const { error: clienteError } = await supabase
-          .from('clientes')
-          .update({ status: 'encerrado' })
-          .eq('id', clienteId);
-
-        if (clienteError) throw clienteError;
+        if (!outrosContratosAtivos || outrosContratosAtivos.length === 0) {
+          const { error: clienteError } = await supabase
+            .from('clientes')
+            .update({ status: 'encerrado' })
+            .eq('id', clienteId);
+          if (clienteError) throw clienteError;
+        }
       }
 
       return { clienteId };

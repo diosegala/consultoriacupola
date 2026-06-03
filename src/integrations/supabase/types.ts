@@ -263,7 +263,9 @@ export type Database = {
           cliente_id: string
           created_at: string
           data_fim: string
+          data_fim_pagamento: string | null
           data_inicio: string
+          encerrado_em: string | null
           id: string
           link_contrato: string | null
           momento: string | null
@@ -281,7 +283,9 @@ export type Database = {
           cliente_id: string
           created_at?: string
           data_fim: string
+          data_fim_pagamento?: string | null
           data_inicio: string
+          encerrado_em?: string | null
           id?: string
           link_contrato?: string | null
           momento?: string | null
@@ -299,7 +303,9 @@ export type Database = {
           cliente_id?: string
           created_at?: string
           data_fim?: string
+          data_fim_pagamento?: string | null
           data_inicio?: string
+          encerrado_em?: string | null
           id?: string
           link_contrato?: string | null
           momento?: string | null
@@ -1071,6 +1077,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      aplicar_baixa_contratos_pagos: { Args: never; Returns: undefined }
       get_consultor_id_for_user: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {

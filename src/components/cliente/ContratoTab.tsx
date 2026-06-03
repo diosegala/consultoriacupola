@@ -35,6 +35,7 @@ function formatCurrency(value: number): string {
 export function ContratoTab({ clienteId, clienteStatus, consultorId }: ContratoTabProps) {
   const { data: contratos, isLoading } = useContratos(clienteId);
   const { data: contratoAtivo } = useContratoAtivo(clienteId);
+  const contratoEncerradoComPagamento = contratoAtivo && (contratoAtivo as any).encerrado_em;
 
   const [showForm, setShowForm] = useState(false);
   const [editingContrato, setEditingContrato] = useState<ContratoComTipo | null>(null);
@@ -69,7 +70,17 @@ export function ContratoTab({ clienteId, clienteStatus, consultorId }: ContratoT
         <Card className="bg-card border-border border-l-4 border-l-primary">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="text-foreground">Contrato Ativo</CardTitle>
+              <CardTitle className="text-foreground flex items-center gap-2">
+                Contrato Ativo
+                {contratoEncerradoComPagamento && (
+                  <Badge variant="outline" className="border-primary/50 text-primary">
+                    Encerrado — aguardando última parcela
+                    {(contratoAtivo as any).data_fim_pagamento && (
+                      <> em {format(parseISO((contratoAtivo as any).data_fim_pagamento), 'dd/MM/yyyy')}</>
+                    )}
+                  </Badge>
+                )}
+              </CardTitle>
               <p className="text-sm text-muted-foreground">
                 {contratoAtivo.tipo_consultoria?.nome || 'Tipo não definido'}
                 {contratoAtivo.momento && ` • ${contratoAtivo.momento}`}

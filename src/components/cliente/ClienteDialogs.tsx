@@ -17,7 +17,7 @@ import { useCreateContrato, useUpdateContrato, useRenovarContrato, ContratoComTi
 import { useTiposConsultoria } from '@/hooks/useDadosAuxiliares';
 import { useConsultores } from '@/hooks/useConsultores';
 import { useUpdateCliente } from '@/hooks/useClientes';
-import { useEncerrarContrato } from '@/hooks/useEncerramentos';
+import { useEncerrarContrato, calcularDataFimPagamento } from '@/hooks/useEncerramentos';
 import { toast } from '@/hooks/use-toast';
 
 const contratoSchema = z.object({
@@ -534,6 +534,17 @@ export function EncerrarContratoDialog({ open, onOpenChange, clienteId, contrato
     },
   });
 
+  const classificacaoSelecionada = form.watch('classificacao');
+  const dataFimPagamento = calcularDataFimPagamento(
+    contrato.data_inicio,
+    contrato.parcelas,
+    contrato.tipo_vencimento as 'antecipado' | 'postecipado'
+  );
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const aindaTemParcelas = dataFimPagamento >= hoje;
+  const mostrarAvisoMRR = classificacaoSelecionada === 'fim_contrato' && aindaTemParcelas;
+
   useEffect(() => {
     if (open) {
       form.reset({
@@ -575,11 +586,19 @@ export function EncerrarContratoDialog({ open, onOpenChange, clienteId, contrato
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="p-4 rounded-lg bg-muted/50 border border-border">
-              <p className="text-sm text-muted-foreground">MRR que será perdido:</p>
-              <p className="text-xl font-bold text-destructive">
+              <p className="text-sm text-muted-foreground">
+                {mostrarAvisoMRR ? 'MRR ainda em curso até a última parcela:' : 'MRR que será perdido:'}
+              </p>
+              <p className={cn('text-xl font-bold', mostrarAvisoMRR ? 'text-primary' : 'text-destructive')}>
                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(contrato.remuneracao_mensal))}
               </p>
             </div>
+
+            {mostrarAvisoMRR && (
+              <div className="p-3 rounded-md border border-primary/30 bg-primary/5 text-sm text-foreground">
+                Este contrato continuará compondo o MRR até <strong>{format(dataFimPagamento, 'dd/MM/yyyy')}</strong> (data da última parcela). A baixa será aplicada automaticamente após essa data.
+              </div>
+            )}
 
             <FormField
               control={form.control}
