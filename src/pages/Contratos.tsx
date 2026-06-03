@@ -71,6 +71,14 @@ function getContratoStatusInfo(contrato: ContratoComCliente & { pausado?: boolea
     return { label: 'Inativo', variant: 'secondary' as const, color: 'bg-muted text-muted-foreground' };
   }
 
+  if ((contrato as any).encerrado_em) {
+    return {
+      label: 'Encerrado (pagto. em curso)',
+      variant: 'outline' as const,
+      color: 'bg-primary/10 text-primary border-primary/40',
+    };
+  }
+
   if (contrato.pausado) {
     return { label: 'Pausado', variant: 'warning' as const, color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' };
   }
