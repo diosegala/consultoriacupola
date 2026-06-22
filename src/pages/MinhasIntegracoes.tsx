@@ -1,14 +1,17 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, CheckCircle2, XCircle, RefreshCw, Link2 } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, RefreshCw, Link2, AlertTriangle, FileText, ExternalLink } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useMyConsultorId } from '@/hooks/useConsultorUser';
 import {
   useGoogleConnection,
   useStartGoogleOAuth,
   useSyncDiarioManual,
+  useReunioesImportadasLog,
 } from '@/hooks/useGoogleDrive';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -21,6 +24,22 @@ export default function MinhasIntegracoes() {
   const startOAuth = useStartGoogleOAuth();
   const syncManual = useSyncDiarioManual();
   const [syncing, setSyncing] = useState(false);
+  const [logFilter, setLogFilter] = useState<string>('all');
+  const { data: logs, isLoading: logsLoading, refetch: refetchLogs } = useReunioesImportadasLog(
+    consultorId ?? undefined,
+    { status: logFilter, limit: 20 },
+  );
+
+  const lastSyncStats = useMemo(() => {
+    if (!conn?.ultima_sincronizacao || !logs) return null;
+    const since = new Date(conn.ultima_sincronizacao).getTime() - 5 * 60 * 1000;
+    const recent = logs.filter((l) => new Date(l.data_importacao).getTime() >= since);
+    return {
+      importadas: recent.filter((l) => l.status === 'importado').length,
+      sem_cliente: recent.filter((l) => l.status === 'sem_match').length,
+      erros: recent.filter((l) => l.status === 'erro').length,
+    };
+  }, [conn?.ultima_sincronizacao, logs]);
 
   const handleConnect = async () => {
     const redirectUri = `${window.location.origin}/google-callback`;
@@ -35,8 +54,12 @@ export default function MinhasIntegracoes() {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      await syncManual.mutateAsync();
-      toast({ title: 'Sincronização concluída', description: 'Verifique as novas reuniões importadas.' });
+      const res: any = await syncManual.mutateAsync();
+      const r = res?.resultados?.[0];
+      const desc = r && typeof r.importados === 'number'
+        ? `${r.importados} importada(s), ${r.pulados} sem cliente, ${r.erros} erro(s)`
+        : 'Verifique as novas reuniões importadas.';
+      toast({ title: 'Sincronização concluída', description: desc });
     } catch (e: any) {
       toast({ title: 'Erro na sincronização', description: e.message, variant: 'destructive' });
     } finally {
