@@ -15,12 +15,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Loader2, ArrowLeft, FileText, Users, Calendar, Wrench, Pencil, Trash2, BarChart3, Video } from 'lucide-react';
+import { Loader2, ArrowLeft, FileText, Users, Calendar, Pencil, Trash2, BarChart3, Video } from 'lucide-react';
 import { useCliente, useDeleteCliente } from '@/hooks/useClientes';
 import { ContratoTab } from '@/components/cliente/ContratoTab';
 import { OnboardingTab } from '@/components/cliente/OnboardingTab';
 import { AtendimentoTab } from '@/components/cliente/AtendimentoTab';
-import { FerramentasTab } from '@/components/cliente/FerramentasTab';
 import { DesempenhoClienteTab } from '@/components/cliente/DesempenhoClienteTab';
 import { ReunioesClienteTab } from '@/components/cliente/ReunioesClienteTab';
 import { ClienteFormDialog } from '@/components/cliente/ClienteFormDialog';
@@ -119,10 +118,6 @@ export default function ClienteDetalhe() {
             <Video className="h-4 w-4" />
             Reuniões
           </TabsTrigger>
-          <TabsTrigger value="ferramentas" className="flex items-center gap-2">
-            <Wrench className="h-4 w-4" />
-            Ferramentas
-          </TabsTrigger>
           <TabsTrigger value="desempenho" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             Desempenho
@@ -143,10 +138,6 @@ export default function ClienteDetalhe() {
 
         <TabsContent value="reunioes" className="mt-6">
           <ReunioesClienteTab clienteId={cliente.id} />
-        </TabsContent>
-
-        <TabsContent value="ferramentas" className="mt-6">
-          <FerramentasTab clienteId={cliente.id} />
         </TabsContent>
 
         <TabsContent value="desempenho" className="mt-6">
