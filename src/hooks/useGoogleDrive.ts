@@ -8,12 +8,27 @@ export function useGoogleConnection(consultorId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('consultor_google_tokens' as any)
-        .select('email_google, ativo, pasta_meet_id, ultima_sincronizacao')
+        .select('email_google, ativo, pasta_meet_id, pasta_meet_nome, pasta_meet_link, pasta_meet_owner_email, ultima_sincronizacao')
         .eq('consultor_id', consultorId!)
         .maybeSingle();
       if (error) throw error;
       return data as any;
     },
+  });
+}
+
+export function useDetectarPastaMeet() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('google-drive-detectar-pasta', {
+        body: {},
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data as { success: boolean; pasta: { id: string; nome: string; link: string | null; owner_email: string | null; owned: boolean } };
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['google-connection'] }),
   });
 }
 

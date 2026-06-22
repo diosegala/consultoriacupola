@@ -85,16 +85,29 @@ Deno.serve(async (req) => {
     const userInfo = await userInfoRes.json();
     const email = userInfo.email as string;
 
-    // Find Meet Recordings folder
-    let folderId: string | null = null;
-    const folderRes = await fetch(
-      "https://www.googleapis.com/drive/v3/files?" +
-      "q=" + encodeURIComponent("name='Meet Recordings' and mimeType='application/vnd.google-apps.folder' and trashed=false") +
-      "&fields=files(id,name)",
-      { headers: { Authorization: `Bearer ${access_token}` } }
+    // Find Meet Recordings folder — prefer folder owned by the connected account
+    const folderFields = "files(id,name,webViewLink,owners(emailAddress))";
+    async function findFolder(query: string) {
+      const r = await fetch(
+        "https://www.googleapis.com/drive/v3/files?q=" + encodeURIComponent(query) +
+        "&fields=" + encodeURIComponent(folderFields),
+        { headers: { Authorization: `Bearer ${access_token}` } }
+      );
+      const d = await r.json();
+      return (d.files || [])[0] || null;
+    }
+    let folder = await findFolder(
+      "name='Meet Recordings' and mimeType='application/vnd.google-apps.folder' and trashed=false and 'me' in owners"
     );
-    const folderData = await folderRes.json();
-    if (folderData.files?.length > 0) folderId = folderData.files[0].id;
+    if (!folder) {
+      folder = await findFolder(
+        "name='Meet Recordings' and mimeType='application/vnd.google-apps.folder' and trashed=false"
+      );
+    }
+    const folderId: string | null = folder?.id || null;
+    const folderNome: string | null = folder?.name || null;
+    const folderLink: string | null = folder?.webViewLink || null;
+    const folderOwner: string | null = folder?.owners?.[0]?.emailAddress || null;
 
     const expiresAt = new Date(Date.now() + (expires_in - 60) * 1000).toISOString();
 
@@ -109,6 +122,9 @@ Deno.serve(async (req) => {
         expires_at: expiresAt,
         escopo: scope || "",
         pasta_meet_id: folderId,
+        pasta_meet_nome: folderNome,
+        pasta_meet_link: folderLink,
+        pasta_meet_owner_email: folderOwner,
         ativo: true,
       }, { onConflict: "consultor_id" });
 

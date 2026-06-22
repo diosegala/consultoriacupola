@@ -167,6 +167,9 @@ export type Database = {
           expires_at: string
           id: string
           pasta_meet_id: string | null
+          pasta_meet_link: string | null
+          pasta_meet_nome: string | null
+          pasta_meet_owner_email: string | null
           refresh_token: string
           ultima_sincronizacao: string | null
           updated_at: string
@@ -181,6 +184,9 @@ export type Database = {
           expires_at: string
           id?: string
           pasta_meet_id?: string | null
+          pasta_meet_link?: string | null
+          pasta_meet_nome?: string | null
+          pasta_meet_owner_email?: string | null
           refresh_token: string
           ultima_sincronizacao?: string | null
           updated_at?: string
@@ -195,6 +201,9 @@ export type Database = {
           expires_at?: string
           id?: string
           pasta_meet_id?: string | null
+          pasta_meet_link?: string | null
+          pasta_meet_nome?: string | null
+          pasta_meet_owner_email?: string | null
           refresh_token?: string
           ultima_sincronizacao?: string | null
           updated_at?: string

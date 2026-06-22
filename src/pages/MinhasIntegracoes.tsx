@@ -12,6 +12,7 @@ import {
   useStartGoogleOAuth,
   useSyncDiarioManual,
   useReunioesImportadasLog,
+  useDetectarPastaMeet,
 } from '@/hooks/useGoogleDrive';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -23,6 +24,7 @@ export default function MinhasIntegracoes() {
   const { data: conn, isLoading } = useGoogleConnection(consultorId ?? undefined);
   const startOAuth = useStartGoogleOAuth();
   const syncManual = useSyncDiarioManual();
+  const detectarPasta = useDetectarPastaMeet();
   const [syncing, setSyncing] = useState(false);
   const [logFilter, setLogFilter] = useState<string>('all');
   const { data: logs, isLoading: logsLoading, refetch: refetchLogs } = useReunioesImportadasLog(
@@ -64,6 +66,18 @@ export default function MinhasIntegracoes() {
       toast({ title: 'Erro na sincronização', description: e.message, variant: 'destructive' });
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleDetectarPasta = async () => {
+    try {
+      const res = await detectarPasta.mutateAsync();
+      toast({
+        title: 'Pasta detectada',
+        description: `${res.pasta.nome}${res.pasta.owned ? '' : ' (proprietário: ' + (res.pasta.owner_email || 'desconhecido') + ')'}`,
+      });
+    } catch (e: any) {
+      toast({ title: 'Erro ao detectar pasta', description: e.message, variant: 'destructive' });
     }
   };
 
@@ -132,10 +146,41 @@ export default function MinhasIntegracoes() {
             <>
               <div className="space-y-1 text-sm">
                 <p className="text-foreground"><span className="text-muted-foreground">Conta Google:</span> {conn.email_google}</p>
-                <p className="text-foreground">
-                  <span className="text-muted-foreground">Pasta Meet Recordings:</span>{' '}
-                  {conn.pasta_meet_id ? 'Localizada' : <span className="text-destructive">Não encontrada</span>}
-                </p>
+                {conn.pasta_meet_id ? (
+                  <div className="text-foreground space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-muted-foreground">Pasta detectada:</span>
+                      <span className="font-medium">{conn.pasta_meet_nome || 'Meet Recordings'}</span>
+                      {conn.pasta_meet_link && (
+                        <a
+                          href={conn.pasta_meet_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline text-xs inline-flex items-center gap-1"
+                        >
+                          Abrir no Drive <ExternalLink className="h-3 w-3" />
+                        </a>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap text-xs">
+                      <span className="text-muted-foreground">Proprietário:</span>
+                      <span className={conn.pasta_meet_owner_email && conn.pasta_meet_owner_email !== conn.email_google ? 'text-yellow-500' : 'text-foreground'}>
+                        {conn.pasta_meet_owner_email || 'desconhecido'}
+                      </span>
+                      {conn.pasta_meet_owner_email && conn.pasta_meet_owner_email !== conn.email_google && (
+                        <Badge className="bg-yellow-600/20 text-yellow-500 border-yellow-600/30">
+                          <AlertTriangle className="h-3 w-3 mr-1" />
+                          Pasta de outro usuário
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-foreground">
+                    <span className="text-muted-foreground">Pasta Meet Recordings:</span>{' '}
+                    <span className="text-destructive">Não encontrada</span>
+                  </p>
+                )}
                 <p className="text-foreground">
                   <span className="text-muted-foreground">Última sincronização:</span>{' '}
                   {conn.ultima_sincronizacao
@@ -161,13 +206,18 @@ export default function MinhasIntegracoes() {
                   {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
                   Sincronizar agora
                 </Button>
+                <Button onClick={handleDetectarPasta} disabled={detectarPasta.isPending} variant="outline" className="border-border">
+                  {detectarPasta.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                  Detectar pasta novamente
+                </Button>
                 <Button onClick={handleConnect} variant="outline" className="border-border">
                   <Link2 className="h-4 w-4 mr-2" /> Reconectar
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
+                A detecção busca pastas chamadas "Meet Recordings" que pertencem à sua conta Google.
+                Se o proprietário for diferente, a pasta foi compartilhada por outro usuário — use "Detectar pasta novamente" após criar/abrir o Meet a partir da sua conta.
                 A sincronização automática roda todas as noites e importa apenas reuniões com cliente identificado.
-                Cadastre apelidos/iniciais do cliente em <strong>Clientes &gt; editar</strong> para melhorar o matching.
               </p>
             </>
           ) : (
