@@ -53,7 +53,7 @@ export function ReunioesList({
   const analisarReuniao = useAnalisarReuniao();
   const deleteReuniao = useDeleteReuniao();
   const { data: role } = useCurrentUserRole();
-  const isAdmin = role === 'admin' || role === 'diretor';
+  const isAdmin = role === 'admin' || role === 'director';
 
   const handleReanalizar = async (reuniaoId: string) => {
     try {
