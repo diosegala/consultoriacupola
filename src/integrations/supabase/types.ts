@@ -620,6 +620,42 @@ export type Database = {
           },
         ]
       }
+      projeto_checklist_responsaveis: {
+        Row: {
+          checklist_item_id: string
+          consultor_id: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          checklist_item_id: string
+          consultor_id: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          checklist_item_id?: string
+          consultor_id?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projeto_checklist_responsaveis_checklist_item_id_fkey"
+            columns: ["checklist_item_id"]
+            isOneToOne: false
+            referencedRelation: "projeto_checklist"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projeto_checklist_responsaveis_consultor_id_fkey"
+            columns: ["consultor_id"]
+            isOneToOne: false
+            referencedRelation: "consultores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projeto_comentarios: {
         Row: {
           created_at: string
@@ -964,6 +1000,50 @@ export type Database = {
           nome?: string
         }
         Relationships: []
+      }
+      todo_pessoal: {
+        Row: {
+          concluido: boolean
+          created_at: string
+          due_date: string | null
+          id: string
+          ordem: number
+          projeto_id: string | null
+          titulo: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          concluido?: boolean
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          ordem?: number
+          projeto_id?: string | null
+          titulo: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          concluido?: boolean
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          ordem?: number
+          projeto_id?: string | null
+          titulo?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "todo_pessoal_projeto_id_fkey"
+            columns: ["projeto_id"]
+            isOneToOne: false
+            referencedRelation: "projetos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
