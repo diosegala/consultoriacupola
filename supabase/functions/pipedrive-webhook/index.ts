@@ -228,6 +228,46 @@ Deno.serve(async (req) => {
     console.log('Dados do cliente:', clienteData);
     console.log('Dados do contrato:', contratoData);
 
+    // 5.5. Detectar renovação manual: cliente já existe com contrato ativo + mesmo nome
+    const matches = await findExistingClienteByName(supabase, clienteData.nome);
+
+    if (matches.length > 1) {
+      const msg = `Match ambíguo para "${clienteData.nome}" — ${matches.length} clientes ativos com nome equivalente. Vincule manualmente.`;
+      console.warn(msg);
+      await updateLogError(supabase, logId, msg);
+      return jsonResponse({ message: msg, candidatos: matches.map(m => m.id) }, 200);
+    }
+
+    if (matches.length === 1) {
+      const match = matches[0];
+      if (match.pipedrive_deal_id && match.pipedrive_deal_id !== dealId) {
+        const msg = `Cliente "${clienteData.nome}" já vinculado a outro deal (${match.pipedrive_deal_id}); deal ${dealId} ignorado para evitar sobrescrita.`;
+        console.warn(msg);
+        await updateLogError(supabase, logId, msg);
+        return jsonResponse({ message: msg, cliente_id: match.id }, 200);
+      }
+
+      if (!match.pipedrive_deal_id) {
+        const { error: linkError } = await supabase
+          .from('clientes')
+          .update({ pipedrive_deal_id: dealId })
+          .eq('id', match.id);
+        if (linkError) {
+          console.error('Erro ao vincular deal ao cliente existente:', linkError);
+          await updateLogError(supabase, logId, `Erro ao vincular deal: ${linkError.message}`);
+          return jsonResponse({ error: 'Erro ao vincular deal ao cliente existente', details: linkError.message }, 500);
+        }
+      }
+
+      await updateLogProcessed(supabase, logId, match.id);
+      console.log(`Renovação detectada — deal ${dealId} vinculado ao cliente ${match.id}`);
+      return jsonResponse({
+        message: 'Renovação detectada — deal vinculado ao cliente existente',
+        cliente_id: match.id,
+        renovacao: true,
+      }, 200);
+    }
+
     // 6. Create cliente
     const { data: cliente, error: clienteError } = await supabase
       .from('clientes')
