@@ -26,6 +26,9 @@ export interface Projeto {
   _comentarios_count?: number;
   _checklist_done?: number;
   _checklist_total?: number;
+  _checklist_overdue?: number;
+  _checklist_soon?: number;
+  _checklist_responsaveis?: Array<{ id: string; nome: string }>;
   _reunioes_count?: number;
   _tags?: Array<{ id: string; nome: string; cor: string }>;
 }
@@ -51,7 +54,17 @@ export function useProjetos(consultorId?: string) {
     queryFn: async () => {
       let query = supabase
         .from('projetos')
-        .select('*, clientes(nome, cidade, uf), consultores(nome), contratos(tipo_consultoria_id, data_fim), projeto_tag_vinculo(tag_id, projeto_tags(id, nome, cor))')
+        .select(`
+          *,
+          clientes(nome, cidade, uf),
+          consultores(nome),
+          contratos(tipo_consultoria_id, data_fim),
+          projeto_tag_vinculo(tag_id, projeto_tags(id, nome, cor)),
+          projeto_checklist(id, concluido, due_date,
+            projeto_checklist_responsaveis(consultor_id, consultores(id, nome))
+          ),
+          projeto_comentarios(id)
+        `)
         .order('ordem_na_etapa');
       
       if (consultorId) {
@@ -60,12 +73,42 @@ export function useProjetos(consultorId?: string) {
 
       const { data, error } = await query;
       if (error) throw error;
-      
-      // Flatten tags into _tags array
-      return (data ?? []).map((p: any) => ({
-        ...p,
-        _tags: (p.projeto_tag_vinculo ?? []).map((v: any) => v.projeto_tags).filter(Boolean),
-      })) as Projeto[];
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const soonLimit = new Date(today);
+      soonLimit.setDate(soonLimit.getDate() + 3);
+
+      return (data ?? []).map((p: any) => {
+        const checklist = (p.projeto_checklist ?? []) as Array<{ id: string; concluido: boolean; due_date: string | null; projeto_checklist_responsaveis: Array<{ consultor_id: string; consultores: { id: string; nome: string } | null }> }>;
+        const done = checklist.filter(i => i.concluido).length;
+        const total = checklist.length;
+        let overdue = 0;
+        let soon = 0;
+        const respMap = new Map<string, { id: string; nome: string }>();
+        for (const item of checklist) {
+          if (!item.concluido && item.due_date) {
+            const d = new Date(item.due_date + 'T00:00:00');
+            if (d < today) overdue++;
+            else if (d <= soonLimit) soon++;
+          }
+          if (!item.concluido) {
+            for (const r of item.projeto_checklist_responsaveis ?? []) {
+              if (r.consultores) respMap.set(r.consultores.id, r.consultores);
+            }
+          }
+        }
+        return {
+          ...p,
+          _tags: (p.projeto_tag_vinculo ?? []).map((v: any) => v.projeto_tags).filter(Boolean),
+          _checklist_done: done,
+          _checklist_total: total,
+          _checklist_overdue: overdue,
+          _checklist_soon: soon,
+          _checklist_responsaveis: Array.from(respMap.values()),
+          _comentarios_count: (p.projeto_comentarios ?? []).length,
+        };
+      }) as Projeto[];
     },
   });
 }
