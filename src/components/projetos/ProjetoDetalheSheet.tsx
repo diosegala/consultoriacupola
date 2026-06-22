@@ -20,6 +20,8 @@ import type { Projeto } from '@/hooks/useProjetos';
 import { useProjetoComentarios, useCreateComentario, useDeleteComentario } from '@/hooks/useProjetoComentarios';
 import { useProjetoChecklist, useCreateChecklistItem, useToggleChecklistItem, useDeleteChecklistItem, useUpdateChecklistItem } from '@/hooks/useProjetoChecklist';
 import { useConsultores } from '@/hooks/useConsultores';
+import { useChecklistResponsaveisByProjeto, useAddChecklistResponsavel, useRemoveChecklistResponsavel } from '@/hooks/useChecklistResponsaveis';
+import { useTodoPessoal, useCreateTodoPessoal, useUpdateTodoPessoal, useDeleteTodoPessoal } from '@/hooks/useTodoPessoal';
 import { useReunioesByConsultor } from '@/hooks/useReunioes';
 import { useProjetoTags, useProjetoTagVinculos, useAddTagToProjeto, useRemoveTagFromProjeto, useCreateTag, TAG_COLORS } from '@/hooks/useProjetoTags';
 import { useProjetoDocumentos, useGerarDocumento, useParseDocumento } from '@/hooks/useProjetoDocumentos';
@@ -75,6 +77,8 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
 
   const { data: comentarios } = useProjetoComentarios(projeto?.id);
   const { data: checklist } = useProjetoChecklist(projeto?.id);
+  const { data: responsaveisRows } = useChecklistResponsaveisByProjeto(projeto?.id);
+  const { data: todos } = useTodoPessoal(projeto?.id ?? undefined);
   const { data: reunioes } = useReunioesByConsultor(projeto?.consultor_id);
   const { data: allTags } = useProjetoTags();
   const { data: tagVinculos } = useProjetoTagVinculos(projeto?.id);
@@ -88,6 +92,12 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
   const toggleCheckItem = useToggleChecklistItem();
   const deleteCheckItem = useDeleteChecklistItem();
   const updateCheckItem = useUpdateChecklistItem();
+  const addResponsavel = useAddChecklistResponsavel();
+  const removeResponsavel = useRemoveChecklistResponsavel();
+  const createTodo = useCreateTodoPessoal();
+  const updateTodo = useUpdateTodoPessoal();
+  const deleteTodo = useDeleteTodoPessoal();
+  const [novoTodo, setNovoTodo] = useState('');
   const { data: consultoresList } = useConsultores();
   const addTag = useAddTagToProjeto();
   const removeTag = useRemoveTagFromProjeto();
@@ -95,6 +105,20 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
 
   const reunioesDoProjeto = reunioes?.filter(r => r.cliente_id === projeto?.cliente_id) ?? [];
   const linkedTagIds = new Set(tagVinculos?.map(v => v.tag_id) ?? []);
+
+  const responsaveisByItem = useMemo(() => {
+    const map = new Map<string, Array<{ id: string; nome: string }>>();
+    for (const r of responsaveisRows ?? []) {
+      if (!r.consultor) continue;
+      const arr = map.get(r.checklist_item_id) ?? [];
+      arr.push({ id: r.consultor.id, nome: r.consultor.nome });
+      map.set(r.checklist_item_id, arr);
+    }
+    return map;
+  }, [responsaveisRows]);
+
+  const initials = (nome: string) =>
+    nome.split(' ').map(p => p[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
 
   const handleSaveDueDate = async (date: Date | undefined) => {
     if (!projeto) return;
@@ -281,20 +305,47 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
                         </Button>
                       </div>
                       <div className="flex items-center gap-2 pl-6 flex-wrap">
-                        {/* Assigned to */}
-                        <select
-                          className="text-[10px] bg-transparent border border-border/50 rounded px-1.5 py-0.5 text-muted-foreground"
-                          value={item.assigned_to ?? ''}
-                          onChange={e => updateCheckItem.mutate({
-                            id: item.id, projeto_id: projeto.id,
-                            assigned_to: e.target.value || null,
-                          })}
-                        >
-                          <option value="">Sem responsável</option>
-                          {consultoresList?.filter(c => c.ativo).map(c => (
-                            <option key={c.id} value={c.id}>{c.nome}</option>
-                          ))}
-                        </select>
+                        {/* Responsáveis (múltiplos) */}
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button className="text-[10px] bg-transparent border border-border/50 rounded px-1.5 py-0.5 text-muted-foreground hover:bg-accent flex items-center gap-1">
+                              {(() => {
+                                const resps = responsaveisByItem.get(item.id) ?? [];
+                                if (resps.length === 0) return <>+ Responsáveis</>;
+                                return (
+                                  <div className="flex -space-x-1">
+                                    {resps.slice(0, 3).map(r => (
+                                      <div key={r.id} title={r.nome} className="h-4 w-4 rounded-full bg-primary/20 border border-background text-[8px] font-semibold flex items-center justify-center text-primary">
+                                        {initials(r.nome)}
+                                      </div>
+                                    ))}
+                                    {resps.length > 3 && <span className="ml-1">+{resps.length - 3}</span>}
+                                  </div>
+                                );
+                              })()}
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-56 p-2 z-[9999]" align="start">
+                            <p className="text-[10px] text-muted-foreground mb-1 px-1">Responsáveis</p>
+                            <div className="space-y-1 max-h-48 overflow-auto">
+                              {consultoresList?.filter(c => c.ativo).map(c => {
+                                const checked = (responsaveisByItem.get(item.id) ?? []).some(r => r.id === c.id);
+                                return (
+                                  <label key={c.id} className="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-accent cursor-pointer">
+                                    <Checkbox
+                                      checked={checked}
+                                      onCheckedChange={(v) => {
+                                        if (v) addResponsavel.mutate({ checklist_item_id: item.id, consultor_id: c.id, projeto_id: projeto.id });
+                                        else removeResponsavel.mutate({ checklist_item_id: item.id, consultor_id: c.id, projeto_id: projeto.id });
+                                      }}
+                                    />
+                                    <span className="text-xs">{c.nome}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
                         {/* Due date */}
                         <Popover>
                           <PopoverTrigger asChild>
@@ -329,6 +380,79 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
                     className="h-8 text-sm"
                   />
                   <Button size="sm" variant="ghost" onClick={handleAddCheckItem} className="h-8">
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Minhas tarefas (to-do pessoal privado) */}
+              <div>
+                <h4 className="text-sm font-medium mb-2 flex items-center gap-1">
+                  <CheckSquare className="h-4 w-4" /> Minhas tarefas
+                  <span className="text-[10px] text-muted-foreground font-normal">(privado)</span>
+                </h4>
+                <div className="space-y-2">
+                  {todos?.length === 0 && (
+                    <p className="text-xs text-muted-foreground">Nenhuma tarefa pessoal neste projeto.</p>
+                  )}
+                  {todos?.map(t => (
+                    <div key={t.id} className="rounded-md border border-border/50 p-2 group flex items-center gap-2">
+                      <Checkbox
+                        checked={t.concluido}
+                        onCheckedChange={(v) => updateTodo.mutate({ id: t.id, concluido: !!v })}
+                      />
+                      <span className={cn("text-sm flex-1", t.concluido && "line-through text-muted-foreground")}>
+                        {t.titulo}
+                      </span>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button className="text-[10px] bg-transparent border border-border/50 rounded px-1.5 py-0.5 text-muted-foreground hover:bg-accent flex items-center gap-1">
+                            <CalendarIcon className="h-3 w-3" />
+                            {t.due_date ? format(new Date(t.due_date + 'T00:00:00'), 'dd/MM/yy') : 'Prazo'}
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0 z-[9999]" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={t.due_date ? new Date(t.due_date + 'T00:00:00') : undefined}
+                            onSelect={(date) => updateTodo.mutate({ id: t.id, due_date: date ? format(date, 'yyyy-MM-dd') : null })}
+                            className="p-3 pointer-events-auto"
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <Button
+                        variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                        onClick={() => deleteTodo.mutate({ id: t.id })}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2 mt-2">
+                  <Input
+                    placeholder="Nova tarefa pessoal..."
+                    value={novoTodo}
+                    onChange={e => setNovoTodo(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && novoTodo.trim()) {
+                        createTodo.mutate({ titulo: novoTodo.trim(), projeto_id: projeto.id });
+                        setNovoTodo('');
+                      }
+                    }}
+                    className="h-8 text-sm"
+                  />
+                  <Button
+                    size="sm" variant="ghost" className="h-8"
+                    onClick={() => {
+                      if (!novoTodo.trim()) return;
+                      createTodo.mutate({ titulo: novoTodo.trim(), projeto_id: projeto.id });
+                      setNovoTodo('');
+                    }}
+                  >
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>

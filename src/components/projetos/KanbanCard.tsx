@@ -1,7 +1,7 @@
 import { Draggable } from '@hello-pangea/dnd';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MapPin, MessageSquarePlus, CalendarIcon, CheckSquare, MessageSquare, Tag } from 'lucide-react';
+import { MapPin, MessageSquarePlus, CalendarIcon, CheckSquare, MessageSquare, AlertTriangle, Clock } from 'lucide-react';
 import { format, isPast, addDays, isBefore } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
@@ -36,6 +36,12 @@ export function KanbanCard({ projeto, index, onRegistrarReuniao, onClick }: Kanb
   const checkDone = projeto._checklist_done ?? 0;
   const checkTotal = projeto._checklist_total ?? 0;
   const checkPercent = checkTotal > 0 ? (checkDone / checkTotal) * 100 : 0;
+  const checkOverdue = projeto._checklist_overdue ?? 0;
+  const checkSoon = projeto._checklist_soon ?? 0;
+  const responsaveis = projeto._checklist_responsaveis ?? [];
+
+  const initials = (nome: string) =>
+    nome.split(' ').map(p => p[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
 
   return (
     <Draggable draggableId={projeto.id} index={index}>
@@ -99,6 +105,20 @@ export function KanbanCard({ projeto, index, onRegistrarReuniao, onClick }: Kanb
                     <CheckSquare className="h-3 w-3" />
                     {checkDone}/{checkTotal}
                   </span>
+                  <div className="flex items-center gap-1">
+                    {checkOverdue > 0 && (
+                      <span className="text-[10px] flex items-center gap-0.5 text-destructive font-medium" title="Itens vencidos">
+                        <AlertTriangle className="h-3 w-3" />
+                        {checkOverdue}
+                      </span>
+                    )}
+                    {checkSoon > 0 && (
+                      <span className="text-[10px] flex items-center gap-0.5 text-yellow-600 font-medium" title="Vencem em até 3 dias">
+                        <Clock className="h-3 w-3" />
+                        {checkSoon}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <Progress value={checkPercent} className="h-1.5" />
               </div>
@@ -116,6 +136,24 @@ export function KanbanCard({ projeto, index, onRegistrarReuniao, onClick }: Kanb
                   <MessageSquare className="h-3 w-3" />
                   {projeto._comentarios_count}
                 </span>
+              )}
+              {responsaveis.length > 0 && (
+                <div className="flex -space-x-1 ml-auto">
+                  {responsaveis.slice(0, 3).map(r => (
+                    <div
+                      key={r.id}
+                      title={r.nome}
+                      className="h-5 w-5 rounded-full bg-primary/20 border border-background text-[9px] font-semibold flex items-center justify-center text-primary"
+                    >
+                      {initials(r.nome)}
+                    </div>
+                  ))}
+                  {responsaveis.length > 3 && (
+                    <div className="h-5 w-5 rounded-full bg-muted border border-background text-[9px] font-semibold flex items-center justify-center text-muted-foreground">
+                      +{responsaveis.length - 3}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 

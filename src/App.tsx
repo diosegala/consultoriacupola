@@ -20,6 +20,7 @@ import Projetos from "./pages/Projetos";
 import ResetPassword from "./pages/ResetPassword";
 import TrocarSenha from "./pages/TrocarSenha";
 import MinhasIntegracoes from "./pages/MinhasIntegracoes";
+import MinhasTarefas from "./pages/MinhasTarefas";
 import GoogleCallback from "./pages/GoogleCallback";
 import NotFound from "./pages/NotFound";
 
@@ -47,6 +48,7 @@ const App = () => (
               <Route path="/consultores/:id" element={<ConsultorDetalhe />} />
               <Route path="/configuracoes" element={<Configuracoes />} />
               <Route path="/projetos" element={<Projetos />} />
+              <Route path="/minhas-tarefas" element={<MinhasTarefas />} />
               <Route path="/integracoes" element={<MinhasIntegracoes />} />
             </Route>
             <Route path="*" element={<NotFound />} />
