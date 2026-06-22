@@ -1,14 +1,12 @@
-import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ArrowLeft, Plus, Users, DollarSign, Star, Video, FileDown } from 'lucide-react';
+import { Loader2, ArrowLeft, Users, DollarSign, Star, Video, FileDown } from 'lucide-react';
 
 import { useConsultoresComStats } from '@/hooks/useConsultores';
 import { useReunioesByConsultor, useScoreConsultor } from '@/hooks/useReunioes';
 import { ReunioesList } from '@/components/consultor/ReunioesList';
-import { NovaReuniaoDialog } from '@/components/consultor/NovaReuniaoDialog';
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('pt-BR', {
@@ -25,7 +23,6 @@ export default function ConsultorDetalhe() {
   const { data: consultores, isLoading: loadingConsultor } = useConsultoresComStats();
   const { data: reunioes, isLoading: loadingReunioes } = useReunioesByConsultor(id);
   const { data: scoreData } = useScoreConsultor(id);
-  const [novaReuniaoOpen, setNovaReuniaoOpen] = useState(false);
 
   const consultor = consultores?.find(c => c.id === id);
 
@@ -126,7 +123,12 @@ export default function ConsultorDetalhe() {
       {/* Reuniões */}
       <Card className="bg-card border-border">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-foreground">Reuniões</CardTitle>
+          <div>
+            <CardTitle className="text-foreground">Reuniões deste consultor</CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              Visão consolidada. Para adicionar ou re-analisar uma reunião, acesse a ficha do cliente.
+            </p>
+          </div>
           <div className="flex gap-2">
             {reunioes?.some(r => r.status_analise === 'concluido') && (
               <Button
@@ -136,21 +138,12 @@ export default function ConsultorDetalhe() {
                 <FileDown className="h-4 w-4 mr-2" /> Gerar Relatório
               </Button>
             )}
-            <Button onClick={() => setNovaReuniaoOpen(true)} className="bg-primary text-primary-foreground">
-              <Plus className="h-4 w-4 mr-2" /> Nova Reunião
-            </Button>
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <ReunioesList reunioes={reunioes} isLoading={loadingReunioes} />
+          <ReunioesList reunioes={reunioes} isLoading={loadingReunioes} linkCliente />
         </CardContent>
       </Card>
-
-      <NovaReuniaoDialog
-        open={novaReuniaoOpen}
-        onOpenChange={setNovaReuniaoOpen}
-        consultorId={id!}
-      />
     </div>
   );
 }

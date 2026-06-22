@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, FileText, Link as LinkIcon, Cloud } from 'lucide-react';
 import { useClientes } from '@/hooks/useClientes';
+import { useConsultores } from '@/hooks/useConsultores';
 import { useCreateReuniao, useAnalisarReuniao } from '@/hooks/useReunioes';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -16,13 +17,14 @@ import { ImportarDriveDialog } from './ImportarDriveDialog';
 interface NovaReuniaoDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  consultorId: string;
+  consultorId?: string;
   clienteId?: string;
 }
 
 export function NovaReuniaoDialog({ open, onOpenChange, consultorId, clienteId }: NovaReuniaoDialogProps) {
   const { toast } = useToast();
   const { data: clientes } = useClientes();
+  const { data: consultores } = useConsultores();
   const createReuniao = useCreateReuniao();
   const analisarReuniao = useAnalisarReuniao();
 
@@ -30,6 +32,7 @@ export function NovaReuniaoDialog({ open, onOpenChange, consultorId, clienteId }
   const [linkTranscricao, setLinkTranscricao] = useState('');
   const [loadingLink, setLoadingLink] = useState(false);
   const [driveOpen, setDriveOpen] = useState(false);
+  const [selectedConsultorId, setSelectedConsultorId] = useState<string>(consultorId ?? '');
 
   const [formData, setFormData] = useState({
     cliente_id: clienteId ?? '',
@@ -86,8 +89,9 @@ export function NovaReuniaoDialog({ open, onOpenChange, consultorId, clienteId }
   };
 
   const handleSubmit = async () => {
-    if (!formData.cliente_id || !formData.data_reuniao) {
-      toast({ title: 'Erro', description: 'Cliente e data são obrigatórios', variant: 'destructive' });
+    const effectiveConsultorId = consultorId ?? selectedConsultorId;
+    if (!formData.cliente_id || !formData.data_reuniao || !effectiveConsultorId) {
+      toast({ title: 'Erro', description: 'Cliente, consultor e data são obrigatórios', variant: 'destructive' });
       return;
     }
     if (!formData.transcricao.trim()) {
@@ -97,7 +101,7 @@ export function NovaReuniaoDialog({ open, onOpenChange, consultorId, clienteId }
 
     try {
       const reuniao = await createReuniao.mutateAsync({
-        consultor_id: consultorId,
+        consultor_id: effectiveConsultorId,
         cliente_id: formData.cliente_id,
         data_reuniao: formData.data_reuniao,
         duracao_minutos: formData.duracao_minutos ? parseInt(formData.duracao_minutos) : null,
@@ -135,6 +139,7 @@ export function NovaReuniaoDialog({ open, onOpenChange, consultorId, clienteId }
   };
 
   const clientesAtivos = clientes?.filter(c => c.status === 'ativo') || [];
+  const consultoresAtivos = (consultores || []).filter((c: any) => c.ativo);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -158,7 +163,11 @@ export function NovaReuniaoDialog({ open, onOpenChange, consultorId, clienteId }
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-foreground">Cliente *</Label>
-              <Select value={formData.cliente_id} onValueChange={(v) => setFormData({ ...formData, cliente_id: v })}>
+              <Select
+                value={formData.cliente_id}
+                onValueChange={(v) => setFormData({ ...formData, cliente_id: v })}
+                disabled={!!clienteId}
+              >
                 <SelectTrigger className="bg-input border-border">
                   <SelectValue placeholder="Selecione o cliente" />
                 </SelectTrigger>
@@ -180,6 +189,22 @@ export function NovaReuniaoDialog({ open, onOpenChange, consultorId, clienteId }
               />
             </div>
           </div>
+
+          {!consultorId && (
+            <div className="space-y-2">
+              <Label className="text-foreground">Consultor *</Label>
+              <Select value={selectedConsultorId} onValueChange={setSelectedConsultorId}>
+                <SelectTrigger className="bg-input border-border">
+                  <SelectValue placeholder="Selecione o consultor" />
+                </SelectTrigger>
+                <SelectContent>
+                  {consultoresAtivos.map((c: any) => (
+                    <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
