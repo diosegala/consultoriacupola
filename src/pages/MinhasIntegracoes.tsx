@@ -143,6 +143,19 @@ export default function MinhasIntegracoes() {
                     : 'Nunca'}
                 </p>
               </div>
+              {lastSyncStats && (
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <Badge className="bg-green-600/20 text-green-500 border-green-600/30">
+                    <CheckCircle2 className="h-3 w-3 mr-1" /> {lastSyncStats.importadas} importada(s)
+                  </Badge>
+                  <Badge className="bg-yellow-600/20 text-yellow-500 border-yellow-600/30">
+                    <AlertTriangle className="h-3 w-3 mr-1" /> {lastSyncStats.sem_cliente} sem cliente
+                  </Badge>
+                  <Badge className="bg-red-600/20 text-red-500 border-red-600/30">
+                    <XCircle className="h-3 w-3 mr-1" /> {lastSyncStats.erros} erro(s)
+                  </Badge>
+                </div>
+              )}
               <div className="flex gap-2">
                 <Button onClick={handleSync} disabled={syncing} variant="outline" className="border-border">
                   {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
