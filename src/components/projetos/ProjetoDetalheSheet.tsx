@@ -387,6 +387,79 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
 
               <Separator />
 
+              {/* Minhas tarefas (to-do pessoal privado) */}
+              <div>
+                <h4 className="text-sm font-medium mb-2 flex items-center gap-1">
+                  <CheckSquare className="h-4 w-4" /> Minhas tarefas
+                  <span className="text-[10px] text-muted-foreground font-normal">(privado)</span>
+                </h4>
+                <div className="space-y-2">
+                  {todos?.length === 0 && (
+                    <p className="text-xs text-muted-foreground">Nenhuma tarefa pessoal neste projeto.</p>
+                  )}
+                  {todos?.map(t => (
+                    <div key={t.id} className="rounded-md border border-border/50 p-2 group flex items-center gap-2">
+                      <Checkbox
+                        checked={t.concluido}
+                        onCheckedChange={(v) => updateTodo.mutate({ id: t.id, concluido: !!v })}
+                      />
+                      <span className={cn("text-sm flex-1", t.concluido && "line-through text-muted-foreground")}>
+                        {t.titulo}
+                      </span>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button className="text-[10px] bg-transparent border border-border/50 rounded px-1.5 py-0.5 text-muted-foreground hover:bg-accent flex items-center gap-1">
+                            <CalendarIcon className="h-3 w-3" />
+                            {t.due_date ? format(new Date(t.due_date + 'T00:00:00'), 'dd/MM/yy') : 'Prazo'}
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0 z-[9999]" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={t.due_date ? new Date(t.due_date + 'T00:00:00') : undefined}
+                            onSelect={(date) => updateTodo.mutate({ id: t.id, due_date: date ? format(date, 'yyyy-MM-dd') : null })}
+                            className="p-3 pointer-events-auto"
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <Button
+                        variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                        onClick={() => deleteTodo.mutate({ id: t.id })}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2 mt-2">
+                  <Input
+                    placeholder="Nova tarefa pessoal..."
+                    value={novoTodo}
+                    onChange={e => setNovoTodo(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && novoTodo.trim()) {
+                        createTodo.mutate({ titulo: novoTodo.trim(), projeto_id: projeto.id });
+                        setNovoTodo('');
+                      }
+                    }}
+                    className="h-8 text-sm"
+                  />
+                  <Button
+                    size="sm" variant="ghost" className="h-8"
+                    onClick={() => {
+                      if (!novoTodo.trim()) return;
+                      createTodo.mutate({ titulo: novoTodo.trim(), projeto_id: projeto.id });
+                      setNovoTodo('');
+                    }}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <Separator />
+
               {/* Comentários */}
               <div>
                 <h4 className="text-sm font-medium mb-2 flex items-center gap-1">
