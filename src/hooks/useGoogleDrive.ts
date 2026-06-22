@@ -86,6 +86,50 @@ export function useSyncDiarioManual() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['reunioes'] });
       qc.invalidateQueries({ queryKey: ['google-connection'] });
+      qc.invalidateQueries({ queryKey: ['reunioes-importadas-log'] });
+    },
+  });
+}
+
+export interface ReuniaoImportadaLog {
+  id: string;
+  google_file_id: string;
+  consultor_id: string;
+  cliente_id: string | null;
+  reuniao_id: string | null;
+  nome_arquivo: string;
+  data_importacao: string;
+  status: 'importado' | 'sem_match' | 'erro';
+  erro: string | null;
+  cliente_nome?: string | null;
+}
+
+export function useReunioesImportadasLog(
+  consultorId: string | undefined,
+  opts: { status?: string; limit?: number } = {},
+) {
+  const { status, limit = 20 } = opts;
+  return useQuery({
+    queryKey: ['reunioes-importadas-log', consultorId, status, limit],
+    enabled: !!consultorId,
+    queryFn: async () => {
+      let q = supabase
+        .from('reunioes_importadas_log' as any)
+        .select('*')
+        .eq('consultor_id', consultorId!)
+        .order('data_importacao', { ascending: false })
+        .limit(limit);
+      if (status && status !== 'all') q = q.eq('status', status);
+      const { data, error } = await q;
+      if (error) throw error;
+      const rows = (data || []) as any[] as ReuniaoImportadaLog[];
+      const ids = Array.from(new Set(rows.map((r) => r.cliente_id).filter(Boolean))) as string[];
+      if (ids.length) {
+        const { data: cs } = await supabase.from('clientes').select('id, nome').in('id', ids);
+        const map = new Map((cs || []).map((c: any) => [c.id, c.nome]));
+        rows.forEach((r) => { r.cliente_nome = r.cliente_id ? map.get(r.cliente_id) ?? null : null; });
+      }
+      return rows;
     },
   });
 }
