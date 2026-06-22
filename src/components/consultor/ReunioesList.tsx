@@ -1,17 +1,25 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Eye, RotateCw, Trash2 } from 'lucide-react';
+import { Loader2, Eye, RotateCw, Trash2, ExternalLink } from 'lucide-react';
 import { ReuniaoComDetalhes, useAnalisarReuniao, useDeleteReuniao } from '@/hooks/useReunioes';
 import { ReuniaoAnalise } from './ReuniaoAnalise';
 import { useToast } from '@/hooks/use-toast';
+import { useCurrentUserRole } from '@/hooks/useUserRoles';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface ReunioesListProps {
   reunioes: ReuniaoComDetalhes[] | undefined;
   isLoading: boolean;
+  /** Hide "Cliente" column (when already scoped to a cliente). */
+  hideClienteColumn?: boolean;
+  /** Show "Consultor" column instead. */
+  showConsultorColumn?: boolean;
+  /** Make cliente name a link to /clientes/:id. */
+  linkCliente?: boolean;
 }
 
 function getScoreColor(score: number): string {
@@ -33,11 +41,19 @@ function getStatusBadge(status: string) {
   }
 }
 
-export function ReunioesList({ reunioes, isLoading }: ReunioesListProps) {
+export function ReunioesList({
+  reunioes,
+  isLoading,
+  hideClienteColumn = false,
+  showConsultorColumn = false,
+  linkCliente = false,
+}: ReunioesListProps) {
   const { toast } = useToast();
   const [selectedReuniao, setSelectedReuniao] = useState<ReuniaoComDetalhes | null>(null);
   const analisarReuniao = useAnalisarReuniao();
   const deleteReuniao = useDeleteReuniao();
+  const { data: role } = useCurrentUserRole();
+  const isAdmin = role === 'admin' || role === 'diretor';
 
   const handleReanalizar = async (reuniaoId: string) => {
     try {
@@ -79,9 +95,15 @@ export function ReunioesList({ reunioes, isLoading }: ReunioesListProps) {
         <TableHeader>
           <TableRow className="border-border hover:bg-transparent">
             <TableHead className="text-muted-foreground">Data</TableHead>
-            <TableHead className="text-muted-foreground">Cliente</TableHead>
+            {!hideClienteColumn && (
+              <TableHead className="text-muted-foreground">Cliente</TableHead>
+            )}
+            {showConsultorColumn && (
+              <TableHead className="text-muted-foreground">Consultor</TableHead>
+            )}
             <TableHead className="text-muted-foreground text-center">Duração</TableHead>
             <TableHead className="text-muted-foreground text-center">Score</TableHead>
+            <TableHead className="text-muted-foreground">Origem</TableHead>
             <TableHead className="text-muted-foreground">Status</TableHead>
             <TableHead className="text-muted-foreground text-right">Ações</TableHead>
           </TableRow>
@@ -92,9 +114,26 @@ export function ReunioesList({ reunioes, isLoading }: ReunioesListProps) {
               <TableCell className="text-foreground">
                 {format(parseISO(reuniao.data_reuniao), 'dd/MM/yyyy', { locale: ptBR })}
               </TableCell>
-              <TableCell className="text-foreground font-medium">
-                {reuniao.clientes?.nome || '-'}
-              </TableCell>
+              {!hideClienteColumn && (
+                <TableCell className="text-foreground font-medium">
+                  {linkCliente && reuniao.cliente_id ? (
+                    <Link
+                      to={`/clientes/${reuniao.cliente_id}`}
+                      className="text-primary hover:underline inline-flex items-center gap-1"
+                    >
+                      {reuniao.clientes?.nome || '-'}
+                      <ExternalLink className="h-3 w-3" />
+                    </Link>
+                  ) : (
+                    reuniao.clientes?.nome || '-'
+                  )}
+                </TableCell>
+              )}
+              {showConsultorColumn && (
+                <TableCell className="text-foreground">
+                  {reuniao.consultores?.nome || '-'}
+                </TableCell>
+              )}
               <TableCell className="text-center text-muted-foreground">
                 {reuniao.duracao_minutos ? `${reuniao.duracao_minutos}min` : '-'}
               </TableCell>
@@ -105,6 +144,17 @@ export function ReunioesList({ reunioes, isLoading }: ReunioesListProps) {
                   </Badge>
                 ) : '-'}
               </TableCell>
+              <TableCell>
+                {(reuniao as any).origem === 'drive' ? (
+                  <Badge variant="outline" className="text-xs border-border text-muted-foreground">
+                    Google Drive
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-xs border-border text-muted-foreground">
+                    Manual
+                  </Badge>
+                )}
+              </TableCell>
               <TableCell>{getStatusBadge(reuniao.status_analise)}</TableCell>
               <TableCell className="text-right">
                 <div className="flex gap-1 justify-end">
@@ -113,25 +163,29 @@ export function ReunioesList({ reunioes, isLoading }: ReunioesListProps) {
                       <Eye className="h-4 w-4" />
                     </Button>
                   )}
-                  {(reuniao.status_analise === 'erro' || reuniao.status_analise === 'pendente') && (
+                  {isAdmin && (reuniao.status_analise === 'erro' || reuniao.status_analise === 'pendente' || reuniao.status_analise === 'concluido') && (
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={() => handleReanalizar(reuniao.id)}
                       disabled={analisarReuniao.isPending}
+                      title="Re-analisar (admin)"
                     >
                       <RotateCw className="h-4 w-4" />
                     </Button>
                   )}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => handleDelete(reuniao.id)}
-                    disabled={deleteReuniao.isPending}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {isAdmin && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => handleDelete(reuniao.id)}
+                      disabled={deleteReuniao.isPending}
+                      title="Excluir (admin)"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               </TableCell>
             </TableRow>
