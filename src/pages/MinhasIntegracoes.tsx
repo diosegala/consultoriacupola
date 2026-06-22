@@ -1,14 +1,17 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, CheckCircle2, XCircle, RefreshCw, Link2 } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, RefreshCw, Link2, AlertTriangle, FileText, ExternalLink } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useMyConsultorId } from '@/hooks/useConsultorUser';
 import {
   useGoogleConnection,
   useStartGoogleOAuth,
   useSyncDiarioManual,
+  useReunioesImportadasLog,
 } from '@/hooks/useGoogleDrive';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -21,6 +24,22 @@ export default function MinhasIntegracoes() {
   const startOAuth = useStartGoogleOAuth();
   const syncManual = useSyncDiarioManual();
   const [syncing, setSyncing] = useState(false);
+  const [logFilter, setLogFilter] = useState<string>('all');
+  const { data: logs, isLoading: logsLoading, refetch: refetchLogs } = useReunioesImportadasLog(
+    consultorId ?? undefined,
+    { status: logFilter, limit: 20 },
+  );
+
+  const lastSyncStats = useMemo(() => {
+    if (!conn?.ultima_sincronizacao || !logs) return null;
+    const since = new Date(conn.ultima_sincronizacao).getTime() - 5 * 60 * 1000;
+    const recent = logs.filter((l) => new Date(l.data_importacao).getTime() >= since);
+    return {
+      importadas: recent.filter((l) => l.status === 'importado').length,
+      sem_cliente: recent.filter((l) => l.status === 'sem_match').length,
+      erros: recent.filter((l) => l.status === 'erro').length,
+    };
+  }, [conn?.ultima_sincronizacao, logs]);
 
   const handleConnect = async () => {
     const redirectUri = `${window.location.origin}/google-callback`;
@@ -35,8 +54,12 @@ export default function MinhasIntegracoes() {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      await syncManual.mutateAsync();
-      toast({ title: 'Sincronização concluída', description: 'Verifique as novas reuniões importadas.' });
+      const res: any = await syncManual.mutateAsync();
+      const r = res?.resultados?.[0];
+      const desc = r && typeof r.importados === 'number'
+        ? `${r.importados} importada(s), ${r.pulados} sem cliente, ${r.erros} erro(s)`
+        : 'Verifique as novas reuniões importadas.';
+      toast({ title: 'Sincronização concluída', description: desc });
     } catch (e: any) {
       toast({ title: 'Erro na sincronização', description: e.message, variant: 'destructive' });
     } finally {
@@ -120,6 +143,19 @@ export default function MinhasIntegracoes() {
                     : 'Nunca'}
                 </p>
               </div>
+              {lastSyncStats && (
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <Badge className="bg-green-600/20 text-green-500 border-green-600/30">
+                    <CheckCircle2 className="h-3 w-3 mr-1" /> {lastSyncStats.importadas} importada(s)
+                  </Badge>
+                  <Badge className="bg-yellow-600/20 text-yellow-500 border-yellow-600/30">
+                    <AlertTriangle className="h-3 w-3 mr-1" /> {lastSyncStats.sem_cliente} sem cliente
+                  </Badge>
+                  <Badge className="bg-red-600/20 text-red-500 border-red-600/30">
+                    <XCircle className="h-3 w-3 mr-1" /> {lastSyncStats.erros} erro(s)
+                  </Badge>
+                </div>
+              )}
               <div className="flex gap-2">
                 <Button onClick={handleSync} disabled={syncing} variant="outline" className="border-border">
                   {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
@@ -148,6 +184,100 @@ export default function MinhasIntegracoes() {
           )}
         </CardContent>
       </Card>
+
+      {conn?.ativo && (
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <CardTitle className="text-foreground flex items-center gap-2">
+                  <FileText className="h-4 w-4" /> Últimas transcrições encontradas
+                </CardTitle>
+                <CardDescription>
+                  Resultado da sincronização — últimos 20 arquivos processados.
+                </CardDescription>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => refetchLogs()} disabled={logsLoading}>
+                {logsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              </Button>
+            </div>
+            <Tabs value={logFilter} onValueChange={setLogFilter} className="mt-2">
+              <TabsList className="bg-muted">
+                <TabsTrigger value="all">Todas</TabsTrigger>
+                <TabsTrigger value="importado">Importadas</TabsTrigger>
+                <TabsTrigger value="sem_match">Sem cliente</TabsTrigger>
+                <TabsTrigger value="erro">Erros</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {logsLoading && (
+              <div className="flex items-center justify-center py-6 text-muted-foreground text-sm">
+                <Loader2 className="h-4 w-4 animate-spin mr-2" /> Carregando...
+              </div>
+            )}
+            {!logsLoading && (!logs || logs.length === 0) && (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                Nenhum arquivo {logFilter !== 'all' ? 'nesta categoria' : 'processado ainda'}.
+              </p>
+            )}
+            <TooltipProvider>
+              {(logs || []).map((l) => (
+                <div key={l.id} className="border border-border rounded-md p-3 flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <p className="text-sm font-medium text-foreground truncate cursor-default">
+                          {l.nome_arquivo}
+                        </p>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-md break-all">{l.nome_arquivo}</TooltipContent>
+                    </Tooltip>
+                    <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
+                      <span>{format(new Date(l.data_importacao), "dd/MM HH:mm", { locale: ptBR })}</span>
+                      <span>•</span>
+                      <span className="text-foreground">{l.cliente_nome || '—'}</span>
+                    </div>
+                    {l.status === 'erro' && l.erro && (
+                      <p className="text-xs text-red-400 mt-1 line-clamp-2">{l.erro}</p>
+                    )}
+                    {l.status === 'sem_match' && (
+                      <p className="text-xs text-yellow-500 mt-1">
+                        Cliente não identificado. Cadastre um apelido em Clientes &gt; editar.
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end gap-2 shrink-0">
+                    {l.status === 'importado' && (
+                      <Badge className="bg-green-600/20 text-green-500 border-green-600/30">
+                        <CheckCircle2 className="h-3 w-3 mr-1" /> Importada
+                      </Badge>
+                    )}
+                    {l.status === 'sem_match' && (
+                      <Badge className="bg-yellow-600/20 text-yellow-500 border-yellow-600/30">
+                        <AlertTriangle className="h-3 w-3 mr-1" /> Sem cliente
+                      </Badge>
+                    )}
+                    {l.status === 'erro' && (
+                      <Badge className="bg-red-600/20 text-red-500 border-red-600/30">
+                        <XCircle className="h-3 w-3 mr-1" /> Erro
+                      </Badge>
+                    )}
+                    {l.status === 'importado' && l.cliente_id && (
+                      <Link
+                        to={`/clientes/${l.cliente_id}`}
+                        className="text-xs text-primary hover:underline flex items-center gap-1"
+                      >
+                        Ver cliente <ExternalLink className="h-3 w-3" />
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </TooltipProvider>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
