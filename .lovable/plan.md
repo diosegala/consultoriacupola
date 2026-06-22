@@ -1,36 +1,63 @@
-## Objetivo
+## Diagnóstico do fluxo atual
 
-Após sincronizar (manual ou noturna), o consultor precisa ver claramente **quais transcrições foram trazidas, quais foram puladas e por quê**. Hoje a página `/minhas-integracoes` só mostra "última sincronização: data/hora" e um toast genérico.
+- **`/consultores/:id`** tem o card "Reuniões" como ponto principal de entrada: botão "Nova Reunião", lista com todas as reuniões daquele consultor (todos os clientes), visualização da análise e ações de re-analisar / excluir.
+- **`/clientes/:id` → Desempenho** mostra apenas o score do cliente (engajamento), sem listar reuniões nem permitir gerenciá-las.
+- A sincronização do Drive já cria as reuniões automaticamente vinculadas ao cliente certo, então o "Nova Reunião" no consultor virou exceção.
 
-## Mudanças
+O resultado é que as reuniões ficam dispersas pelo consultor, enquanto o que faz sentido para a operação é vê-las **dentro do cliente** (cada cliente é o "fio do bordado") e o consultor virar uma visão agregada/relatório.
 
-### 1. Retorno da sincronização manual
-`google-drive-sync-diario` já retorna `{ resultados: [{ importados, pulados, erros }] }`. O hook `useSyncDiarioManual` vai propagar esse retorno e a página vai exibir os contadores no toast (ex.: "3 importadas, 2 sem cliente, 0 erros") em vez do texto genérico atual.
+## Redesenho proposto
 
-### 2. Painel "Últimas transcrições encontradas"
-Novo card abaixo do card "Google Drive" em `MinhasIntegracoes.tsx`, listando os últimos 20 registros de `reunioes_importadas_log` do consultor logado, ordenado por `data_importacao desc`:
+### 1. Nova aba "Reuniões" em `/clientes/:id`
+Posicionar entre **Atendimento** e **Ferramentas** uma aba "Reuniões" (ícone `Video`). Vira o lugar canônico para ver/gerenciar as transcrições:
 
-| Coluna | Conteúdo |
-|---|---|
-| Arquivo | `nome_arquivo` (truncado, tooltip com nome completo) |
-| Cliente | nome do cliente vinculado (via `cliente_id`) ou "—" |
-| Importada em | `data_importacao` formatada `dd/MM HH:mm` |
-| Status | badge: **Importada** (verde), **Sem cliente** (amarelo, com hint "cadastre apelido"), **Erro** (vermelho, tooltip com `erro`) |
-| Ação | quando `status='importado'` e `reuniao_id` existe → link "Ver reunião" para `/consultores/{consultor_id}` (aba reuniões); quando `sem_match` → botão "Vincular cliente" que abre um pequeno dialog para escolher cliente e reimportar (chama `google-drive-importar-arquivo` com `file_id` armazenado). |
+- Lista cronológica (mais recentes primeiro) de todas as reuniões do cliente.
+- Por linha: data, consultor responsável (badge), duração, score IA (consultor) + score cliente, status da análise.
+- Botão `+ Adicionar reunião manualmente` no topo (reaproveita `NovaReuniaoDialog`, mas com `cliente_id` travado e seletor de consultor).
+- Indicador "via Google Drive" quando a reunião tem registro em `reunioes_importadas_log` com `status='importado'` (badge discreto).
+- Ao clicar em uma reunião → abre o `ReuniaoAnalise` (modal existente) mostrando transcrição, resumo IA, análise consultor e análise cliente lado a lado.
+- Ações por reunião: **Re-analisar** (apenas admin/diretor), **Excluir** (apenas admin/diretor), **Ver transcrição completa**.
 
-Filtro simples no topo do card: tabs **Todas / Importadas / Sem cliente / Erros** + botão refresh.
+A aba **Desempenho** continua existindo mas focada só nos gráficos agregados de engajamento (não duplica a lista).
 
-### 3. Indicador resumido no card de conexão
-No bloco "Conectado", logo abaixo de "Última sincronização", adicionar três mini-stats da última sync (lidos do log filtrando por `data_importacao >= ultima_sincronizacao`):
-- ✅ X importadas
-- ⚠ Y sem cliente
-- ✖ Z erros
+### 2. `/consultores/:id` vira visão agregada
+O card "Reuniões" atual perde a edição. Vira:
 
-### 4. Hooks novos
-- `useReunioesImportadasLog(consultorId, { status?, limit })` em `useGoogleDrive.ts` — query React Query do log com join opcional ao nome do cliente (carregar `clientes` via outra query e mapear no client, padrão usado em outros hooks do projeto).
-- Atualizar `useSyncDiarioManual` para invalidar também `['reunioes-importadas-log']`.
+- Tabela compacta de **últimas N reuniões** (read-only), agrupada por cliente, com link direto para `/clientes/:cliente_id` → aba Reuniões.
+- Botão "Nova Reunião" sai daqui (a entrada de reuniões manual passa a ser pelo cliente).
+- Mantém as métricas (score médio, total analisadas, MRR, clientes ativos) e o botão "Gerar Relatório".
+- Adiciona link "Ver todas reuniões deste consultor" que leva a uma página filtrada (ou simplesmente expande a tabela).
 
-### Out of scope
-- Não mexer em `google-drive-sync-diario` (já loga tudo certo).
-- Não mexer no fluxo do dialog `ImportarDriveDialog` (página separada).
-- Sem notificações por e-mail.
+### 3. Permissões da análise (rodar/re-rodar)
+Hoje qualquer usuário com sessão chama `useAnalisarReuniao`. Vamos:
+
+- Esconder o botão **Re-analisar** para consultores comuns na nova aba Reuniões do cliente (e na visão do consultor).
+- Manter o gatilho automático: ao inserir a reunião (manual ou via sync do Drive), continua disparando análise IA assim como hoje.
+- Diretor/admin pode re-analisar manualmente quando quiser revisar o score.
+
+### 4. Origem da reunião visível
+Para diferenciar reuniões importadas vs. manuais, exibir no item da lista:
+
+- "Importada do Drive em dd/mm" — quando `reunioes_importadas_log.reuniao_id = reuniao.id`.
+- "Adicionada manualmente por <nome>" — quando não houver log correspondente. Não precisa de mudança de schema, basta um lookup leve.
+
+### 5. Hooks novos / ajustados
+- `useReunioesByCliente(clienteId)` — espelha `useReunioesByConsultor`, traz `consultores(nome)` e o flag `origem` via join leve com `reunioes_importadas_log` (consulta paralela e mapeia no client).
+- `useReunioesByConsultor` deixa de ser ponto de edição — só leitura, agora pode ser limitado a últimos 30 dias / paginar.
+- `useAnalisarReuniao` ganha checagem de role no UI consumer (não no hook, para evitar acoplamento).
+
+### 6. Arquivos afetados
+- `src/pages/ClienteDetalhe.tsx` — adicionar TabsTrigger + TabsContent "Reuniões".
+- **Novo** `src/components/cliente/ReunioesClienteTab.tsx` — lista + ações + dialog manual.
+- `src/components/consultor/NovaReuniaoDialog.tsx` — aceitar `clienteId` opcional travado.
+- `src/pages/ConsultorDetalhe.tsx` — remover botão "Nova Reunião", encolher tabela para read-only com link por cliente.
+- `src/components/consultor/ReunioesList.tsx` — virar variante read-only (ou criar `ReunioesListReadOnly`) e remover botões de excluir/re-analisar para não-admins.
+- `src/hooks/useReunioes.ts` — adicionar `useReunioesByCliente` e helper de origem.
+
+### Fora do escopo
+- Não mexer no schema de `reunioes` nem em `analisar-reuniao` edge function.
+- Não mudar o fluxo de sincronização do Drive (já redesenhado na frente anterior).
+- Sem refazer o relatório consolidado do consultor (continua igual).
+
+### Pergunta aberta
+Quando o consultor (não diretor) entrar em `/clientes/:id` → Reuniões, ele deve **ver** as transcrições e análises das reuniões dele mesmo? Assumindo que **sim** (visualização aberta para o consultor responsável; restrição é só para re-analisar/excluir). Se você quiser que consultor não veja o score IA dele no cliente, me avise antes de implementar.
