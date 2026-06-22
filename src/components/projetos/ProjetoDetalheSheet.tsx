@@ -20,6 +20,8 @@ import type { Projeto } from '@/hooks/useProjetos';
 import { useProjetoComentarios, useCreateComentario, useDeleteComentario } from '@/hooks/useProjetoComentarios';
 import { useProjetoChecklist, useCreateChecklistItem, useToggleChecklistItem, useDeleteChecklistItem, useUpdateChecklistItem } from '@/hooks/useProjetoChecklist';
 import { useConsultores } from '@/hooks/useConsultores';
+import { useChecklistResponsaveisByProjeto, useAddChecklistResponsavel, useRemoveChecklistResponsavel } from '@/hooks/useChecklistResponsaveis';
+import { useTodoPessoal, useCreateTodoPessoal, useUpdateTodoPessoal, useDeleteTodoPessoal } from '@/hooks/useTodoPessoal';
 import { useReunioesByConsultor } from '@/hooks/useReunioes';
 import { useProjetoTags, useProjetoTagVinculos, useAddTagToProjeto, useRemoveTagFromProjeto, useCreateTag, TAG_COLORS } from '@/hooks/useProjetoTags';
 import { useProjetoDocumentos, useGerarDocumento, useParseDocumento } from '@/hooks/useProjetoDocumentos';
@@ -75,6 +77,8 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
 
   const { data: comentarios } = useProjetoComentarios(projeto?.id);
   const { data: checklist } = useProjetoChecklist(projeto?.id);
+  const { data: responsaveisRows } = useChecklistResponsaveisByProjeto(projeto?.id);
+  const { data: todos } = useTodoPessoal(projeto?.id ?? undefined);
   const { data: reunioes } = useReunioesByConsultor(projeto?.consultor_id);
   const { data: allTags } = useProjetoTags();
   const { data: tagVinculos } = useProjetoTagVinculos(projeto?.id);
@@ -88,6 +92,12 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
   const toggleCheckItem = useToggleChecklistItem();
   const deleteCheckItem = useDeleteChecklistItem();
   const updateCheckItem = useUpdateChecklistItem();
+  const addResponsavel = useAddChecklistResponsavel();
+  const removeResponsavel = useRemoveChecklistResponsavel();
+  const createTodo = useCreateTodoPessoal();
+  const updateTodo = useUpdateTodoPessoal();
+  const deleteTodo = useDeleteTodoPessoal();
+  const [novoTodo, setNovoTodo] = useState('');
   const { data: consultoresList } = useConsultores();
   const addTag = useAddTagToProjeto();
   const removeTag = useRemoveTagFromProjeto();
@@ -95,6 +105,20 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
 
   const reunioesDoProjeto = reunioes?.filter(r => r.cliente_id === projeto?.cliente_id) ?? [];
   const linkedTagIds = new Set(tagVinculos?.map(v => v.tag_id) ?? []);
+
+  const responsaveisByItem = useMemo(() => {
+    const map = new Map<string, Array<{ id: string; nome: string }>>();
+    for (const r of responsaveisRows ?? []) {
+      if (!r.consultor) continue;
+      const arr = map.get(r.checklist_item_id) ?? [];
+      arr.push({ id: r.consultor.id, nome: r.consultor.nome });
+      map.set(r.checklist_item_id, arr);
+    }
+    return map;
+  }, [responsaveisRows]);
+
+  const initials = (nome: string) =>
+    nome.split(' ').map(p => p[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
 
   const handleSaveDueDate = async (date: Date | undefined) => {
     if (!projeto) return;
