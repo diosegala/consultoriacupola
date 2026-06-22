@@ -305,20 +305,47 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
                         </Button>
                       </div>
                       <div className="flex items-center gap-2 pl-6 flex-wrap">
-                        {/* Assigned to */}
-                        <select
-                          className="text-[10px] bg-transparent border border-border/50 rounded px-1.5 py-0.5 text-muted-foreground"
-                          value={item.assigned_to ?? ''}
-                          onChange={e => updateCheckItem.mutate({
-                            id: item.id, projeto_id: projeto.id,
-                            assigned_to: e.target.value || null,
-                          })}
-                        >
-                          <option value="">Sem responsável</option>
-                          {consultoresList?.filter(c => c.ativo).map(c => (
-                            <option key={c.id} value={c.id}>{c.nome}</option>
-                          ))}
-                        </select>
+                        {/* Responsáveis (múltiplos) */}
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button className="text-[10px] bg-transparent border border-border/50 rounded px-1.5 py-0.5 text-muted-foreground hover:bg-accent flex items-center gap-1">
+                              {(() => {
+                                const resps = responsaveisByItem.get(item.id) ?? [];
+                                if (resps.length === 0) return <>+ Responsáveis</>;
+                                return (
+                                  <div className="flex -space-x-1">
+                                    {resps.slice(0, 3).map(r => (
+                                      <div key={r.id} title={r.nome} className="h-4 w-4 rounded-full bg-primary/20 border border-background text-[8px] font-semibold flex items-center justify-center text-primary">
+                                        {initials(r.nome)}
+                                      </div>
+                                    ))}
+                                    {resps.length > 3 && <span className="ml-1">+{resps.length - 3}</span>}
+                                  </div>
+                                );
+                              })()}
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-56 p-2 z-[9999]" align="start">
+                            <p className="text-[10px] text-muted-foreground mb-1 px-1">Responsáveis</p>
+                            <div className="space-y-1 max-h-48 overflow-auto">
+                              {consultoresList?.filter(c => c.ativo).map(c => {
+                                const checked = (responsaveisByItem.get(item.id) ?? []).some(r => r.id === c.id);
+                                return (
+                                  <label key={c.id} className="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-accent cursor-pointer">
+                                    <Checkbox
+                                      checked={checked}
+                                      onCheckedChange={(v) => {
+                                        if (v) addResponsavel.mutate({ checklist_item_id: item.id, consultor_id: c.id, projeto_id: projeto.id });
+                                        else removeResponsavel.mutate({ checklist_item_id: item.id, consultor_id: c.id, projeto_id: projeto.id });
+                                      }}
+                                    />
+                                    <span className="text-xs">{c.nome}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
                         {/* Due date */}
                         <Popover>
                           <PopoverTrigger asChild>
