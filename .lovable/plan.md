@@ -1,53 +1,34 @@
-## Objetivo
+## Problema
 
-Quando um contrato for encerrado como **fim_contrato**, ele deve continuar compondo o MRR até a data em que a última parcela for efetivamente paga — não sair imediatamente como hoje. Encerramentos por **churn** mantêm o comportamento atual (saída imediata).
+Hoje o webhook `pipedrive-webhook` só evita duplicidade quando o `pipedrive_deal_id` do deal já existe em `clientes`. Quando o consultor renova um contrato manualmente, o cliente continua o mesmo (sem novo `deal_id`), e ao marcar o deal como Ganho no CRM o webhook cria **um cliente e um contrato duplicados**.
 
-## Mudanças no banco
+## Solução
 
-Adicionar coluna em `contratos`:
-- `data_fim_pagamento` (DATE, nullable): data até a qual o contrato ainda gera receita. Quando nula, usa `data_fim` (comportamento atual).
+Antes de criar cliente/contrato novos, o webhook verifica se já existe um cliente ativo com o mesmo nome de organização. Se existir, apenas vincula o `pipedrive_deal_id` ao cliente existente e encerra — não cria nada novo.
 
-Calculada automaticamente como:
-- `tipo_vencimento = 'antecipado'`: `data_inicio + (parcelas - 1) meses`
-- `tipo_vencimento = 'postecipado'`: `data_inicio + parcelas meses`
+### Regra de match
+- Nome a comparar: `org_id.name` do deal (fallback para `title`), normalizado (trim + lowercase + colapso de espaços).
+- Comparação também contra `cliente_aliases` (já existe a tabela), com a mesma normalização.
+- Cliente precisa ter pelo menos um `contrato` com `ativo = true` (qualquer data — sem janela de tempo).
+- Empate (mais de um cliente bate): não vincula automaticamente, marca log como pendente com mensagem explicando, e devolve 200 para o Pipedrive não reenviar.
 
-Backfill: preencher `data_fim_pagamento` em contratos existentes a partir de `data_inicio`, `parcelas` e `tipo_vencimento`.
+### Comportamento
+1. Match único encontrado com contrato ativo:
+   - Se o cliente já tem `pipedrive_deal_id`: log "deal divergente — cliente já vinculado a outro deal", não sobrescreve.
+   - Se está vazio: faz `UPDATE clientes SET pipedrive_deal_id = <novo> WHERE id = <match>`.
+   - Marca `webhook_logs` como processado, ligado ao `cliente_id` existente.
+   - Resposta 200 com mensagem "Renovação detectada — deal vinculado ao cliente existente".
+2. Nenhum match: fluxo atual (cria cliente + contrato + onboarding + atendimento + ferramentas).
+3. Match ambíguo (>1): log com erro descritivo, sem criar nada.
 
-## Mudanças na lógica de encerramento (`useEncerrarContrato`)
+### Onde mexer
+- `supabase/functions/pipedrive-webhook/index.ts`:
+  - Nova função `findExistingClienteByName(supabase, nome)` que faz duas queries (`clientes` por nome normalizado + `cliente_aliases`) e filtra por contrato ativo.
+  - Inserir a checagem logo após o atual bloco "4. Check for duplicates" (passo 4.5), antes do `extractContratoData` / `INSERT cliente`.
+  - Reaproveitar helpers `updateLogProcessed` / `updateLogError`.
 
-Quando `classificacao = 'fim_contrato'`:
-1. Calcular a data da última parcela.
-2. Se `data_última_parcela > hoje`: **não desativar** o contrato ainda. Apenas registrar o `encerramento` e marcar um flag/campo (`encerrado_em` em `contratos`) para indicar que está em "rabicho financeiro".
-3. Se já passou: comportamento atual (desativar imediatamente).
+Sem mudanças de schema, sem mudanças de UI, sem mudanças no fluxo de renovação manual.
 
-Status do cliente vai para `encerrado` somente quando o contrato realmente sair do MRR (sem outros contratos ativos).
-
-Para churn: mantém fluxo atual (desativa e zera MRR na hora).
-
-## Job de baixa automática
-
-Edge function agendada diária (`encerrar-contratos-pagos`) que:
-- Busca contratos com `encerrado_em IS NOT NULL` e `data_fim_pagamento <= hoje` ainda com `ativo = true`.
-- Marca `ativo = false` e atualiza status do cliente se for o caso.
-
-## Mudanças nas queries de MRR
-
-`useMRRTotal` e `useListaContratosMRR` (em `useContratos.ts`) continuam filtrando `ativo = true` — como a desativação real é adiada, o MRR permanece correto sem mudar a query. Adicionar apenas filtro defensivo: ignorar contratos cuja `data_fim_pagamento < hoje`.
-
-## UI
-
-- Em `ContratoTab` e `Contratos.tsx`: mostrar badge "Encerrado — aguardando última parcela em DD/MM/AAAA" para contratos nesse estado intermediário.
-- No diálogo de encerramento: ao escolher "fim_contrato", exibir aviso: "Este contrato continuará no MRR até DD/MM/AAAA (última parcela)."
-
-## Arquivos afetados
-
-- nova migration: coluna `data_fim_pagamento` + `encerrado_em` + backfill
-- `src/hooks/useEncerramentos.ts`: lógica condicional
-- `src/hooks/useContratos.ts`: filtro defensivo + tipos
-- `src/components/cliente/ContratoTab.tsx` e diálogo de encerramento: aviso + badge
-- `src/pages/Contratos.tsx`: badge na listagem
-- nova edge function `encerrar-contratos-pagos` + agendamento em `supabase/config.toml`
-
-## Memória
-
-Atualizar `mem://features/financial-monitoring` com a regra: "MRR de contratos com fim_contrato persiste até a última parcela (data_fim_pagamento). Churn zera imediatamente."
+## Validação
+- Inspecionar `webhook_logs` recentes para confirmar que os casos de renovação cairiam no novo branch.
+- Teste manual: simular payload de deal won cuja organização bate com um cliente ativo → esperar 200 + `pipedrive_deal_id` atualizado, sem novo contrato.

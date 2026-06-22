@@ -228,6 +228,46 @@ Deno.serve(async (req) => {
     console.log('Dados do cliente:', clienteData);
     console.log('Dados do contrato:', contratoData);
 
+    // 5.5. Detectar renovação manual: cliente já existe com contrato ativo + mesmo nome
+    const matches = await findExistingClienteByName(supabase, clienteData.nome);
+
+    if (matches.length > 1) {
+      const msg = `Match ambíguo para "${clienteData.nome}" — ${matches.length} clientes ativos com nome equivalente. Vincule manualmente.`;
+      console.warn(msg);
+      await updateLogError(supabase, logId, msg);
+      return jsonResponse({ message: msg, candidatos: matches.map(m => m.id) }, 200);
+    }
+
+    if (matches.length === 1) {
+      const match = matches[0];
+      if (match.pipedrive_deal_id && match.pipedrive_deal_id !== dealId) {
+        const msg = `Cliente "${clienteData.nome}" já vinculado a outro deal (${match.pipedrive_deal_id}); deal ${dealId} ignorado para evitar sobrescrita.`;
+        console.warn(msg);
+        await updateLogError(supabase, logId, msg);
+        return jsonResponse({ message: msg, cliente_id: match.id }, 200);
+      }
+
+      if (!match.pipedrive_deal_id) {
+        const { error: linkError } = await supabase
+          .from('clientes')
+          .update({ pipedrive_deal_id: dealId })
+          .eq('id', match.id);
+        if (linkError) {
+          console.error('Erro ao vincular deal ao cliente existente:', linkError);
+          await updateLogError(supabase, logId, `Erro ao vincular deal: ${linkError.message}`);
+          return jsonResponse({ error: 'Erro ao vincular deal ao cliente existente', details: linkError.message }, 500);
+        }
+      }
+
+      await updateLogProcessed(supabase, logId, match.id);
+      console.log(`Renovação detectada — deal ${dealId} vinculado ao cliente ${match.id}`);
+      return jsonResponse({
+        message: 'Renovação detectada — deal vinculado ao cliente existente',
+        cliente_id: match.id,
+        renovacao: true,
+      }, 200);
+    }
+
     // 6. Create cliente
     const { data: cliente, error: clienteError } = await supabase
       .from('clientes')
@@ -450,4 +490,65 @@ async function updateLogProcessed(supabase: SupabaseClient<any, any, any>, logId
     .from('webhook_logs')
     .update({ processado: true, cliente_id: clienteId })
     .eq('id', logId);
+}
+
+function normalizeNome(nome: string): string {
+  return nome
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function findExistingClienteByName(
+  supabase: SupabaseClient<any, any, any>,
+  nome: string,
+): Promise<Array<{ id: string; pipedrive_deal_id: string | null }>> {
+  const target = normalizeNome(nome);
+  if (!target) return [];
+
+  // Buscar clientes com contrato ativo
+  const { data: ativos, error } = await supabase
+    .from('clientes')
+    .select('id, nome, pipedrive_deal_id, contratos!inner(id, ativo)')
+    .eq('contratos.ativo', true);
+
+  if (error) {
+    console.error('Erro ao buscar clientes ativos para dedupe:', error);
+    return [];
+  }
+
+  const matchesById = new Map<string, { id: string; pipedrive_deal_id: string | null }>();
+
+  for (const c of (ativos || []) as Array<{ id: string; nome: string; pipedrive_deal_id: string | null }>) {
+    if (normalizeNome(c.nome || '') === target) {
+      matchesById.set(c.id, { id: c.id, pipedrive_deal_id: c.pipedrive_deal_id });
+    }
+  }
+
+  // Buscar via aliases
+  const { data: aliases, error: aliasErr } = await supabase
+    .from('cliente_aliases')
+    .select('cliente_id, alias');
+
+  if (aliasErr) {
+    console.error('Erro ao buscar cliente_aliases para dedupe:', aliasErr);
+  } else if (aliases?.length) {
+    const aliasClienteIds = (aliases as Array<{ cliente_id: string; alias: string }>)
+      .filter(a => normalizeNome(a.alias || '') === target)
+      .map(a => a.cliente_id);
+
+    if (aliasClienteIds.length) {
+      const ativosSet = new Set((ativos || []).map((c: { id: string }) => c.id));
+      const ativosById = new Map((ativos || []).map((c: { id: string; pipedrive_deal_id: string | null }) => [c.id, c]));
+      for (const cid of aliasClienteIds) {
+        if (ativosSet.has(cid) && !matchesById.has(cid)) {
+          const c = ativosById.get(cid)!;
+          matchesById.set(cid, { id: c.id, pipedrive_deal_id: c.pipedrive_deal_id });
+        }
+      }
+    }
+  }
+
+  return Array.from(matchesById.values());
 }
