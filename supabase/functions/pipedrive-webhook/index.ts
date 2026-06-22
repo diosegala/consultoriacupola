@@ -491,3 +491,64 @@ async function updateLogProcessed(supabase: SupabaseClient<any, any, any>, logId
     .update({ processado: true, cliente_id: clienteId })
     .eq('id', logId);
 }
+
+function normalizeNome(nome: string): string {
+  return nome
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function findExistingClienteByName(
+  supabase: SupabaseClient<any, any, any>,
+  nome: string,
+): Promise<Array<{ id: string; pipedrive_deal_id: string | null }>> {
+  const target = normalizeNome(nome);
+  if (!target) return [];
+
+  // Buscar clientes com contrato ativo
+  const { data: ativos, error } = await supabase
+    .from('clientes')
+    .select('id, nome, pipedrive_deal_id, contratos!inner(id, ativo)')
+    .eq('contratos.ativo', true);
+
+  if (error) {
+    console.error('Erro ao buscar clientes ativos para dedupe:', error);
+    return [];
+  }
+
+  const matchesById = new Map<string, { id: string; pipedrive_deal_id: string | null }>();
+
+  for (const c of (ativos || []) as Array<{ id: string; nome: string; pipedrive_deal_id: string | null }>) {
+    if (normalizeNome(c.nome || '') === target) {
+      matchesById.set(c.id, { id: c.id, pipedrive_deal_id: c.pipedrive_deal_id });
+    }
+  }
+
+  // Buscar via aliases
+  const { data: aliases, error: aliasErr } = await supabase
+    .from('cliente_aliases')
+    .select('cliente_id, alias');
+
+  if (aliasErr) {
+    console.error('Erro ao buscar cliente_aliases para dedupe:', aliasErr);
+  } else if (aliases?.length) {
+    const aliasClienteIds = (aliases as Array<{ cliente_id: string; alias: string }>)
+      .filter(a => normalizeNome(a.alias || '') === target)
+      .map(a => a.cliente_id);
+
+    if (aliasClienteIds.length) {
+      const ativosSet = new Set((ativos || []).map((c: { id: string }) => c.id));
+      const ativosById = new Map((ativos || []).map((c: { id: string; pipedrive_deal_id: string | null }) => [c.id, c]));
+      for (const cid of aliasClienteIds) {
+        if (ativosSet.has(cid) && !matchesById.has(cid)) {
+          const c = ativosById.get(cid)!;
+          matchesById.set(cid, { id: c.id, pipedrive_deal_id: c.pipedrive_deal_id });
+        }
+      }
+    }
+  }
+
+  return Array.from(matchesById.values());
+}
