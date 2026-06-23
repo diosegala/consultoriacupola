@@ -151,6 +151,12 @@ export default function MinhasTarefas() {
             <ClipboardList className="h-4 w-4 mr-2" />
             To-do pessoal ({todosFiltrados.length})
           </TabsTrigger>
+          {canAssignTasks && (
+            <TabsTrigger value="atribuidas">
+              <UserPlus className="h-4 w-4 mr-2" />
+              Atribuídas por mim ({tarefasAtribuidas?.length ?? 0})
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="checklist" className="mt-4">
