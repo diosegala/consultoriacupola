@@ -70,6 +70,9 @@ function aplicarFiltros<T extends { concluido: boolean; due_date: string | null 
 export default function MinhasTarefas() {
   const { data: checklistItens, isLoading: l1 } = useMinhasTarefasChecklist();
   const { data: todoItens, isLoading: l2 } = useMinhasTarefasTodo();
+  const { canAssignTasks } = useAuth();
+  const { data: tarefasAtribuidas, isLoading: l3 } = useTarefasAtribuidasPorMim();
+  const { data: consultoresAtribuiveis } = useConsultoresAtribuiveis();
 
   const toggleChecklist = useToggleChecklistItem();
   const createTodo = useCreateTodoPessoal();
@@ -80,6 +83,11 @@ export default function MinhasTarefas() {
   const [prazo, setPrazo] = useState<FiltroPrazo>('todos');
   const [search, setSearch] = useState('');
   const [novoTodo, setNovoTodo] = useState('');
+
+  // Estado para nova tarefa atribuída
+  const [novaAtribTitulo, setNovaAtribTitulo] = useState('');
+  const [novaAtribResp, setNovaAtribResp] = useState<string>('');
+  const [novaAtribPrazo, setNovaAtribPrazo] = useState<Date | undefined>();
 
   const checklistFiltrada = useMemo(
     () => aplicarFiltros(checklistItens ?? [], status, prazo, search, t => `${t.titulo} ${t.cliente_nome ?? ''}`),
