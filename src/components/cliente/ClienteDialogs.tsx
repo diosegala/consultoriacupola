@@ -315,6 +315,27 @@ export function ContratoFormDialog({ open, onOpenChange, clienteId, contrato, co
               />
             </div>
 
+            {isPersonalizado && (
+              <FormField
+                control={form.control}
+                name="tipo_consultoria_personalizado"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nome da consultoria personalizada</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Ex: Consultoria sob medida para X"
+                        className="bg-background border-input"
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
             <div className="grid grid-cols-3 gap-4">
               {/* Prazo */}
               <FormField
