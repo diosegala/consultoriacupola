@@ -37,7 +37,17 @@ function matchCliente(nome: string, clientes: any[], aliases: any[]): string | n
     const exact = candidates.filter(c => c.key === b);
     if (exact.length === 1) return exact[0].cliente_id;
   }
-  const matches = new Set(candidates.filter(c => lower.includes(c.key)).map(c => c.cliente_id));
+  const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const matches = new Set(
+    candidates
+      .filter(c => {
+        const k = c.key.trim();
+        if (!k) return false;
+        // Whole-word match so short aliases like "INT" don't hit "interview".
+        return new RegExp(`(^|[^a-z0-9])${escape(k)}([^a-z0-9]|$)`, "i").test(lower);
+      })
+      .map(c => c.cliente_id)
+  );
   return matches.size === 1 ? Array.from(matches)[0] : null;
 }
 
