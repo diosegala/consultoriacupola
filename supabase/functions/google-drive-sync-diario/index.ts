@@ -77,15 +77,27 @@ Deno.serve(async (req) => {
 
         const ids = docs.map((d: any) => d.id);
         const { data: jaImp } = await admin
-          .from("reunioes_importadas_log").select("google_file_id")
+          .from("reunioes_importadas_log").select("id, google_file_id, status")
           .in("google_file_id", ids.length ? ids : ["__none__"]);
-        const importedSet = new Set((jaImp || []).map((j: any) => j.google_file_id));
+        // Only files actually imported (status='importado') should be skipped.
+        // sem_match / erro logs are re-evaluated so newly-created aliases take effect.
+        const importedSet = new Set(
+          (jaImp || []).filter((j: any) => j.status === "importado").map((j: any) => j.google_file_id)
+        );
+        const staleLogByFile = new Map(
+          (jaImp || []).filter((j: any) => j.status !== "importado").map((j: any) => [j.google_file_id, j.id])
+        );
 
         let importados = 0; let pulados = 0; let erros = 0;
 
         for (const d of docs) {
           if (importedSet.has(d.id)) continue;
           const clienteId = matchCliente(d.name, clientes || [], aliases || []);
+          // Clean up any previous sem_match/erro entry for this file before re-logging.
+          const staleId = staleLogByFile.get(d.id);
+          if (staleId) {
+            await admin.from("reunioes_importadas_log").delete().eq("id", staleId);
+          }
           if (!clienteId) {
             await admin.from("reunioes_importadas_log").insert({
               google_file_id: d.id, consultor_id: row.consultor_id,
