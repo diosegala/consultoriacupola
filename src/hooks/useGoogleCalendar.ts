@@ -44,10 +44,18 @@ export function useGCalEvents(timeMin: string, timeMax: string, calendarIds?: st
         body: { timeMin, timeMax, calendarIds },
       });
       if (error) {
-        // try to parse missing scope from response context
-        const msg = (error as any)?.context?.error || error.message;
-        if (typeof msg === 'string' && msg.includes('missing_scope')) {
-          return { email: '', calendars: [], events: [], missingScope: true };
+        // FunctionsHttpError: parse JSON body from context Response
+        try {
+          const ctx = (error as any)?.context;
+          if (ctx && typeof ctx.json === 'function') {
+            const body = await ctx.json();
+            if (body?.error === 'missing_scope') {
+              return { email: '', calendars: [], events: [], missingScope: true };
+            }
+            throw new Error(body?.error || body?.message || error.message);
+          }
+        } catch (parseErr) {
+          if (parseErr instanceof Error && parseErr.message) throw parseErr;
         }
         throw error;
       }
