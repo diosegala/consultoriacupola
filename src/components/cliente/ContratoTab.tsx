@@ -18,6 +18,7 @@ import { useContratos, useContratoAtivo, ContratoComTipo, useDeleteContrato } fr
 import { format, parseISO } from 'date-fns';
 import { ContratoFormDialog, RenovarContratoDialog } from './ClienteDialogs';
 import { toast } from 'sonner';
+import { getTipoConsultoriaLabel } from '@/lib/contrato';
 
 interface ContratoTabProps {
   clienteId: string;
@@ -82,7 +83,7 @@ export function ContratoTab({ clienteId, clienteStatus, consultorId }: ContratoT
                 )}
               </CardTitle>
               <p className="text-sm text-muted-foreground">
-                {contratoAtivo.tipo_consultoria?.nome || 'Tipo não definido'}
+                {getTipoConsultoriaLabel(contratoAtivo, 'Tipo não definido')}
                 {contratoAtivo.momento && ` • ${contratoAtivo.momento}`}
               </p>
             </div>
@@ -207,7 +208,7 @@ export function ContratoTab({ clienteId, clienteStatus, consultorId }: ContratoT
                 {contratos.filter(c => !c.ativo).map(contrato => (
                   <TableRow key={contrato.id} className="border-border">
                     <TableCell className="text-foreground">
-                      {contrato.tipo_consultoria?.nome || '-'}
+                      {getTipoConsultoriaLabel(contrato)}
                     </TableCell>
                     <TableCell className="text-foreground">
                       {format(parseISO(contrato.data_inicio), 'dd/MM/yyyy')} -{' '}
