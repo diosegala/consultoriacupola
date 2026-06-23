@@ -285,6 +285,7 @@ export type Database = {
           remuneracao_mensal: number
           remuneracao_total: number
           tipo_consultoria_id: string | null
+          tipo_consultoria_personalizado: string | null
           tipo_vencimento: Database["public"]["Enums"]["tipo_vencimento"]
         }
         Insert: {
@@ -305,6 +306,7 @@ export type Database = {
           remuneracao_mensal: number
           remuneracao_total: number
           tipo_consultoria_id?: string | null
+          tipo_consultoria_personalizado?: string | null
           tipo_vencimento?: Database["public"]["Enums"]["tipo_vencimento"]
         }
         Update: {
@@ -325,6 +327,7 @@ export type Database = {
           remuneracao_mensal?: number
           remuneracao_total?: number
           tipo_consultoria_id?: string | null
+          tipo_consultoria_personalizado?: string | null
           tipo_vencimento?: Database["public"]["Enums"]["tipo_vencimento"]
         }
         Relationships: [

@@ -53,6 +53,7 @@ import { RetomarContratoDialog } from '@/components/contrato/RetomarContratoDial
 import { ProrrogarContratoDialog } from '@/components/contrato/ProrrogarContratoDialog';
 import { ViagensContrato } from '@/components/contrato/ViagensContrato';
 import { cn } from '@/lib/utils';
+import { getTipoConsultoriaLabel } from '@/lib/contrato';
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-BR', {
@@ -151,7 +152,7 @@ export default function Contratos() {
           comparison = (a.cliente?.nome || '').localeCompare(b.cliente?.nome || '');
           break;
         case 'tipo':
-          comparison = (a.tipo_consultoria?.nome || '').localeCompare(b.tipo_consultoria?.nome || '');
+          comparison = getTipoConsultoriaLabel(a, '').localeCompare(getTipoConsultoriaLabel(b, ''));
           break;
         case 'data_inicio':
           comparison = new Date(a.data_inicio).getTime() - new Date(b.data_inicio).getTime();
@@ -534,7 +535,7 @@ export default function Contratos() {
                           )}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          {contrato.tipo_consultoria?.nome || '-'}
+                          {getTipoConsultoriaLabel(contrato)}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {format(parseISO(contrato.data_inicio), 'dd/MM/yyyy', { locale: ptBR })}
@@ -612,7 +613,7 @@ export default function Contratos() {
                               </span>
                             </div>
                             <p className="text-sm text-muted-foreground mt-1">
-                              {contrato.tipo_consultoria?.nome || 'Sem tipo'}
+                              {getTipoConsultoriaLabel(contrato, 'Sem tipo')}
                               {contrato.cliente?.consultor && (
                                 <> • {contrato.cliente.consultor.nome}</>
                               )}
@@ -695,7 +696,7 @@ export default function Contratos() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <p className="text-xs text-muted-foreground">Tipo de Consultoria</p>
-                    <p className="font-medium">{selectedContrato.tipo_consultoria?.nome || '-'}</p>
+                    <p className="font-medium">{getTipoConsultoriaLabel(selectedContrato)}</p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-xs text-muted-foreground">Consultor</p>

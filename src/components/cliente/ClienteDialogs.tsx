@@ -19,10 +19,12 @@ import { useConsultores } from '@/hooks/useConsultores';
 import { useUpdateCliente } from '@/hooks/useClientes';
 import { useEncerrarContrato, calcularDataFimPagamento } from '@/hooks/useEncerramentos';
 import { toast } from '@/hooks/use-toast';
+import { getTipoConsultoriaLabel, TIPO_CONSULTORIA_PERSONALIZADO_NOME } from '@/lib/contrato';
 
 const contratoSchema = z.object({
   consultor_id: z.string().optional().nullable(),
   tipo_consultoria_id: z.string().optional().nullable(),
+  tipo_consultoria_personalizado: z.string().optional().nullable(),
   prazo_meses: z.coerce.number().min(1, 'Prazo deve ser maior que 0'),
   data_inicio: z.date({ required_error: 'Data de início é obrigatória' }),
   data_fim: z.date({ required_error: 'Data de fim é obrigatória' }),
@@ -58,6 +60,7 @@ export function ContratoFormDialog({ open, onOpenChange, clienteId, contrato, co
     defaultValues: {
       consultor_id: '',
       tipo_consultoria_id: '',
+      tipo_consultoria_personalizado: '',
       prazo_meses: 12,
       data_inicio: new Date(),
       data_fim: addMonths(new Date(), 12),
@@ -76,6 +79,7 @@ export function ContratoFormDialog({ open, onOpenChange, clienteId, contrato, co
       form.reset({
         consultor_id: consultorId || '',
         tipo_consultoria_id: contrato.tipo_consultoria_id || '',
+        tipo_consultoria_personalizado: (contrato as any).tipo_consultoria_personalizado || '',
         prazo_meses: contrato.prazo_meses,
         data_inicio: parseISO(contrato.data_inicio),
         data_fim: parseISO(contrato.data_fim),
@@ -91,6 +95,7 @@ export function ContratoFormDialog({ open, onOpenChange, clienteId, contrato, co
       form.reset({
         consultor_id: consultorId || '',
         tipo_consultoria_id: '',
+        tipo_consultoria_personalizado: '',
         prazo_meses: 12,
         data_inicio: new Date(),
         data_fim: addMonths(new Date(), 12),
@@ -130,11 +135,33 @@ export function ContratoFormDialog({ open, onOpenChange, clienteId, contrato, co
     }
   }, [watchTotal, watchParcelas, form]);
 
+  // Detecta o id do tipo "Personalizado" e limpa o campo quando o tipo muda.
+  const tipoPersonalizadoId = tiposConsultoria?.find(
+    (t) => t.nome.toLowerCase() === TIPO_CONSULTORIA_PERSONALIZADO_NOME.toLowerCase()
+  )?.id;
+  const watchTipoId = form.watch('tipo_consultoria_id');
+  const isPersonalizado = !!tipoPersonalizadoId && watchTipoId === tipoPersonalizadoId;
+  useEffect(() => {
+    if (!isPersonalizado && form.getValues('tipo_consultoria_personalizado')) {
+      form.setValue('tipo_consultoria_personalizado', '');
+    }
+  }, [isPersonalizado, form]);
+
   async function onSubmit(values: ContratoFormValues) {
+    if (isPersonalizado && !values.tipo_consultoria_personalizado?.trim()) {
+      form.setError('tipo_consultoria_personalizado', {
+        type: 'manual',
+        message: 'Informe o nome da consultoria personalizada',
+      });
+      return;
+    }
     try {
       const payload = {
         cliente_id: clienteId,
         tipo_consultoria_id: values.tipo_consultoria_id || null,
+        tipo_consultoria_personalizado: isPersonalizado
+          ? values.tipo_consultoria_personalizado?.trim() || null
+          : null,
         prazo_meses: values.prazo_meses,
         data_inicio: format(values.data_inicio, 'yyyy-MM-dd'),
         data_fim: format(values.data_fim, 'yyyy-MM-dd'),
@@ -245,6 +272,27 @@ export function ContratoFormDialog({ open, onOpenChange, clienteId, contrato, co
               />
             </div>
 
+            {isPersonalizado && (
+              <FormField
+                control={form.control}
+                name="tipo_consultoria_personalizado"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nome da consultoria personalizada</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Ex: Consultoria sob medida para X"
+                        className="bg-background border-input"
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               {/* Momento */}
               <FormField
@@ -266,6 +314,27 @@ export function ContratoFormDialog({ open, onOpenChange, clienteId, contrato, co
                 )}
               />
             </div>
+
+            {isPersonalizado && (
+              <FormField
+                control={form.control}
+                name="tipo_consultoria_personalizado"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nome da consultoria personalizada</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Ex: Consultoria sob medida para X"
+                        className="bg-background border-input"
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <div className="grid grid-cols-3 gap-4">
               {/* Prazo */}
@@ -667,6 +736,7 @@ interface RenovarContratoDialogProps {
 
 const renovarSchema = z.object({
   tipo_consultoria_id: z.string().optional().nullable(),
+  tipo_consultoria_personalizado: z.string().optional().nullable(),
   prazo_meses: z.coerce.number().min(1, 'Prazo deve ser maior que 0'),
   data_inicio: z.date({ required_error: 'Data de início é obrigatória' }),
   data_fim: z.date({ required_error: 'Data de fim é obrigatória' }),
@@ -692,6 +762,7 @@ export function RenovarContratoDialog({ open, onOpenChange, clienteId, contratoA
     resolver: zodResolver(renovarSchema),
     defaultValues: {
       tipo_consultoria_id: contratoAtual.tipo_consultoria_id || '',
+      tipo_consultoria_personalizado: (contratoAtual as any).tipo_consultoria_personalizado || '',
       prazo_meses: contratoAtual.prazo_meses,
       data_inicio: dataInicioRenovacao,
       data_fim: addMonths(dataInicioRenovacao, contratoAtual.prazo_meses),
@@ -710,6 +781,7 @@ export function RenovarContratoDialog({ open, onOpenChange, clienteId, contratoA
       const novaDataInicio = addDays(parseISO(contratoAtual.data_fim), 1);
       form.reset({
         tipo_consultoria_id: contratoAtual.tipo_consultoria_id || '',
+        tipo_consultoria_personalizado: (contratoAtual as any).tipo_consultoria_personalizado || '',
         prazo_meses: contratoAtual.prazo_meses,
         data_inicio: novaDataInicio,
         data_fim: addMonths(novaDataInicio, contratoAtual.prazo_meses),
@@ -749,13 +821,34 @@ export function RenovarContratoDialog({ open, onOpenChange, clienteId, contratoA
     }
   }, [watchTotal, watchParcelas, form]);
 
+  const tipoPersonalizadoId = tiposConsultoria?.find(
+    (t) => t.nome.toLowerCase() === TIPO_CONSULTORIA_PERSONALIZADO_NOME.toLowerCase()
+  )?.id;
+  const watchTipoId = form.watch('tipo_consultoria_id');
+  const isPersonalizado = !!tipoPersonalizadoId && watchTipoId === tipoPersonalizadoId;
+  useEffect(() => {
+    if (!isPersonalizado && form.getValues('tipo_consultoria_personalizado')) {
+      form.setValue('tipo_consultoria_personalizado', '');
+    }
+  }, [isPersonalizado, form]);
+
   async function onSubmit(values: RenovarFormValues) {
+    if (isPersonalizado && !values.tipo_consultoria_personalizado?.trim()) {
+      form.setError('tipo_consultoria_personalizado', {
+        type: 'manual',
+        message: 'Informe o nome da consultoria personalizada',
+      });
+      return;
+    }
     try {
       await renovarContrato.mutateAsync({
         contratoAtualId: contratoAtual.id,
         novoContrato: {
           cliente_id: clienteId,
           tipo_consultoria_id: values.tipo_consultoria_id || null,
+          tipo_consultoria_personalizado: isPersonalizado
+            ? values.tipo_consultoria_personalizado?.trim() || null
+            : null,
           prazo_meses: values.prazo_meses,
           data_inicio: format(values.data_inicio, 'yyyy-MM-dd'),
           data_fim: format(values.data_fim, 'yyyy-MM-dd'),
@@ -792,7 +885,7 @@ export function RenovarContratoDialog({ open, onOpenChange, clienteId, contratoA
         <div className="p-4 rounded-lg bg-muted/50 border border-border mb-4">
           <p className="text-sm text-muted-foreground">Contrato atual:</p>
           <p className="font-medium">
-            {contratoAtual.tipo_consultoria?.nome || 'Tipo não definido'} • 
+            {getTipoConsultoriaLabel(contratoAtual, 'Tipo não definido')} • 
             {format(parseISO(contratoAtual.data_inicio), 'dd/MM/yyyy')} a {format(parseISO(contratoAtual.data_fim), 'dd/MM/yyyy')}
           </p>
         </div>

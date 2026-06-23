@@ -663,7 +663,9 @@ export default function Dashboard() {
                           </p>
                           {contrato.tipo_consultoria && (
                             <Badge variant="outline" className="mt-1">
-                              {contrato.tipo_consultoria.nome}
+                              {contrato.tipo_consultoria.nome?.toLowerCase() === 'personalizado' && (contrato as any).tipo_consultoria_personalizado
+                                ? (contrato as any).tipo_consultoria_personalizado
+                                : contrato.tipo_consultoria.nome}
                             </Badge>
                           )}
                         </div>

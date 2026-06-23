@@ -1,0 +1,1 @@
+ALTER TABLE public.contratos ADD COLUMN tipo_consultoria_personalizado text;
