@@ -1108,6 +1108,7 @@ export type Database = {
       }
       todo_pessoal: {
         Row: {
+          assigned_by: string | null
           concluido: boolean
           created_at: string
           due_date: string | null
@@ -1119,6 +1120,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          assigned_by?: string | null
           concluido?: boolean
           created_at?: string
           due_date?: string | null
@@ -1130,6 +1132,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          assigned_by?: string | null
           concluido?: boolean
           created_at?: string
           due_date?: string | null
