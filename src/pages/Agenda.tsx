@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { addDays, addWeeks, endOfDay, endOfWeek, format, isSameDay, startOfDay, startOfWeek, subWeeks } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -44,7 +44,7 @@ export default function Agenda() {
   const [initialEvent, setInitialEvent] = useState<any>(null);
 
   // Open dialog with attendees from query param (e.g. ?attendee=cliente@x.com)
-  useMemo(() => {
+  useEffect(() => {
     const at = params.get('attendee');
     const title = params.get('title');
     if (at || title) {
