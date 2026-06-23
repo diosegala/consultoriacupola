@@ -1,121 +1,85 @@
-
 ## Objetivo
 
-Substituir a planilha de pré-onboarding/onboarding por um formulário web amigável. O consultor gera um link único, envia ao cliente; o cliente preenche ao longo de vários dias (com progresso salvo automaticamente e barra de progresso); as respostas ficam disponíveis nas páginas do **Cliente** e do **Contrato**.
+Tornar a plataforma o "hub" do consultor adicionando uma visualização do Google Calendar dele dentro do app, reduzindo a necessidade de abrir outras abas.
 
-Esta primeira fase entrega a infraestrutura completa com **um template fixo de exemplo**. Depois você revisa os question_arios e me passa as perguntas reais — eu só atualizo o template, sem refazer a base.
+## O que é possível (e o que não é) com embed do Google Calendar
 
----
+O Google **não permite** embedar a interface completa e interativa do Google Calendar (calendar.google.com) dentro de um iframe de outro domínio — eles bloqueiam via `X-Frame-Options: SAMEORIGIN`. Isso significa que **não dá para "logar" no Google e usar a UI nativa do Agenda inteira dentro da nossa plataforma** (criar evento, responder convite, arrastar, etc., com a mesma UX do calendar.google.com).
 
-## Fluxo de uso
+O que **dá** para fazer, em ordem de fidelidade:
 
-1. Admin/consultor abre a página do cliente → aba **Onboarding** (existente) ganha um bloco "Question_ario do cliente".
-2. Clica em **Gerar link de preenchimento** → sistema cria um token único e mostra link copiável (`/q/{token}`).
-3. Cliente abre o link (sem login). Vê tela amigável com:
-   - Cabeçalho com nome do cliente e logo CUPOLA.
-   - Barra de progresso (% preenchido) fixa no topo.
-   - Seções navegáveis (sidebar ou stepper).
-   - Cada campo salva automaticamente ao sair do foco (debounce ~800ms). Indicador "Salvo às HH:MM".
-   - Botão **Salvar e continuar depois** + **Enviar respostas** (só habilita quando todas as obrigatórias estão preenchidas).
-4. Consultor vê na plataforma:
-   - Badge de status (Não iniciado / Em andamento / Concluído) + % de preenchimento.
-   - Botão **Ver respostas** abre modal com leitura organizada por seção.
-   - Quando cliente finaliza → badge muda + (e-mail fica em stand-by até dom_inio CUPOLA estar pronto; já deixo o gatilho pronto e desativado).
+### Opção A — Embed público read-only (iframe oficial do Google)
 
----
+- Usa o iframe oficial `calendar.google.com/calendar/embed?src=...`.
+- Mostra os eventos em visual de mês/semana/agenda.
+- **Limitações graves para o caso de uso**: o calendário precisa estar público OU o consultor precisa estar logado na mesma conta Google no navegador (não dá para "vincular" via OAuth). Não permite criar evento, responder invite ou ver detalhes privados.
+- **Conclusão**: não atende o pedido (responder invites, agendar).
 
-## Modelagem de dados
+### Opção B — Cliente de agenda próprio dentro do app (recomendado)
 
-Tabelas novas (todas em `public`, com RLS e GRANTs):
+Construir uma "mini agenda" nossa, usando a Google Calendar API com o OAuth que cada consultora **já conecta hoje** em `MinhasIntegracoes` (a infra `google-oauth-start` / `google-oauth-callback` e a tabela `consultor_google_tokens` já existem — hoje cobre só Drive). Estendemos os scopes para incluir Calendar e construímos a UI.
 
-- **`questionarios_template`** — versões do template
-  - `nome`, `versao` (int), `ativo` (bool), `estrutura` (jsonb — seções e perguntas)
-  - Pe_rmite ter v1 fixa agora e v2 configurável no futuro sem migrar dados antigos.
+Funcionalidades:
 
-- **`questionarios`** — instância por cliente
-  - `cliente_id` (FK → clientes), `template_id`, `token` (uuid único), `status` (`nao_iniciado` | `em_andamento` | `concluido`), `progresso_pct` (int 0-100), `respostas` (jsonb), `iniciado_em`, `concluido_em`, `ultimo_salvamento_em`, `expira_em` (nullable).
-  - Único por `cliente_id` ativo (1 question_ario ativo por cliente).
+- Visão semana / dia / agenda (lista) dos calendários da conta Cupola da consultora.
+- Mostrar eventos com horário, título, participantes, link do Meet.
+- Criar novo evento (título, data/hora, descrição, convidados, gerar link do Meet automaticamente).
+- Editar / excluir evento criado por ela.
+- Responder convites: aceitar / recusar / talvez (atualizando `responseStatus` do attendee via API).
+- Abrir o evento no Google Calendar em nova aba como "fallback" para edições avançadas.
 
-**RLS:**
-- `questionarios_template`: leitura para `authenticated`; escrita só `admin`/`diretor`.
-- `questionarios`: leitura para `authenticated` que tenham acesso ao cliente; escrita autorizada via função `is_authorized_user`.
-- Acesso público pelo token **não usa RLS direto** → vai por edge function pública (ver abaixo).
+Vantagem: roda 100% dentro da plataforma, integra com clientes/projetos no futuro (ex.: "agendar reunião com cliente X" já preenche convidado). Desvantagem: é UI nossa, não idêntica à do Google.
 
-**Estrutura do JSON `estrutura` do template** (resumo):
-```json
-{
-  "secoes": [
-    {
-      "id": "empresa",
-      "titulo": "Sobre a empresa",
-      "descricao": "...",
-      "perguntas": [
-        { "id": "razao_social", "tipo": "texto_curto", "label": "...", "obrigatorio": true },
-        { "id": "faturamento", "tipo": "numero", "label": "...", "sufixo": "R$" },
-        { "id": "segmento", "tipo": "escolha_unica", "opcoes": ["B2B","B2C","Ambos"] }
-      ]
-    }
-  ]
-}
-```
-Tipos suportados na fase 1: `texto_curto`, `texto_longo`, `numero`, `data`, `escolha_unica`, `escolha_multipla`, `sim_nao`, `escala_1_10`. (Upload de arquivo fica para fase 2.)
+### Opção C — Híbrido
 
----
+Mostrar a lista/grade de eventos em UI nossa (Opção B) e, para ações pesadas (configurar recorrência complexa, etc.), botão "Abrir no Google Calendar" em nova aba.
 
-## Acesso público pelo token
+## Recomendação
 
-Duas edge functions públicas (`verify_jwt = false`):
+**Opção B**, com botão de fallback "Abrir no Google Calendar" (Opção C de fato). É o único caminho que entrega "agendar reuniões e responder invites de dentro da plataforma".
 
-- **`questionario-get`** — recebe `token`, devolve `{ cliente_nome, template_estrutura, respostas, status, progresso_pct }`. Retorna 404/410 se token inválido ou question_ario já concluído/expirado.
-- **`questionario-save`** — recebe `{ token, respostas, finalizar?: boolean }`. Valida com Zod, recalcula `progresso_pct`, atualiza `respostas`, `ultimo_salvamento_em`. Se `finalizar=true` e todas obrigatórias preenchidas → muda status para `concluido` e dispara gancho de notificação (desativado por ora).
+## Escopo proposto (fase 1)
 
-Vantagem: o cliente nunca toca direto no banco; toda validação é server-side.
+1. **Ampliar OAuth existente**
+  - Adicionar scopes `https://www.googleapis.com/auth/calendar.events` e `https://www.googleapis.com/auth/calendar.readonly` em `google-oauth-start`.
+  - Avisar consultoras já conectadas que precisam reconectar (badge/alerta em `MinhasIntegracoes`) para concederem o novo scope.
+2. **Nova página `/agenda**` (item no Sidebar, visível para consultor/diretor/admin)
+  - Visões: Semana (default), Dia, Lista (próximos 30 dias).
+  - Componente de calendário (usar `react-big-calendar` ou montar grid simples com Tailwind — definir na implementação).
+  - Filtro por calendário (primary, secundários da conta).
+3. **Edge functions novas**
+  - `gcal-list-events` (range start/end, lista calendars do usuário, retorna eventos).
+  - `gcal-create-event` (título, início, fim, descrição, convidados, criar Meet via `conferenceData`).
+  - `gcal-update-event` (editar).
+  - `gcal-delete-event`.
+  - `gcal-respond-invite` (PATCH no attendee `responseStatus`).
+  - Todas reutilizam refresh token de `consultor_google_tokens` (lógica de refresh já existe nas funções de Drive — extrair helper compartilhado).
+4. **UI de criação/edição de evento**
+  - Dialog com formulário (título, datas, descrição, convidados por e-mail, toggle "criar link do Meet").
+  - Em eventos existentes: botões Aceitar / Recusar / Talvez quando o usuário é attendee.
+  - Link "Abrir no Google Calendar" para casos não cobertos.
+5. **Integração com plataforma (fase 1 leve)**
+  - Botão "Agendar reunião" no detalhe do cliente que abre o dialog de criação já com o e-mail do cliente como convidado (se houver). Pode ficar para fase 2 se preferir.
 
----
+## Fora de escopo (fase 1)
 
-## UI
+- Drag & drop de eventos.
+- Recorrência complexa (oferecer "Abrir no Google" para isso).
+- Notificações push de novos invites dentro da plataforma.
+- Sincronização bidirecional automática com tabelas internas de reuniões/projetos.
 
-### Cliente (público) — rota `/q/:token`
-- Página standalone (fora do layout admin), tema claro, tipografia limpa.
-- Layout 2 colunas no desktop: sidebar de seções (com check ao concluir) + área principal de perguntas.
-- Mobile: stepper horizontal.
-- Barra de progresso global fixa no topo.
-- Auto-save com `react-hook-form` + watch + debounce, indicador "Salvo às HH:MM" no canto.
-- Tela final: "Obrigado! Suas respostas foram enviadas. O time CUPOLA entrará em contato."
+## Detalhes técnicos
 
-### Admin — página do Cliente, aba **Onboarding**
-Bloco novo "Question_ario do cliente":
-- Se inexistente: botão **Gerar question_ario** (cria registro + token).
-- Se existente: status badge, barra de progresso, data último salvamento, botões **Copiar link**, **Ver respostas** (modal read-only por seção), **Reenviar/Regenerar token** (gera novo token, invalida o antigo).
+- **Auth**: reaproveita `consultor_google_tokens` + fluxo OAuth atual. Refresh token via `https://oauth2.googleapis.com/token` quando `expires_at` < now.
+- **API base**: `https://www.googleapis.com/calendar/v3/calendars/{calendarId}/events`.
+- **Meet**: ao criar evento, enviar `conferenceData.createRequest` + query `conferenceDataVersion=1`.
+- **Cores/UI**: dark theme padrão da Cupola, eventos em #B0F90A para "meus", neutros para convites pendentes, vermelho para conflitos.
+- **Permissões**: cada consultora vê só a própria agenda (token é dela). Diretor/admin não vê agenda de terceiros nesta fase.
 
-### Admin — página do Contrato
-Card resumido (somente leitura) com status + % + botão **Ver respostas** que abre o mesmo modal. Sem geração de link aqui — vínculo é por cliente, conforme decidido.
+## Perguntas antes de implementar
 
----
-
-## Notificação por e-mail (preparado, desativado)
-
-- Edge function `questionario-save` já chama um helper `notificarConsultorOnboardingConcluido(cliente_id)` que hoje só faz `console.log`.
-- Quando o domínio CUPOLA estiver pronto, basta plugar `send-transactional-email` no helper + criar template `onboarding-concluido.tsx`. Sem refatoração.
-
----
-
-## Fora do escopo desta fase
-- Editor visual de templates (vem na fase 2 com "configurável por admin").
-- Upload de arquivos / anexos.
-- E-mail real ao concluir (depende do domínio CUPOLA).
-- Lógica condicional entre perguntas (ex.: "se sim, mostrar..."). Avaliamos quando você trouxer as perguntas reais.
-- Multi-idioma.
-
----
-
-## Entregáveis
-
-1. Migração com `questionarios_template` + `questionarios` + RLS + GRANTs + seed de 1 template fixo de exemplo.
-2. Edge functions `questionario-get` e `questionario-save` (públicas, com Zod).
-3. Rota pública `/q/:token` com auto-save, barra de progresso, navegação por seções.
-4. Bloco "Question_ario do cliente" na aba Onboarding do cliente (gerar/copiar/ver).
-5. Card resumo no detalhe do contrato (status + ver respostas).
-6. Helper de notificação stub para plugar e-mail depois.
-
-Após validarmos esse esqueleto com o template de exemplo, você me passa as perguntas reais e eu atualizo o seed do template (sem mexer em mais nada).
+1. Confirma **Opção B** (cliente próprio) ao invés do iframe read-only? Confirmo
+2. Quer o item no sidebar como **"Agenda"** próprio, ou dentro de `/minhas-tarefas` como aba?  
+Agenda próprio no sidebar
+3. Na fase 1, basta a consultora ver/criar/responder na **própria conta** dela, certo? (Sem visão consolidada de equipe.) Sim.
+4. Atalho "Agendar reunião com cliente" a partir do detalhe do cliente entra na fase 1 ou fica para depois? Entra na fase 1.
