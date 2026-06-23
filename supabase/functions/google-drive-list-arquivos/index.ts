@@ -99,9 +99,14 @@ Deno.serve(async (req) => {
     const ids = docs.map((d: any) => d.id);
     const { data: imported } = await admin
       .from("reunioes_importadas_log")
-      .select("google_file_id, cliente_id, reuniao_id")
+      .select("google_file_id, cliente_id, reuniao_id, status")
       .in("google_file_id", ids.length ? ids : ["__none__"]);
-    const importedMap = new Map((imported || []).map((i: any) => [i.google_file_id, i]));
+    // Only count as "already imported" entries that actually produced a reunião.
+    const importedMap = new Map(
+      (imported || [])
+        .filter((i: any) => i.status === "importado")
+        .map((i: any) => [i.google_file_id, i])
+    );
 
     // Match clients
     const { data: clientes } = await admin.from("clientes").select("id, nome");
@@ -120,8 +125,15 @@ Deno.serve(async (req) => {
         const exact = candidates.filter(c => c.key === b);
         if (exact.length === 1) return exact[0].cliente_id;
       }
+      const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const matches = new Set(
-        candidates.filter(c => lower.includes(c.key)).map(c => c.cliente_id)
+        candidates
+          .filter(c => {
+            const k = c.key.trim();
+            if (!k) return false;
+            return new RegExp(`(^|[^a-z0-9])${escape(k)}([^a-z0-9]|$)`, "i").test(lower);
+          })
+          .map(c => c.cliente_id)
       );
       return matches.size === 1 ? Array.from(matches)[0] : null;
     };
