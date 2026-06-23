@@ -43,15 +43,18 @@ export function OnboardingTab({ clienteId }: OnboardingTabProps) {
 
   if (!onboarding) {
     return (
-      <Card className="bg-card border-border border-dashed">
-        <CardContent className="py-8 text-center">
-          <p className="text-muted-foreground mb-4">Nenhum onboarding iniciado</p>
-          <Button onClick={handleCreate} disabled={createOnboarding.isPending}>
-            {createOnboarding.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Iniciar Onboarding
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        <QuestionarioBloco clienteId={clienteId} />
+        <Card className="bg-card border-border border-dashed">
+          <CardContent className="py-8 text-center">
+            <p className="text-muted-foreground mb-4">Nenhum onboarding iniciado</p>
+            <Button onClick={handleCreate} disabled={createOnboarding.isPending}>
+              {createOnboarding.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Iniciar Onboarding
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
