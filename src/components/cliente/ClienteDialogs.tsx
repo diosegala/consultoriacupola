@@ -19,10 +19,12 @@ import { useConsultores } from '@/hooks/useConsultores';
 import { useUpdateCliente } from '@/hooks/useClientes';
 import { useEncerrarContrato, calcularDataFimPagamento } from '@/hooks/useEncerramentos';
 import { toast } from '@/hooks/use-toast';
+import { getTipoConsultoriaLabel, TIPO_CONSULTORIA_PERSONALIZADO_NOME } from '@/lib/contrato';
 
 const contratoSchema = z.object({
   consultor_id: z.string().optional().nullable(),
   tipo_consultoria_id: z.string().optional().nullable(),
+  tipo_consultoria_personalizado: z.string().optional().nullable(),
   prazo_meses: z.coerce.number().min(1, 'Prazo deve ser maior que 0'),
   data_inicio: z.date({ required_error: 'Data de início é obrigatória' }),
   data_fim: z.date({ required_error: 'Data de fim é obrigatória' }),
