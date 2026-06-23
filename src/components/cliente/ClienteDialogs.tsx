@@ -864,7 +864,7 @@ export function RenovarContratoDialog({ open, onOpenChange, clienteId, contratoA
         <div className="p-4 rounded-lg bg-muted/50 border border-border mb-4">
           <p className="text-sm text-muted-foreground">Contrato atual:</p>
           <p className="font-medium">
-            {contratoAtual.tipo_consultoria?.nome || 'Tipo não definido'} • 
+            {getTipoConsultoriaLabel(contratoAtual, 'Tipo não definido')} • 
             {format(parseISO(contratoAtual.data_inicio), 'dd/MM/yyyy')} a {format(parseISO(contratoAtual.data_fim), 'dd/MM/yyyy')}
           </p>
         </div>
