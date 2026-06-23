@@ -11,7 +11,8 @@ import {
   Kanban,
   Link2,
   ListChecks,
-  Video
+  Video,
+  CalendarDays
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -27,6 +28,7 @@ const adminMenuItems = [
   { to: '/consultores', icon: UserCog, label: 'Consultores' },
   { to: '/projetos', icon: Kanban, label: 'Projetos' },
   { to: '/reunioes', icon: Video, label: 'Reuniões' },
+  { to: '/agenda', icon: CalendarDays, label: 'Agenda' },
   { to: '/minhas-tarefas', icon: ListChecks, label: 'Minhas tarefas' },
   { to: '/integracoes', icon: Link2, label: 'Minhas Integrações' },
   { to: '/configuracoes', icon: Settings, label: 'Configurações' },
@@ -34,6 +36,7 @@ const adminMenuItems = [
 
 const consultorMenuItems = [
   { to: '/projetos', icon: Kanban, label: 'Projetos' },
+  { to: '/agenda', icon: CalendarDays, label: 'Agenda' },
   { to: '/minhas-tarefas', icon: ListChecks, label: 'Minhas tarefas' },
   { to: '/integracoes', icon: Link2, label: 'Minhas Integrações' },
 ];

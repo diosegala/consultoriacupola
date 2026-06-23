@@ -15,7 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Loader2, ArrowLeft, FileText, Users, Calendar, Pencil, Trash2, BarChart3, Video } from 'lucide-react';
+import { Loader2, ArrowLeft, FileText, Users, Calendar, Pencil, Trash2, BarChart3, Video, CalendarPlus } from 'lucide-react';
 import { useCliente, useDeleteCliente } from '@/hooks/useClientes';
 import { ContratoTab } from '@/components/cliente/ContratoTab';
 import { OnboardingTab } from '@/components/cliente/OnboardingTab';
@@ -85,6 +85,22 @@ export default function ClienteDetalhe() {
               title="Excluir cliente"
             >
               <Trash2 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="ml-2"
+              onClick={() => {
+                const email = (cliente as any).email || '';
+                const params = new URLSearchParams();
+                if (email) params.set('attendee', email);
+                params.set('title', `Reunião — ${cliente.nome}`);
+                navigate(`/agenda?${params.toString()}`);
+              }}
+              title="Agendar reunião no Google Agenda"
+            >
+              <CalendarPlus className="h-4 w-4 mr-1" />
+              Agendar reunião
             </Button>
           </div>
           <p className="text-muted-foreground ml-10">
