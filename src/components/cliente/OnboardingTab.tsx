@@ -5,6 +5,7 @@ import { Loader2, Check, Circle } from 'lucide-react';
 import { useOnboarding, useCreateOnboarding, useUpdateOnboarding } from '@/hooks/useOnboarding';
 import { format, parseISO } from 'date-fns';
 import { OnboardingFormDialog } from './ClienteDialogs';
+import { QuestionarioBloco } from './QuestionarioBloco';
 
 interface OnboardingTabProps {
   clienteId: string;
@@ -64,6 +65,7 @@ export function OnboardingTab({ clienteId }: OnboardingTabProps) {
 
   return (
     <div className="space-y-6">
+      <QuestionarioBloco clienteId={clienteId} />
       <Card className="bg-card border-border">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-foreground">Timeline do Onboarding</CardTitle>
