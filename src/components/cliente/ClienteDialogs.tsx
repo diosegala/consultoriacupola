@@ -741,6 +741,7 @@ export function RenovarContratoDialog({ open, onOpenChange, clienteId, contratoA
     resolver: zodResolver(renovarSchema),
     defaultValues: {
       tipo_consultoria_id: contratoAtual.tipo_consultoria_id || '',
+      tipo_consultoria_personalizado: (contratoAtual as any).tipo_consultoria_personalizado || '',
       prazo_meses: contratoAtual.prazo_meses,
       data_inicio: dataInicioRenovacao,
       data_fim: addMonths(dataInicioRenovacao, contratoAtual.prazo_meses),
@@ -759,6 +760,7 @@ export function RenovarContratoDialog({ open, onOpenChange, clienteId, contratoA
       const novaDataInicio = addDays(parseISO(contratoAtual.data_fim), 1);
       form.reset({
         tipo_consultoria_id: contratoAtual.tipo_consultoria_id || '',
+        tipo_consultoria_personalizado: (contratoAtual as any).tipo_consultoria_personalizado || '',
         prazo_meses: contratoAtual.prazo_meses,
         data_inicio: novaDataInicio,
         data_fim: addMonths(novaDataInicio, contratoAtual.prazo_meses),
