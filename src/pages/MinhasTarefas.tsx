@@ -232,13 +232,23 @@ export default function MinhasTarefas() {
                       onCheckedChange={(v) => updateTodo.mutate({ id: t.id, concluido: !!v })}
                     />
                     <div className="flex-1 min-w-0">
-                      <p className={cn('text-sm', t.concluido && 'line-through text-muted-foreground')}>
-                        {t.titulo}
-                      </p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className={cn('text-sm', t.concluido && 'line-through text-muted-foreground')}>
+                          {t.titulo}
+                        </p>
+                        {t.assigned_by && (
+                          <Badge variant="outline" className="text-[9px] bg-primary/10 text-primary border-primary/30">
+                            Atribuída por gestor
+                          </Badge>
+                        )}
+                      </div>
                       {t.cliente_nome && (
                         <p className="text-[10px] text-muted-foreground">{t.cliente_nome}</p>
                       )}
                     </div>
+                    {t.assigned_by ? (
+                      <PrazoBadge due_date={t.due_date} />
+                    ) : (
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button variant="outline" size="sm" className="h-7 text-xs">
@@ -256,18 +266,126 @@ export default function MinhasTarefas() {
                         />
                       </PopoverContent>
                     </Popover>
-                    <Button
-                      variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100"
-                      onClick={() => deleteTodo.mutate({ id: t.id })}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
+                    )}
+                    {!t.assigned_by && (
+                      <Button
+                        variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100"
+                        onClick={() => deleteTodo.mutate({ id: t.id })}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    )}
                   </div>
                 ))}
               </div>
             </CardContent>
           </Card>
         </TabsContent>
+
+        {canAssignTasks && (
+          <TabsContent value="atribuidas" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Atribuir nova tarefa</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex flex-wrap gap-2 items-end">
+                  <div className="flex-1 min-w-[240px]">
+                    <label className="text-xs text-muted-foreground">Tarefa</label>
+                    <Input
+                      placeholder="O que precisa ser feito?"
+                      value={novaAtribTitulo}
+                      onChange={e => setNovaAtribTitulo(e.target.value)}
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="min-w-[200px]">
+                    <label className="text-xs text-muted-foreground">Responsável</label>
+                    <Select value={novaAtribResp} onValueChange={setNovaAtribResp}>
+                      <SelectTrigger className="h-9"><SelectValue placeholder="Escolher consultora..." /></SelectTrigger>
+                      <SelectContent>
+                        {(consultoresAtribuiveis ?? []).map(c => (
+                          <SelectItem key={c.user_id} value={c.user_id}>{c.nome}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="h-9">
+                        <CalendarIcon className="h-4 w-4 mr-1" />
+                        {novaAtribPrazo ? format(novaAtribPrazo, 'dd/MM/yy') : 'Prazo (opcional)'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <Calendar mode="single" selected={novaAtribPrazo} onSelect={setNovaAtribPrazo} className="p-3 pointer-events-auto" initialFocus />
+                    </PopoverContent>
+                  </Popover>
+                  <Button
+                    disabled={!novaAtribTitulo.trim() || !novaAtribResp || createTodo.isPending}
+                    onClick={() => {
+                      createTodo.mutate(
+                        {
+                          titulo: novaAtribTitulo.trim(),
+                          assigned_to_user_id: novaAtribResp,
+                          due_date: novaAtribPrazo ? format(novaAtribPrazo, 'yyyy-MM-dd') : null,
+                        },
+                        {
+                          onSuccess: () => {
+                            setNovaAtribTitulo('');
+                            setNovaAtribResp('');
+                            setNovaAtribPrazo(undefined);
+                          },
+                        },
+                      );
+                    }}
+                  >
+                    <Send className="h-4 w-4 mr-1" /> Atribuir
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="mt-4">
+              <CardHeader>
+                <CardTitle className="text-base">Tarefas que você atribuiu</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {l3 && <Loader2 className="h-5 w-5 animate-spin" />}
+                {!l3 && (tarefasAtribuidas?.length ?? 0) === 0 && (
+                  <p className="text-sm text-muted-foreground">Você ainda não atribuiu tarefas.</p>
+                )}
+                <div className="space-y-2">
+                  {(tarefasAtribuidas ?? []).map(t => (
+                    <div key={t.id} className="flex items-center gap-3 p-2 rounded-md border border-border/50 group">
+                      <div className={cn('h-2 w-2 rounded-full', t.concluido ? 'bg-primary' : 'bg-muted-foreground/40')} />
+                      <div className="flex-1 min-w-0">
+                        <p className={cn('text-sm', t.concluido && 'line-through text-muted-foreground')}>
+                          {t.titulo}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">
+                          Para: {t.responsavel_nome ?? '—'}
+                          {t.cliente_nome && ` · ${t.cliente_nome}`}
+                        </p>
+                      </div>
+                      <Badge variant="outline" className={cn('text-[10px]', t.concluido && 'bg-primary/15 text-primary border-primary/30')}>
+                        {t.concluido ? 'Concluída' : 'Em aberto'}
+                      </Badge>
+                      <PrazoBadge due_date={t.due_date} />
+                      <Button
+                        variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100"
+                        onClick={() => deleteTodo.mutate({ id: t.id })}
+                        title="Excluir tarefa"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
