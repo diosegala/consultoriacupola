@@ -10,7 +10,8 @@ import {
   FileText,
   Kanban,
   Link2,
-  ListChecks
+  ListChecks,
+  Video
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,6 +26,7 @@ const adminMenuItems = [
   { to: '/contratos', icon: FileText, label: 'Contratos' },
   { to: '/consultores', icon: UserCog, label: 'Consultores' },
   { to: '/projetos', icon: Kanban, label: 'Projetos' },
+  { to: '/reunioes', icon: Video, label: 'Reuniões' },
   { to: '/minhas-tarefas', icon: ListChecks, label: 'Minhas tarefas' },
   { to: '/integracoes', icon: Link2, label: 'Minhas Integrações' },
   { to: '/configuracoes', icon: Settings, label: 'Configurações' },
