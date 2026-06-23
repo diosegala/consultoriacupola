@@ -19,6 +19,7 @@ import { format, parseISO } from 'date-fns';
 import { ContratoFormDialog, RenovarContratoDialog } from './ClienteDialogs';
 import { toast } from 'sonner';
 import { getTipoConsultoriaLabel } from '@/lib/contrato';
+import { QuestionarioBloco } from './QuestionarioBloco';
 
 interface ContratoTabProps {
   clienteId: string;
@@ -66,6 +67,7 @@ export function ContratoTab({ clienteId, clienteStatus, consultorId }: ContratoT
 
   return (
     <div className="space-y-6">
+      <QuestionarioBloco clienteId={clienteId} compact />
       {/* Contrato Ativo */}
       {contratoAtivo ? (
         <Card className="bg-card border-border border-l-4 border-l-primary">

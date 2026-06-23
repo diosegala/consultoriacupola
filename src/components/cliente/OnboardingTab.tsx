@@ -5,6 +5,7 @@ import { Loader2, Check, Circle } from 'lucide-react';
 import { useOnboarding, useCreateOnboarding, useUpdateOnboarding } from '@/hooks/useOnboarding';
 import { format, parseISO } from 'date-fns';
 import { OnboardingFormDialog } from './ClienteDialogs';
+import { QuestionarioBloco } from './QuestionarioBloco';
 
 interface OnboardingTabProps {
   clienteId: string;
@@ -42,15 +43,18 @@ export function OnboardingTab({ clienteId }: OnboardingTabProps) {
 
   if (!onboarding) {
     return (
-      <Card className="bg-card border-border border-dashed">
-        <CardContent className="py-8 text-center">
-          <p className="text-muted-foreground mb-4">Nenhum onboarding iniciado</p>
-          <Button onClick={handleCreate} disabled={createOnboarding.isPending}>
-            {createOnboarding.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Iniciar Onboarding
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        <QuestionarioBloco clienteId={clienteId} />
+        <Card className="bg-card border-border border-dashed">
+          <CardContent className="py-8 text-center">
+            <p className="text-muted-foreground mb-4">Nenhum onboarding iniciado</p>
+            <Button onClick={handleCreate} disabled={createOnboarding.isPending}>
+              {createOnboarding.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Iniciar Onboarding
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
@@ -64,6 +68,7 @@ export function OnboardingTab({ clienteId }: OnboardingTabProps) {
 
   return (
     <div className="space-y-6">
+      <QuestionarioBloco clienteId={clienteId} />
       <Card className="bg-card border-border">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-foreground">Timeline do Onboarding</CardTitle>

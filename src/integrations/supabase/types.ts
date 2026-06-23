@@ -887,6 +887,99 @@ export type Database = {
         }
         Relationships: []
       }
+      questionarios: {
+        Row: {
+          cliente_id: string
+          concluido_em: string | null
+          created_at: string
+          expira_em: string | null
+          id: string
+          iniciado_em: string | null
+          progresso_pct: number
+          respostas: Json
+          status: string
+          template_id: string
+          token: string
+          ultimo_salvamento_em: string | null
+          updated_at: string
+        }
+        Insert: {
+          cliente_id: string
+          concluido_em?: string | null
+          created_at?: string
+          expira_em?: string | null
+          id?: string
+          iniciado_em?: string | null
+          progresso_pct?: number
+          respostas?: Json
+          status?: string
+          template_id: string
+          token?: string
+          ultimo_salvamento_em?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cliente_id?: string
+          concluido_em?: string | null
+          created_at?: string
+          expira_em?: string | null
+          id?: string
+          iniciado_em?: string | null
+          progresso_pct?: number
+          respostas?: Json
+          status?: string
+          template_id?: string
+          token?: string
+          ultimo_salvamento_em?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "questionarios_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "questionarios_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "questionarios_template"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      questionarios_template: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          estrutura: Json
+          id: string
+          nome: string
+          updated_at: string
+          versao: number
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          estrutura?: Json
+          id?: string
+          nome: string
+          updated_at?: string
+          versao?: number
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          estrutura?: Json
+          id?: string
+          nome?: string
+          updated_at?: string
+          versao?: number
+        }
+        Relationships: []
+      }
       reunioes: {
         Row: {
           analise_cliente: Json | null

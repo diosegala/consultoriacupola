@@ -24,6 +24,7 @@ import MinhasTarefas from "./pages/MinhasTarefas";
 import Reunioes from "./pages/Reunioes";
 import GoogleCallback from "./pages/GoogleCallback";
 import NotFound from "./pages/NotFound";
+import QuestionarioPublico from "./pages/QuestionarioPublico";
 
 const queryClient = new QueryClient();
 
@@ -39,6 +40,7 @@ const App = () => (
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/trocar-senha" element={<TrocarSenha />} />
             <Route path="/google-callback" element={<GoogleCallback />} />
+            <Route path="/q/:token" element={<QuestionarioPublico />} />
             <Route element={<AppLayout />}>
               <Route path="/" element={<Dashboard />} />
               <Route path="/clientes" element={<Clientes />} />
