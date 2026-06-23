@@ -21,6 +21,7 @@ import ResetPassword from "./pages/ResetPassword";
 import TrocarSenha from "./pages/TrocarSenha";
 import MinhasIntegracoes from "./pages/MinhasIntegracoes";
 import MinhasTarefas from "./pages/MinhasTarefas";
+import Reunioes from "./pages/Reunioes";
 import GoogleCallback from "./pages/GoogleCallback";
 import NotFound from "./pages/NotFound";
 
@@ -49,6 +50,7 @@ const App = () => (
               <Route path="/configuracoes" element={<Configuracoes />} />
               <Route path="/projetos" element={<Projetos />} />
               <Route path="/minhas-tarefas" element={<MinhasTarefas />} />
+              <Route path="/reunioes" element={<Reunioes />} />
               <Route path="/integracoes" element={<MinhasIntegracoes />} />
             </Route>
             <Route path="*" element={<NotFound />} />
