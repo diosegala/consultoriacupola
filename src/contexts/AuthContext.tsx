@@ -12,6 +12,8 @@ interface AuthContextType {
   userRole: AppRole | null;
   isAdmin: boolean;
   isConsultor: boolean;
+  isDirector: boolean;
+  canAssignTasks: boolean;
   forcePasswordChange: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -76,9 +78,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isAdmin = userRole === 'admin';
   const isConsultor = userRole === 'consultor';
+  const isDirector = userRole === 'director';
+  const canAssignTasks = isAdmin || isDirector;
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, userRole, isAdmin, isConsultor, forcePasswordChange, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, userRole, isAdmin, isConsultor, isDirector, canAssignTasks, forcePasswordChange, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );
