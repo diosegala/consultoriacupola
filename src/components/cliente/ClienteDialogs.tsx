@@ -60,6 +60,7 @@ export function ContratoFormDialog({ open, onOpenChange, clienteId, contrato, co
     defaultValues: {
       consultor_id: '',
       tipo_consultoria_id: '',
+      tipo_consultoria_personalizado: '',
       prazo_meses: 12,
       data_inicio: new Date(),
       data_fim: addMonths(new Date(), 12),
@@ -78,6 +79,7 @@ export function ContratoFormDialog({ open, onOpenChange, clienteId, contrato, co
       form.reset({
         consultor_id: consultorId || '',
         tipo_consultoria_id: contrato.tipo_consultoria_id || '',
+        tipo_consultoria_personalizado: (contrato as any).tipo_consultoria_personalizado || '',
         prazo_meses: contrato.prazo_meses,
         data_inicio: parseISO(contrato.data_inicio),
         data_fim: parseISO(contrato.data_fim),
@@ -93,6 +95,7 @@ export function ContratoFormDialog({ open, onOpenChange, clienteId, contrato, co
       form.reset({
         consultor_id: consultorId || '',
         tipo_consultoria_id: '',
+        tipo_consultoria_personalizado: '',
         prazo_meses: 12,
         data_inicio: new Date(),
         data_fim: addMonths(new Date(), 12),
