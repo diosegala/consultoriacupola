@@ -97,6 +97,36 @@ export function useReuniao(id: string | undefined) {
   });
 }
 
+export function useAllReunioes(opts: { origem?: 'all' | 'drive' | 'manual' } = {}) {
+  const { origem = 'all' } = opts;
+  return useQuery({
+    queryKey: ['reunioes', 'all', origem],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('reunioes')
+        .select('*, clientes(nome), consultores(nome)')
+        .order('data_reuniao', { ascending: false });
+      if (error) throw error;
+      const reunioes = (data || []) as unknown as ReuniaoComDetalhes[];
+      const ids = reunioes.map((r) => r.id);
+      if (ids.length) {
+        const { data: logs } = await supabase
+          .from('reunioes_importadas_log' as any)
+          .select('reuniao_id, data_importacao, nome_arquivo')
+          .in('reuniao_id', ids);
+        const map = new Map(((logs || []) as any[]).map((l) => [l.reuniao_id, l]));
+        reunioes.forEach((r: any) => {
+          const log = map.get(r.id);
+          r.origem = log ? 'drive' : 'manual';
+          r.origem_log = log || null;
+        });
+      }
+      if (origem === 'all') return reunioes;
+      return reunioes.filter((r: any) => r.origem === origem);
+    },
+  });
+}
+
 export function useCreateReuniao() {
   const queryClient = useQueryClient();
 
