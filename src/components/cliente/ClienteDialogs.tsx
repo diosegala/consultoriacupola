@@ -135,11 +135,33 @@ export function ContratoFormDialog({ open, onOpenChange, clienteId, contrato, co
     }
   }, [watchTotal, watchParcelas, form]);
 
+  // Detecta o id do tipo "Personalizado" e limpa o campo quando o tipo muda.
+  const tipoPersonalizadoId = tiposConsultoria?.find(
+    (t) => t.nome.toLowerCase() === TIPO_CONSULTORIA_PERSONALIZADO_NOME.toLowerCase()
+  )?.id;
+  const watchTipoId = form.watch('tipo_consultoria_id');
+  const isPersonalizado = !!tipoPersonalizadoId && watchTipoId === tipoPersonalizadoId;
+  useEffect(() => {
+    if (!isPersonalizado && form.getValues('tipo_consultoria_personalizado')) {
+      form.setValue('tipo_consultoria_personalizado', '');
+    }
+  }, [isPersonalizado, form]);
+
   async function onSubmit(values: ContratoFormValues) {
+    if (isPersonalizado && !values.tipo_consultoria_personalizado?.trim()) {
+      form.setError('tipo_consultoria_personalizado', {
+        type: 'manual',
+        message: 'Informe o nome da consultoria personalizada',
+      });
+      return;
+    }
     try {
       const payload = {
         cliente_id: clienteId,
         tipo_consultoria_id: values.tipo_consultoria_id || null,
+        tipo_consultoria_personalizado: isPersonalizado
+          ? values.tipo_consultoria_personalizado?.trim() || null
+          : null,
         prazo_meses: values.prazo_meses,
         data_inicio: format(values.data_inicio, 'yyyy-MM-dd'),
         data_fim: format(values.data_fim, 'yyyy-MM-dd'),
