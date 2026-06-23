@@ -8,12 +8,13 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { CalendarIcon, Plus, Trash2, ListChecks, ClipboardList, Loader2 } from 'lucide-react';
+import { CalendarIcon, Plus, Trash2, ListChecks, ClipboardList, Loader2, UserPlus, Send } from 'lucide-react';
 import { format, isPast, isToday, addDays, isBefore } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { useMinhasTarefasChecklist, useMinhasTarefasTodo } from '@/hooks/useMinhasTarefas';
+import { useMinhasTarefasChecklist, useMinhasTarefasTodo, useTarefasAtribuidasPorMim, useConsultoresAtribuiveis } from '@/hooks/useMinhasTarefas';
 import { useToggleChecklistItem } from '@/hooks/useProjetoChecklist';
 import { useCreateTodoPessoal, useUpdateTodoPessoal, useDeleteTodoPessoal } from '@/hooks/useTodoPessoal';
+import { useAuth } from '@/contexts/AuthContext';
 
 type FiltroStatus = 'aberto' | 'concluido' | 'todos';
 type FiltroPrazo = 'todos' | 'vencidos' | 'hoje' | 'proximos7' | 'sem_prazo';
