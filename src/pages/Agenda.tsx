@@ -227,6 +227,9 @@ function SemanaGrid({ days, events, onSlot, onClickEvent }: {
 }) {
   const hours = Array.from({ length: 17 }, (_, i) => 6 + i); // 6h-22h
   const today = new Date();
+  const HOUR_PX = 64;
+  const START_HOUR = 6;
+  const totalHeight = hours.length * HOUR_PX;
 
   return (
     <div className="border border-border rounded-lg overflow-auto bg-card">
@@ -239,51 +242,92 @@ function SemanaGrid({ days, events, onSlot, onClickEvent }: {
           </div>
         ))}
 
-        {hours.map((h) => (
-          <div key={`row-${h}`} className="contents">
-            <div className="text-[10px] text-muted-foreground text-right pr-1 pt-1 border-r border-border h-16">{`${String(h).padStart(2, '0')}:00`}</div>
-            {days.map((d) => {
-              const slotStart = new Date(d); slotStart.setHours(h, 0, 0, 0);
-              const slotEnd = new Date(d); slotEnd.setHours(h + 1, 0, 0, 0);
-              const dayEvents = events.filter((ev) => {
+        {/* Hours gutter + day columns body */}
+        <div className="relative border-r border-border" style={{ height: totalHeight }}>
+          {hours.map((h) => (
+            <div key={`hg-${h}`} className="text-[10px] text-muted-foreground text-right pr-1 pt-1 border-b border-border" style={{ height: HOUR_PX }}>
+              {`${String(h).padStart(2, '0')}:00`}
+            </div>
+          ))}
+        </div>
+        {days.map((d) => {
+          const dayEvents = events
+            .filter((ev) => isSameDay(eventStart(ev), d))
+            .sort((a, b) => eventStart(a).getTime() - eventStart(b).getTime());
+          const laidOut = layoutDayEvents(dayEvents);
+          return (
+            <div key={`col-${d.toISOString()}`} className="relative border-r border-border" style={{ height: totalHeight }}>
+              {/* Background hour slots (click-to-create) */}
+              {hours.map((h) => {
+                const slotStart = new Date(d); slotStart.setHours(h, 0, 0, 0);
+                return (
+                  <div key={`slot-${h}`}
+                    className="border-b border-border hover:bg-muted/30 cursor-pointer"
+                    style={{ height: HOUR_PX }}
+                    onClick={() => onSlot(slotStart)} />
+                );
+              })}
+              {/* Events overlay */}
+              {laidOut.map(({ ev, col, cols }) => {
                 const s = eventStart(ev), e = eventEnd(ev);
-                return s < slotEnd && e > slotStart && isSameDay(s, d);
-              });
-              return (
-                <div key={`${d.toISOString()}-${h}`}
-                  className="relative h-16 border-r border-b border-border hover:bg-muted/30 cursor-pointer"
-                  onClick={() => onSlot(slotStart)}>
-                  {dayEvents.map((ev) => {
-                    const s = eventStart(ev), e = eventEnd(ev);
-                    if (s.getHours() !== h) return null; // render only in starting hour
-                    const minutes = Math.max(30, (e.getTime() - s.getTime()) / 60000);
-                    const top = (s.getMinutes() / 60) * 64;
-                    const height = (minutes / 60) * 64 - 2;
-                    const resp = myResponse(ev);
-                    const declined = resp === 'declined';
-                    const tentative = resp === 'tentative' || resp === 'needsAction';
-                    return (
-                      <div key={ev.id}
-                        onClick={(e) => { e.stopPropagation(); onClickEvent(ev); }}
-                        style={{ top, height, zIndex: 1 }}
-                        className={`absolute left-1 right-1 rounded px-1 py-0.5 text-[11px] overflow-hidden cursor-pointer border ${
-                          declined ? 'bg-muted/40 text-muted-foreground line-through border-border' :
-                          tentative ? 'bg-yellow-600/20 text-yellow-200 border-yellow-600/40' :
-                          'bg-primary/20 text-foreground border-primary/40 hover:bg-primary/30'
-                        }`}>
-                        <div className="font-medium truncate">{ev.summary}</div>
-                        <div className="opacity-70">{format(s, 'HH:mm')}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
-        ))}
+                const startMin = (s.getHours() - START_HOUR) * 60 + s.getMinutes();
+                const endMin = Math.min(hours.length * 60, (e.getHours() - START_HOUR) * 60 + e.getMinutes());
+                const top = (startMin / 60) * HOUR_PX;
+                const height = Math.max(20, ((endMin - startMin) / 60) * HOUR_PX - 2);
+                const widthPct = 100 / cols;
+                const leftPct = col * widthPct;
+                const resp = myResponse(ev);
+                const declined = resp === 'declined';
+                const tentative = resp === 'tentative' || resp === 'needsAction';
+                return (
+                  <div key={ev.id}
+                    onClick={(evt) => { evt.stopPropagation(); onClickEvent(ev); }}
+                    style={{ top, height, left: `calc(${leftPct}% + 2px)`, width: `calc(${widthPct}% - 4px)`, zIndex: 2 }}
+                    className={`absolute rounded px-1 py-0.5 text-[11px] overflow-hidden cursor-pointer border ${
+                      declined ? 'bg-muted/40 text-muted-foreground line-through border-border' :
+                      tentative ? 'bg-yellow-600/20 text-yellow-200 border-yellow-600/40' :
+                      'bg-primary/20 text-foreground border-primary/40 hover:bg-primary/30'
+                    }`}>
+                    <div className="font-medium truncate leading-tight">{ev.summary}</div>
+                    <div className="opacity-70 leading-tight">{format(s, 'HH:mm')}</div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
+}
+
+/** Greedy column layout for overlapping events within a single day. */
+function layoutDayEvents(evs: GCalEvent[]): Array<{ ev: GCalEvent; col: number; cols: number }> {
+  const result: Array<{ ev: GCalEvent; col: number; cols: number; start: number; end: number }> = [];
+  let cluster: typeof result = [];
+  let clusterEnd = 0;
+
+  const flush = () => {
+    const cols = Math.max(1, ...cluster.map((c) => c.col + 1));
+    cluster.forEach((c) => (c.cols = cols));
+    cluster = [];
+  };
+
+  for (const ev of evs) {
+    const start = eventStart(ev).getTime();
+    const end = eventEnd(ev).getTime();
+    if (cluster.length && start >= clusterEnd) flush();
+    // find first free column in cluster
+    const used = new Set(cluster.filter((c) => c.end > start).map((c) => c.col));
+    let col = 0;
+    while (used.has(col)) col++;
+    const item = { ev, col, cols: 1, start, end };
+    cluster.push(item);
+    result.push(item);
+    clusterEnd = Math.max(clusterEnd, end);
+  }
+  flush();
+  return result.map(({ ev, col, cols }) => ({ ev, col, cols }));
 }
 
 function ListaEventos({ events, onEdit, onDelete, onRespond }: {
