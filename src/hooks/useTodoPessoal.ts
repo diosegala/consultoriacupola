@@ -10,6 +10,7 @@ export interface TodoPessoalRow {
   concluido: boolean;
   due_date: string | null;
   ordem: number;
+  assigned_by: string | null;
   created_at: string;
   updated_at: string;
   projeto?: {
@@ -48,16 +49,24 @@ export function useCreateTodoPessoal() {
   const qc = useQueryClient();
   const { user } = useAuth();
   return useMutation({
-    mutationFn: async ({ titulo, projeto_id, due_date }: { titulo: string; projeto_id?: string | null; due_date?: string | null }) => {
+    mutationFn: async ({ titulo, projeto_id, due_date, assigned_to_user_id }: { titulo: string; projeto_id?: string | null; due_date?: string | null; assigned_to_user_id?: string | null }) => {
       if (!user) throw new Error('Não autenticado');
+      const isAssign = !!assigned_to_user_id && assigned_to_user_id !== user.id;
       const { error } = await supabase
         .from('todo_pessoal')
-        .insert({ user_id: user.id, titulo, projeto_id: projeto_id ?? null, due_date: due_date ?? null });
+        .insert({
+          user_id: assigned_to_user_id ?? user.id,
+          titulo,
+          projeto_id: projeto_id ?? null,
+          due_date: due_date ?? null,
+          assigned_by: isAssign ? user.id : null,
+        });
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['todo_pessoal'] });
       qc.invalidateQueries({ queryKey: ['minhas_tarefas'] });
+      qc.invalidateQueries({ queryKey: ['tarefas_atribuidas'] });
     },
   });
 }
@@ -75,6 +84,7 @@ export function useUpdateTodoPessoal() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['todo_pessoal'] });
       qc.invalidateQueries({ queryKey: ['minhas_tarefas'] });
+      qc.invalidateQueries({ queryKey: ['tarefas_atribuidas'] });
     },
   });
 }
@@ -89,6 +99,7 @@ export function useDeleteTodoPessoal() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['todo_pessoal'] });
       qc.invalidateQueries({ queryKey: ['minhas_tarefas'] });
+      qc.invalidateQueries({ queryKey: ['tarefas_atribuidas'] });
     },
   });
 }
