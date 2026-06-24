@@ -1,85 +1,110 @@
-## Objetivo
+# Oráculo da Cupola dentro da plataforma
 
-Tornar a plataforma o "hub" do consultor adicionando uma visualização do Google Calendar dele dentro do app, reduzindo a necessidade de abrir outras abas.
+Disponibilizar para o consultor um chat com a base de conhecimento da Cupola (hoje no projeto "Oraculo da Cupola"), replicado neste projeto para autonomia total.
 
-## O que é possível (e o que não é) com embed do Google Calendar
+## 1. Backend (Lovable Cloud)
 
-O Google **não permite** embedar a interface completa e interativa do Google Calendar (calendar.google.com) dentro de um iframe de outro domínio — eles bloqueiam via `X-Frame-Options: SAMEORIGIN`. Isso significa que **não dá para "logar" no Google e usar a UI nativa do Agenda inteira dentro da nossa plataforma** (criar evento, responder convite, arrastar, etc., com a mesma UX do calendar.google.com).
+### Tabela `notion_documents`
+Replica o schema usado no Oráculo.
 
-O que **dá** para fazer, em ordem de fidelidade:
+```sql
+CREATE TABLE public.notion_documents (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  notion_page_id text UNIQUE NOT NULL,
+  data_source_id text NOT NULL,
+  title text,
+  content text,
+  url text,
+  last_edited_time timestamptz,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+GRANT SELECT ON public.notion_documents TO authenticated;
+GRANT ALL ON public.notion_documents TO service_role;
+ALTER TABLE public.notion_documents ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Authenticated read" ON public.notion_documents
+  FOR SELECT TO authenticated USING (public.is_authorized_user(auth.uid()));
+CREATE INDEX ON public.notion_documents USING gin (to_tsvector('portuguese', coalesce(title,'') || ' ' || coalesce(content,'')));
+```
 
-### Opção A — Embed público read-only (iframe oficial do Google)
+### Tabela `oraculo_conversas` / `oraculo_mensagens` (histórico por consultor)
+Para que o consultor possa retomar conversas antigas.
 
-- Usa o iframe oficial `calendar.google.com/calendar/embed?src=...`.
-- Mostra os eventos em visual de mês/semana/agenda.
-- **Limitações graves para o caso de uso**: o calendário precisa estar público OU o consultor precisa estar logado na mesma conta Google no navegador (não dá para "vincular" via OAuth). Não permite criar evento, responder invite ou ver detalhes privados.
-- **Conclusão**: não atende o pedido (responder invites, agendar).
+```sql
+CREATE TABLE public.oraculo_conversas (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  titulo text,
+  contexto_origem jsonb,   -- ex.: { tipo: 'cliente', id: '...', nome: '...' }
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+CREATE TABLE public.oraculo_mensagens (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversa_id uuid NOT NULL REFERENCES public.oraculo_conversas(id) ON DELETE CASCADE,
+  role text NOT NULL CHECK (role IN ('user','assistant')),
+  content text NOT NULL,
+  created_at timestamptz DEFAULT now()
+);
+-- GRANTs + RLS por user_id (auth.uid())
+```
 
-### Opção B — Cliente de agenda próprio dentro do app (recomendado)
+### Edge Functions
+- `oraculo-sync-notion`: porta a função `sync-notion` do projeto Oráculo (mesmo databaseId `1a035c7b74608022a85fe26026dbb2d9` + futuros databaseIds do método de aluguel). Roda manualmente (botão admin em Configurações) e via cron.
+- `oraculo-chat`: porta `chat/index.ts` do Oráculo, com duas adições:
+  - Aceita `contexto_pagina` opcional (cliente/projeto/contrato atual) e injeta no system prompt.
+  - Persiste a conversa em `oraculo_conversas`/`oraculo_mensagens` quando `conversa_id` é enviado.
+  - Mantém streaming SSE, busca por keywords em `notion_documents`, modelo `google/gemini-2.5-flash` via Lovable AI Gateway.
 
-Construir uma "mini agenda" nossa, usando a Google Calendar API com o OAuth que cada consultora **já conecta hoje** em `MinhasIntegracoes` (a infra `google-oauth-start` / `google-oauth-callback` e a tabela `consultor_google_tokens` já existem — hoje cobre só Drive). Estendemos os scopes para incluir Calendar e construímos a UI.
+### Secrets necessários
+- `NOTION_API_KEY` (será solicitado via add_secret quando for sincronizar).
+- `LOVABLE_API_KEY` (já existe).
 
-Funcionalidades:
+## 2. Frontend
 
-- Visão semana / dia / agenda (lista) dos calendários da conta Cupola da consultora.
-- Mostrar eventos com horário, título, participantes, link do Meet.
-- Criar novo evento (título, data/hora, descrição, convidados, gerar link do Meet automaticamente).
-- Editar / excluir evento criado por ela.
-- Responder convites: aceitar / recusar / talvez (atualizando `responseStatus` do attendee via API).
-- Abrir o evento no Google Calendar em nova aba como "fallback" para edições avançadas.
+### Componente global `<OraculoFloatingChat />`
+- Botão flutuante (ícone do Cupola) fixo no canto inferior direito, dentro de `AppLayout`, visível em todas as rotas autenticadas.
+- Clique abre um `Sheet` lateral à direita (~480px) com:
+  - Header com toggle de **"Usar contexto desta página"** (default: ligado quando há contexto detectável; desligável a qualquer momento → conversa pura).
+  - Chip mostrando o contexto ativo (ex.: "Cliente: ACME"), com X para remover.
+  - Lista de mensagens (reaproveita estilo Markdown atual).
+  - Input com envio por Enter.
+  - Botão "Abrir conversa completa" → navega para `/oraculo?conversa=<id>`.
+  - Botão "Nova conversa".
 
-Vantagem: roda 100% dentro da plataforma, integra com clientes/projetos no futuro (ex.: "agendar reunião com cliente X" já preenche convidado). Desvantagem: é UI nossa, não idêntica à do Google.
+### Hook `useOraculoContext()`
+Detecta a rota atual e monta um objeto de contexto:
+- `/clientes/:id` → busca nome do cliente e contrato ativo.
+- `/projetos` + projeto selecionado → nome, etapa.
+- `/reunioes` ou detalhe → reunião + cliente.
+- Outras rotas → sem contexto.
 
-### Opção C — Híbrido
+### Página `/oraculo`
+- Item no menu (admin + consultor) com ícone `Sparkles`/oráculo.
+- Layout duas colunas:
+  - Esquerda (260px): lista de conversas do usuário (`oraculo_conversas`), botão "Nova".
+  - Direita: mesma UI de chat do flutuante, em tela cheia.
+- Permite retomar/renomear/excluir conversas.
 
-Mostrar a lista/grade de eventos em UI nossa (Opção B) e, para ações pesadas (configurar recorrência complexa, etc.), botão "Abrir no Google Calendar" em nova aba.
+### Configurações (admin)
+- Aba "Oráculo": botão "Sincronizar base do Notion agora", contador de documentos, data da última sync, lista resumida.
 
-## Recomendação
+## 3. Comportamento "misto" do contexto
+- Toggle por conversa: o contexto da página é capturado **no momento do envio** da mensagem e fica registrado em `contexto_origem` da conversa.
+- Em conversas existentes, o usuário pode ligar/desligar a injeção de contexto a qualquer momento via toggle no header do chat.
+- Quando desligado: prompt do sistema é o mesmo do Oráculo original.
+- Quando ligado: anexa bloco "CONTEXTO DA CONSULTA ATUAL" antes da seção de referências.
 
-**Opção B**, com botão de fallback "Abrir no Google Calendar" (Opção C de fato). É o único caminho que entrega "agendar reuniões e responder invites de dentro da plataforma".
+## 4. Entregas (ordem)
+1. Migration: `notion_documents`, `oraculo_conversas`, `oraculo_mensagens` + RLS/GRANTs.
+2. Edge functions `oraculo-sync-notion` e `oraculo-chat`.
+3. Solicitar `NOTION_API_KEY` via add_secret.
+4. Hook `useOraculoContext`, componente `OraculoFloatingChat`, montagem no `AppLayout`.
+5. Página `/oraculo` + rota + item de menu (admin e consultor).
+6. Aba Oráculo em Configurações (admin) com botão de sync.
+7. Rodar sync inicial e validar respostas.
 
-## Escopo proposto (fase 1)
-
-1. **Ampliar OAuth existente**
-  - Adicionar scopes `https://www.googleapis.com/auth/calendar.events` e `https://www.googleapis.com/auth/calendar.readonly` em `google-oauth-start`.
-  - Avisar consultoras já conectadas que precisam reconectar (badge/alerta em `MinhasIntegracoes`) para concederem o novo scope.
-2. **Nova página `/agenda**` (item no Sidebar, visível para consultor/diretor/admin)
-  - Visões: Semana (default), Dia, Lista (próximos 30 dias).
-  - Componente de calendário (usar `react-big-calendar` ou montar grid simples com Tailwind — definir na implementação).
-  - Filtro por calendário (primary, secundários da conta).
-3. **Edge functions novas**
-  - `gcal-list-events` (range start/end, lista calendars do usuário, retorna eventos).
-  - `gcal-create-event` (título, início, fim, descrição, convidados, criar Meet via `conferenceData`).
-  - `gcal-update-event` (editar).
-  - `gcal-delete-event`.
-  - `gcal-respond-invite` (PATCH no attendee `responseStatus`).
-  - Todas reutilizam refresh token de `consultor_google_tokens` (lógica de refresh já existe nas funções de Drive — extrair helper compartilhado).
-4. **UI de criação/edição de evento**
-  - Dialog com formulário (título, datas, descrição, convidados por e-mail, toggle "criar link do Meet").
-  - Em eventos existentes: botões Aceitar / Recusar / Talvez quando o usuário é attendee.
-  - Link "Abrir no Google Calendar" para casos não cobertos.
-5. **Integração com plataforma (fase 1 leve)**
-  - Botão "Agendar reunião" no detalhe do cliente que abre o dialog de criação já com o e-mail do cliente como convidado (se houver). Pode ficar para fase 2 se preferir.
-
-## Fora de escopo (fase 1)
-
-- Drag & drop de eventos.
-- Recorrência complexa (oferecer "Abrir no Google" para isso).
-- Notificações push de novos invites dentro da plataforma.
-- Sincronização bidirecional automática com tabelas internas de reuniões/projetos.
-
-## Detalhes técnicos
-
-- **Auth**: reaproveita `consultor_google_tokens` + fluxo OAuth atual. Refresh token via `https://oauth2.googleapis.com/token` quando `expires_at` < now.
-- **API base**: `https://www.googleapis.com/calendar/v3/calendars/{calendarId}/events`.
-- **Meet**: ao criar evento, enviar `conferenceData.createRequest` + query `conferenceDataVersion=1`.
-- **Cores/UI**: dark theme padrão da Cupola, eventos em #B0F90A para "meus", neutros para convites pendentes, vermelho para conflitos.
-- **Permissões**: cada consultora vê só a própria agenda (token é dela). Diretor/admin não vê agenda de terceiros nesta fase.
-
-## Perguntas antes de implementar
-
-1. Confirma **Opção B** (cliente próprio) ao invés do iframe read-only? Confirmo
-2. Quer o item no sidebar como **"Agenda"** próprio, ou dentro de `/minhas-tarefas` como aba?  
-Agenda próprio no sidebar
-3. Na fase 1, basta a consultora ver/criar/responder na **própria conta** dela, certo? (Sem visão consolidada de equipe.) Sim.
-4. Atalho "Agendar reunião com cliente" a partir do detalhe do cliente entra na fase 1 ou fica para depois? Entra na fase 1.
+## Fora do escopo
+- Integração de embeddings/vector search (mantemos a busca por keywords + ilike como no Oráculo atual; pode ser evoluído depois).
+- Notificações sobre novos documentos sincronizados.
+- Compartilhamento de conversas entre consultores.
