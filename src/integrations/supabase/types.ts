@@ -467,6 +467,42 @@ export type Database = {
           },
         ]
       }
+      notion_documents: {
+        Row: {
+          content: string | null
+          created_at: string
+          data_source_id: string
+          id: string
+          last_edited_time: string | null
+          notion_page_id: string
+          title: string | null
+          updated_at: string
+          url: string | null
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          data_source_id: string
+          id?: string
+          last_edited_time?: string | null
+          notion_page_id: string
+          title?: string | null
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          data_source_id?: string
+          id?: string
+          last_edited_time?: string | null
+          notion_page_id?: string
+          title?: string | null
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: []
+      }
       onboarding: {
         Row: {
           cliente_id: string
@@ -523,6 +559,65 @@ export type Database = {
             columns: ["contrato_id"]
             isOneToOne: false
             referencedRelation: "contratos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      oraculo_conversas: {
+        Row: {
+          contexto_origem: Json | null
+          created_at: string
+          id: string
+          titulo: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          contexto_origem?: Json | null
+          created_at?: string
+          id?: string
+          titulo?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          contexto_origem?: Json | null
+          created_at?: string
+          id?: string
+          titulo?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      oraculo_mensagens: {
+        Row: {
+          content: string
+          conversa_id: string
+          created_at: string
+          id: string
+          role: string
+        }
+        Insert: {
+          content: string
+          conversa_id: string
+          created_at?: string
+          id?: string
+          role: string
+        }
+        Update: {
+          content?: string
+          conversa_id?: string
+          created_at?: string
+          id?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oraculo_mensagens_conversa_id_fkey"
+            columns: ["conversa_id"]
+            isOneToOne: false
+            referencedRelation: "oraculo_conversas"
             referencedColumns: ["id"]
           },
         ]
