@@ -80,6 +80,27 @@ export default function Configuracoes() {
   const [newUserRole, setNewUserRole] = useState<'consultor' | 'director'>('consultor');
   const [creatingUser, setCreatingUser] = useState(false);
 
+  // Oráculo (Notion sync)
+  const [syncingOraculo, setSyncingOraculo] = useState(false);
+  const [lastSyncResult, setLastSyncResult] = useState<string | null>(null);
+
+  const handleSyncOraculo = async () => {
+    setSyncingOraculo(true);
+    setLastSyncResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('oraculo-sync-notion');
+      if (error) throw error;
+      const total = data?.indexed ?? data?.total ?? 0;
+      setLastSyncResult(`Sincronização concluída. ${total} documentos indexados.`);
+      toast({ title: 'Oráculo sincronizado', description: `${total} documentos indexados.` });
+    } catch (e: any) {
+      setLastSyncResult(`Erro: ${e.message}`);
+      toast({ title: 'Erro ao sincronizar', description: e.message, variant: 'destructive' });
+    } finally {
+      setSyncingOraculo(false);
+    }
+  };
+
   // Agente prompts (admin only)
   const { data: agentePrompts, isLoading: loadingPrompts } = useAgentePrompts();
   const updatePrompt = useUpdateAgentePrompt();
