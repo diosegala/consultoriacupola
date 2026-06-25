@@ -26,6 +26,7 @@ import GoogleCallback from "./pages/GoogleCallback";
 import NotFound from "./pages/NotFound";
 import QuestionarioPublico from "./pages/QuestionarioPublico";
 import Agenda from "./pages/Agenda";
+import Oraculo from "./pages/Oraculo";
 
 const queryClient = new QueryClient();
 
@@ -55,6 +56,7 @@ const App = () => (
               <Route path="/minhas-tarefas" element={<MinhasTarefas />} />
               <Route path="/reunioes" element={<Reunioes />} />
               <Route path="/agenda" element={<Agenda />} />
+              <Route path="/oraculo" element={<Oraculo />} />
               <Route path="/integracoes" element={<MinhasIntegracoes />} />
             </Route>
             <Route path="*" element={<NotFound />} />
