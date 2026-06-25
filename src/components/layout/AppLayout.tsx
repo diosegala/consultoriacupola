@@ -2,6 +2,7 @@ import { Outlet, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sidebar } from './Sidebar';
 import { Skeleton } from '@/components/ui/skeleton';
+import { OraculoFloatingChat } from '@/components/oraculo/OraculoFloatingChat';
 
 export function AppLayout() {
   const { user, loading, userRole, forcePasswordChange } = useAuth();
@@ -43,6 +44,7 @@ export function AppLayout() {
           <Outlet />
         </div>
       </main>
+      <OraculoFloatingChat />
     </div>
   );
 }

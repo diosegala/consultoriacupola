@@ -16,7 +16,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Plus, Pencil, Trash2, Loader2, ShieldCheck, KeyRound, Bot, Save, Upload } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, ShieldCheck, KeyRound, Bot, Save, Upload, Sparkles, RefreshCw } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -79,6 +79,27 @@ export default function Configuracoes() {
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserRole, setNewUserRole] = useState<'consultor' | 'director'>('consultor');
   const [creatingUser, setCreatingUser] = useState(false);
+
+  // Oráculo (Notion sync)
+  const [syncingOraculo, setSyncingOraculo] = useState(false);
+  const [lastSyncResult, setLastSyncResult] = useState<string | null>(null);
+
+  const handleSyncOraculo = async () => {
+    setSyncingOraculo(true);
+    setLastSyncResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('oraculo-sync-notion');
+      if (error) throw error;
+      const total = data?.indexed ?? data?.total ?? 0;
+      setLastSyncResult(`Sincronização concluída. ${total} documentos indexados.`);
+      toast({ title: 'Oráculo sincronizado', description: `${total} documentos indexados.` });
+    } catch (e: any) {
+      setLastSyncResult(`Erro: ${e.message}`);
+      toast({ title: 'Erro ao sincronizar', description: e.message, variant: 'destructive' });
+    } finally {
+      setSyncingOraculo(false);
+    }
+  };
 
   // Agente prompts (admin only)
   const { data: agentePrompts, isLoading: loadingPrompts } = useAgentePrompts();
@@ -335,6 +356,7 @@ export default function Configuracoes() {
           {isAdmin && <TabsTrigger value="agentes">Agentes IA</TabsTrigger>}
           <TabsTrigger value="tipos">Tipos de Consultoria</TabsTrigger>
           <TabsTrigger value="crms">CRMs</TabsTrigger>
+          {isAdmin && <TabsTrigger value="oraculo">Oráculo</TabsTrigger>}
         </TabsList>
 
         {/* Minha Conta */}
@@ -623,6 +645,36 @@ export default function Configuracoes() {
                 );
               })
             )}
+          </TabsContent>
+        )}
+
+        {/* Oráculo (admin only) */}
+        {isAdmin && (
+          <TabsContent value="oraculo" className="mt-6 space-y-4">
+            <Card className="bg-card border-border">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-foreground text-base">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                  Base de conhecimento do Oráculo
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm text-muted-foreground">
+                <p>
+                  O Oráculo busca respostas a partir dos documentos sincronizados do Notion (método Cupola,
+                  método de Gestão do Aluguel e outros). Execute a sincronização sempre que houver atualizações
+                  na base.
+                </p>
+                <div className="flex items-center gap-3">
+                  <Button onClick={handleSyncOraculo} disabled={syncingOraculo}>
+                    {syncingOraculo
+                      ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      : <RefreshCw className="h-4 w-4 mr-2" />}
+                    Sincronizar Notion agora
+                  </Button>
+                  {lastSyncResult && <span className="text-xs">{lastSyncResult}</span>}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         )}
 
