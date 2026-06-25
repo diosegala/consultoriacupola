@@ -16,7 +16,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Plus, Pencil, Trash2, Loader2, ShieldCheck, KeyRound, Bot, Save, Upload } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, ShieldCheck, KeyRound, Bot, Save, Upload, Sparkles, RefreshCw } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -335,6 +335,7 @@ export default function Configuracoes() {
           {isAdmin && <TabsTrigger value="agentes">Agentes IA</TabsTrigger>}
           <TabsTrigger value="tipos">Tipos de Consultoria</TabsTrigger>
           <TabsTrigger value="crms">CRMs</TabsTrigger>
+          {isAdmin && <TabsTrigger value="oraculo">Oráculo</TabsTrigger>}
         </TabsList>
 
         {/* Minha Conta */}
