@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Sidebar } from './Sidebar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { OraculoFloatingChat } from '@/components/oraculo/OraculoFloatingChat';
+import { ErrorBoundary } from './ErrorBoundary';
 
 export function AppLayout() {
   const { user, loading, userRole, forcePasswordChange } = useAuth();
@@ -41,7 +42,9 @@ export function AppLayout() {
       <Sidebar />
       <main className="flex-1 overflow-auto">
         <div className="p-6">
-          <Outlet />
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
         </div>
       </main>
       <OraculoFloatingChat />
