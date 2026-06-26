@@ -899,6 +899,28 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
           </div>
         )}
       </DialogContent>
+      {projeto.tipo === 'renovacao' && contratoAtivo && (
+        <RenovarContratoDialog
+          open={showRenovar}
+          onOpenChange={setShowRenovar}
+          clienteId={projeto.cliente_id}
+          contratoAtual={contratoAtivo}
+          onSuccess={async () => {
+            const etapaFechada = await supabase
+              .from('projetos_etapas')
+              .select('id')
+              .eq('nome', 'Renovação Fechada')
+              .maybeSingle();
+            if (etapaFechada.data?.id) {
+              await supabase.from('projetos').update({ etapa_id: etapaFechada.data.id }).eq('id', projeto.id);
+            }
+            queryClient.invalidateQueries({ queryKey: ['projetos'] });
+            queryClient.invalidateQueries({ queryKey: ['renovacoes-kpis'] });
+            setShowRenovar(false);
+            toast.success('Renovação registrada! Card movido para "Renovação Fechada".');
+          }}
+        />
+      )}
     </Dialog>
   );
 }
