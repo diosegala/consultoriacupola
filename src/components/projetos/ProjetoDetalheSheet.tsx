@@ -10,7 +10,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
-import { CalendarIcon, Plus, Trash2, MessageSquare, CheckSquare, Video, Send, Tag, X, FileText, Target, ClipboardList, Loader2, Eye, Sparkles, Upload, Link as LinkIcon } from 'lucide-react';
+import { CalendarIcon, Plus, Trash2, MessageSquare, CheckSquare, Video, Send, Tag, X, FileText, Target, ClipboardList, Loader2, Eye, Sparkles, Upload, Link as LinkIcon, RefreshCw } from 'lucide-react';
 import { format, isPast } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -27,6 +27,8 @@ import { useProjetoTags, useProjetoTagVinculos, useAddTagToProjeto, useRemoveTag
 import { useProjetoDocumentos, useGerarDocumento, useParseDocumento } from '@/hooks/useProjetoDocumentos';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { RenovarContratoDialog } from '@/components/cliente/ClienteDialogs';
+import { useContratoAtivo } from '@/hooks/useContratos';
 
 interface ProjetoDetalheSheetProps {
   projeto: Projeto | null;
@@ -46,6 +48,7 @@ interface UploadedFile {
 export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, onRegistrarReuniao }: ProjetoDetalheSheetProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [showRenovar, setShowRenovar] = useState(false);
   const [novoComentario, setNovoComentario] = useState('');
   const [novoCheckItem, setNovoCheckItem] = useState('');
   const [editingObs, setEditingObs] = useState(false);
@@ -83,6 +86,7 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
   const { data: allTags } = useProjetoTags();
   const { data: tagVinculos } = useProjetoTagVinculos(projeto?.id);
   const { data: documentos } = useProjetoDocumentos(projeto?.id);
+  const { data: contratoAtivo } = useContratoAtivo(projeto?.cliente_id);
   const gerarDocumento = useGerarDocumento();
   const parseDocumento = useParseDocumento();
 
@@ -184,10 +188,47 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
           <div className="flex items-center gap-2 flex-wrap mt-1">
             {etapaNome && <Badge variant="outline">{etapaNome}</Badge>}
             {projeto.consultores?.nome && <Badge variant="secondary">{projeto.consultores.nome}</Badge>}
+            {projeto.tipo === 'renovacao' && (
+              <Badge variant="outline" className="bg-amber-500/15 text-amber-600 border-amber-500/30 gap-1">
+                <RefreshCw className="h-3 w-3" /> Renovação
+              </Badge>
+            )}
           </div>
         </DialogHeader>
 
         <ScrollArea className="flex-1 px-6 pb-6">
+          {projeto.tipo === 'renovacao' && projeto.contratos && (
+            <div className="mb-6 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h4 className="text-sm font-semibold text-amber-600 flex items-center gap-1">
+                  <RefreshCw className="h-4 w-4" /> Ciclo de renovação
+                </h4>
+                {contratoAtivo && (
+                  <Button size="sm" onClick={() => setShowRenovar(true)}>
+                    <RefreshCw className="h-3.5 w-3.5 mr-1" /> Renovar agora
+                  </Button>
+                )}
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                <div>
+                  <p className="text-muted-foreground">Fim do contrato</p>
+                  <p className="font-medium">{projeto.contratos.data_fim ? format(new Date(projeto.contratos.data_fim + 'T00:00:00'), 'dd/MM/yyyy') : '—'}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Valor mensal</p>
+                  <p className="font-medium">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(projeto.contratos.remuneracao_mensal ?? 0))}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Valor total</p>
+                  <p className="font-medium">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(projeto.contratos.remuneracao_total ?? 0))}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Prazo</p>
+                  <p className="font-medium">{projeto.contratos.prazo_meses} meses</p>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Main content - 2/3 */}
             <div className="md:col-span-2 space-y-6">
