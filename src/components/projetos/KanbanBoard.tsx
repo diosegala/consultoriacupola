@@ -21,6 +21,7 @@ export function KanbanBoard() {
   const [filtroConsultor, setFiltroConsultor] = useState<string>('todos');
   const [filtroTag, setFiltroTag] = useState<string>('todas');
   const [searchText, setSearchText] = useState('');
+  const [apenasRenovacoes, setApenasRenovacoes] = useState(false);
   const [reuniaoDialogOpen, setReuniaoDialogOpen] = useState(false);
   const [selectedProjeto, setSelectedProjeto] = useState<Projeto | null>(null);
   const [novoProjetoOpen, setNovoProjetoOpen] = useState(false);
@@ -44,8 +45,11 @@ export function KanbanBoard() {
     if (filtroTag !== 'todas') {
       list = list.filter(p => p._tags?.some(t => t.id === filtroTag));
     }
+    if (apenasRenovacoes) {
+      list = list.filter(p => p.tipo === 'renovacao');
+    }
     return list;
-  }, [projetos, searchText, filtroTag]);
+  }, [projetos, searchText, filtroTag, apenasRenovacoes]);
 
   const handleDragEnd = useCallback((result: DropResult) => {
     if (!result.destination) return;
@@ -96,6 +100,8 @@ export function KanbanBoard() {
           onFiltroTagChange={setFiltroTag}
           consultores={consultores}
           isConsultor={isConsultor}
+          apenasRenovacoes={apenasRenovacoes}
+          onApenasRenovacoesChange={isAdmin ? setApenasRenovacoes : undefined}
         />
 
         <Button size="sm" onClick={() => setNovoProjetoOpen(true)}>

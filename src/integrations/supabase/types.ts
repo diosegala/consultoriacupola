@@ -899,6 +899,7 @@ export type Database = {
           id: string
           observacoes: string | null
           ordem_na_etapa: number
+          tipo: string
           updated_at: string
         }
         Insert: {
@@ -912,6 +913,7 @@ export type Database = {
           id?: string
           observacoes?: string | null
           ordem_na_etapa?: number
+          tipo?: string
           updated_at?: string
         }
         Update: {
@@ -925,6 +927,7 @@ export type Database = {
           id?: string
           observacoes?: string | null
           ordem_na_etapa?: number
+          tipo?: string
           updated_at?: string
         }
         Relationships: [
@@ -1361,6 +1364,7 @@ export type Database = {
     }
     Functions: {
       aplicar_baixa_contratos_pagos: { Args: never; Returns: undefined }
+      criar_cards_renovacao: { Args: never; Returns: number }
       get_consultor_id_for_user: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {

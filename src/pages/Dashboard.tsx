@@ -5,13 +5,14 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useNavigate } from 'react-router-dom';
-import { Users, DollarSign, Clock, TrendingDown, AlertTriangle, CalendarX, BookOpen, Loader2, ChevronDown, X, Plane } from 'lucide-react';
+import { Users, DollarSign, Clock, TrendingDown, AlertTriangle, CalendarX, BookOpen, Loader2, ChevronDown, X, Plane, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend, Cell } from 'recharts';
 import { useClientesAtivos, useClientesAguardandoRenovacao, useListaClientesAtivos, useListaClientesAguardandoRenovacao } from '@/hooks/useClientes';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useMRRTotal, useListaContratosMRR } from '@/hooks/useContratos';
 import { useChurnDoMes, useListaChurnMes } from '@/hooks/useEncerramentos';
+import { useRenovacoesKPIs } from '@/hooks/useRenovacoes';
 import { useAlertas, useMRRHistorico, useContratosHistorico, useMediaDespesasViagens, useDespesasViagensMensal, useEngajamentoClientes } from '@/hooks/useDashboard';
 import { useConsultores } from '@/hooks/useConsultores';
 import { useState } from 'react';
@@ -54,6 +55,7 @@ export default function Dashboard() {
   const { data: listaContratosMRR } = useListaContratosMRR(consultorIdsFiltro);
   const { data: listaAguardandoRenovacao } = useListaClientesAguardandoRenovacao(consultorIdsFiltro);
   const { data: listaChurnMes } = useListaChurnMes(consultorIdsFiltro);
+  const { data: renovacoesKPIs, isLoading: loadingRenovacoes } = useRenovacoesKPIs(consultorIdsFiltro);
 
   const isLoading = loadingClientes || loadingMRR || loadingRenovacao || loadingChurn;
 
@@ -262,6 +264,49 @@ export default function Dashboard() {
               </div>
             )}
             <p className="text-xs text-muted-foreground mt-1">por contrato</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Renovações KPIs */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card
+          className="bg-card border-border cursor-pointer transition-all hover:scale-[1.02] hover:border-amber-500/50"
+          onClick={() => navigate('/projetos')}
+        >
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Renovações em andamento
+            </CardTitle>
+            <RefreshCw className="h-4 w-4 text-amber-500" />
+          </CardHeader>
+          <CardContent>
+            {loadingRenovacoes ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <div className="text-3xl font-bold text-amber-600">{renovacoesKPIs?.emAndamento ?? 0}</div>
+            )}
+            <p className="text-xs text-muted-foreground mt-1">cards em Ciclo ou Negociação</p>
+          </CardContent>
+        </Card>
+
+        <Card
+          className="bg-card border-border cursor-pointer transition-all hover:scale-[1.02] hover:border-primary/50"
+          onClick={() => navigate('/projetos')}
+        >
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Renovações fechadas no mês
+            </CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            {loadingRenovacoes ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <div className="text-3xl font-bold text-primary">{renovacoesKPIs?.fechadasMes ?? 0}</div>
+            )}
+            <p className="text-xs text-muted-foreground mt-1">movidos para "Renovação Fechada"</p>
           </CardContent>
         </Card>
       </div>
