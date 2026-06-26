@@ -429,7 +429,7 @@ export default function Configuracoes() {
                           <TableCell className="font-medium text-foreground">{role.email}</TableCell>
                           <TableCell>
                             <Badge className={role.role === 'admin' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}>
-                              {role.role === 'admin' ? 'Admin' : 'Diretor'}
+                              {role.role === 'admin' ? 'Admin' : role.role === 'director' ? 'Diretor' : 'Consultor'}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
