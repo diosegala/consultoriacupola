@@ -18,11 +18,12 @@ export interface Projeto {
   observacoes: string | null;
   due_date: string | null;
   due_date_start: string | null;
+  tipo: 'normal' | 'renovacao';
   created_at: string;
   updated_at: string;
   clientes?: { nome: string; cidade: string; uf: string };
   consultores?: { nome: string };
-  contratos?: { tipo_consultoria_id: string | null; data_fim: string } | null;
+  contratos?: { tipo_consultoria_id: string | null; data_fim: string; remuneracao_mensal: number; remuneracao_total: number; prazo_meses: number; parcelas: number; tipo_vencimento: string } | null;
   _comentarios_count?: number;
   _checklist_done?: number;
   _checklist_total?: number;
@@ -58,7 +59,7 @@ export function useProjetos(consultorId?: string) {
           *,
           clientes(nome, cidade, uf),
           consultores(nome),
-          contratos(tipo_consultoria_id, data_fim),
+          contratos(tipo_consultoria_id, data_fim, remuneracao_mensal, remuneracao_total, prazo_meses, parcelas, tipo_vencimento),
           projeto_tag_vinculo(tag_id, projeto_tags(id, nome, cor)),
           projeto_checklist(id, concluido, due_date,
             projeto_checklist_responsaveis(consultor_id, consultores(id, nome))
