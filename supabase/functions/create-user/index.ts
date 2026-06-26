@@ -67,7 +67,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Create user with admin API
+    // Create user with admin API. If the email already exists in auth.users
+    // (e.g. the role row was deleted but the auth user wasn't), reuse it and
+    // reset the password so the admin's chosen password takes effect.
+    let userId: string | null = null;
     const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
       email,
       password,
@@ -75,20 +78,54 @@ Deno.serve(async (req) => {
     });
 
     if (createError) {
-      return new Response(JSON.stringify({ error: createError.message }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      const msg = (createError.message || "").toLowerCase();
+      const alreadyExists =
+        msg.includes("already been registered") ||
+        msg.includes("already exists") ||
+        msg.includes("duplicate");
+      if (!alreadyExists) {
+        return new Response(JSON.stringify({ error: createError.message }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      // Find the existing auth user by email and reset their password.
+      const { data: list, error: listErr } = await adminClient.auth.admin.listUsers();
+      if (listErr) {
+        return new Response(JSON.stringify({ error: listErr.message }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const existing = list.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+      if (!existing) {
+        return new Response(JSON.stringify({ error: "Usuário já existe mas não foi possível localizá-lo." }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { error: updErr } = await adminClient.auth.admin.updateUserById(existing.id, {
+        password,
+        email_confirm: true,
       });
+      if (updErr) {
+        return new Response(JSON.stringify({ error: updErr.message }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      userId = existing.id;
+    } else {
+      userId = newUser.user.id;
     }
 
-    // Add role with force_password_change
+    // Upsert role with force_password_change
     const { error: roleError } = await adminClient
       .from("user_roles")
-      .insert({
-        user_id: newUser.user.id,
-        role,
-        force_password_change: true,
-      });
+      .upsert(
+        { user_id: userId, role, force_password_change: true },
+        { onConflict: "user_id,role" }
+      );
 
     if (roleError) {
       return new Response(JSON.stringify({ error: roleError.message }), {
@@ -98,7 +135,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, user_id: newUser.user.id }),
+      JSON.stringify({ success: true, user_id: userId }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
