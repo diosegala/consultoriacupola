@@ -104,8 +104,8 @@ export default function Agenda() {
         <CardHeader>
           <CardTitle>Agenda</CardTitle>
           <CardDescription>
-            Seu usuário ainda não está vinculado a um consultor. Acesse{' '}
-            <Link to="/configuracoes" className="text-primary underline">Configurações</Link> para vincular.
+            Seu usuário ainda não está vinculado a um consultor. Peça a um administrador
+            para fazer a vinculação em Configurações &gt; Usuários.
           </CardDescription>
         </CardHeader>
       </Card>

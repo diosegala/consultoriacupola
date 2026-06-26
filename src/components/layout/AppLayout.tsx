@@ -6,9 +6,9 @@ import { OraculoFloatingChat } from '@/components/oraculo/OraculoFloatingChat';
 import { ErrorBoundary } from './ErrorBoundary';
 
 export function AppLayout() {
-  const { user, loading, userRole, forcePasswordChange } = useAuth();
+  const { user, loading, roleLoading, userRole, forcePasswordChange } = useAuth();
 
-  if (loading) {
+  if (loading || (user && roleLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="space-y-4 w-full max-w-md p-8">
