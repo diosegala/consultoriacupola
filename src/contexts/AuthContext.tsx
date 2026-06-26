@@ -9,6 +9,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  roleLoading: boolean;
   userRole: AppRole | null;
   isAdmin: boolean;
   isConsultor: boolean;
@@ -27,8 +28,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<AppRole | null>(null);
   const [forcePasswordChange, setForcePasswordChange] = useState(false);
+  const [roleLoading, setRoleLoading] = useState(true);
 
   const fetchUserRole = async (userId: string) => {
+    setRoleLoading(true);
     const { data } = await supabase
       .from('user_roles')
       .select('role, force_password_change')
@@ -36,6 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .single();
     setUserRole(data?.role ?? null);
     setForcePasswordChange((data as any)?.force_password_change ?? false);
+    setRoleLoading(false);
   };
 
   useEffect(() => {
@@ -45,10 +49,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
         setLoading(false);
         if (session?.user) {
+          setRoleLoading(true);
           setTimeout(() => fetchUserRole(session.user.id), 0);
         } else {
           setUserRole(null);
           setForcePasswordChange(false);
+          setRoleLoading(false);
         }
       }
     );
@@ -59,6 +65,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       if (session?.user) {
         fetchUserRole(session.user.id);
+      } else {
+        setRoleLoading(false);
       }
     });
 
@@ -82,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const canAssignTasks = isAdmin || isDirector;
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, userRole, isAdmin, isConsultor, isDirector, canAssignTasks, forcePasswordChange, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, roleLoading, userRole, isAdmin, isConsultor, isDirector, canAssignTasks, forcePasswordChange, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );
