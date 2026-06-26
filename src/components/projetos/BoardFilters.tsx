@@ -1,7 +1,8 @@
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Search } from 'lucide-react';
+import { Search, RefreshCw } from 'lucide-react';
 import { useProjetoTags, type ProjetoTag } from '@/hooks/useProjetoTags';
 
 interface BoardFiltersProps {
@@ -13,6 +14,8 @@ interface BoardFiltersProps {
   onFiltroTagChange: (value: string) => void;
   consultores: Array<{ id: string; nome: string; ativo: boolean }> | undefined;
   isConsultor: boolean;
+  apenasRenovacoes?: boolean;
+  onApenasRenovacoesChange?: (value: boolean) => void;
 }
 
 export function BoardFilters({
@@ -24,6 +27,8 @@ export function BoardFilters({
   onFiltroTagChange,
   consultores,
   isConsultor,
+  apenasRenovacoes,
+  onApenasRenovacoesChange,
 }: BoardFiltersProps) {
   const { data: tags } = useProjetoTags();
 
@@ -69,6 +74,18 @@ export function BoardFilters({
           ))}
         </SelectContent>
       </Select>
+
+      {onApenasRenovacoesChange && (
+        <Button
+          variant={apenasRenovacoes ? 'default' : 'outline'}
+          size="sm"
+          className="h-9 gap-1"
+          onClick={() => onApenasRenovacoesChange(!apenasRenovacoes)}
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          Apenas renovações
+        </Button>
+      )}
     </div>
   );
 }
