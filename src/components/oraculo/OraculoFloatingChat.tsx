@@ -2,6 +2,12 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Sparkles, Maximize2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { OraculoChatPanel } from "./OraculoChatPanel";
 
