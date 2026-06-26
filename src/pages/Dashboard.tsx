@@ -5,13 +5,14 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useNavigate } from 'react-router-dom';
-import { Users, DollarSign, Clock, TrendingDown, AlertTriangle, CalendarX, BookOpen, Loader2, ChevronDown, X, Plane } from 'lucide-react';
+import { Users, DollarSign, Clock, TrendingDown, AlertTriangle, CalendarX, BookOpen, Loader2, ChevronDown, X, Plane, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend, Cell } from 'recharts';
 import { useClientesAtivos, useClientesAguardandoRenovacao, useListaClientesAtivos, useListaClientesAguardandoRenovacao } from '@/hooks/useClientes';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useMRRTotal, useListaContratosMRR } from '@/hooks/useContratos';
 import { useChurnDoMes, useListaChurnMes } from '@/hooks/useEncerramentos';
+import { useRenovacoesKPIs } from '@/hooks/useRenovacoes';
 import { useAlertas, useMRRHistorico, useContratosHistorico, useMediaDespesasViagens, useDespesasViagensMensal, useEngajamentoClientes } from '@/hooks/useDashboard';
 import { useConsultores } from '@/hooks/useConsultores';
 import { useState } from 'react';
@@ -54,6 +55,7 @@ export default function Dashboard() {
   const { data: listaContratosMRR } = useListaContratosMRR(consultorIdsFiltro);
   const { data: listaAguardandoRenovacao } = useListaClientesAguardandoRenovacao(consultorIdsFiltro);
   const { data: listaChurnMes } = useListaChurnMes(consultorIdsFiltro);
+  const { data: renovacoesKPIs, isLoading: loadingRenovacoes } = useRenovacoesKPIs(consultorIdsFiltro);
 
   const isLoading = loadingClientes || loadingMRR || loadingRenovacao || loadingChurn;
 
