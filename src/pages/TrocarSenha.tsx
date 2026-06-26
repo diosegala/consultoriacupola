@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -15,11 +15,31 @@ export default function TrocarSenha() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [sessionChecked, setSessionChecked] = useState(false);
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  if (authLoading) {
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) { setSessionChecked(true); return; }
+    (async () => {
+      const { error } = await supabase.auth.getUser();
+      if (error) {
+        await supabase.auth.signOut().catch(() => {});
+        toast({
+          title: 'Sessão expirada',
+          description: 'Faça login novamente para definir sua nova senha.',
+          variant: 'destructive',
+        });
+        navigate('/auth', { replace: true });
+        return;
+      }
+      setSessionChecked(true);
+    })();
+  }, [authLoading, user, navigate, toast]);
+
+  if (authLoading || (user && !sessionChecked)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -47,6 +67,17 @@ export default function TrocarSenha() {
     const { error: pwError } = await supabase.auth.updateUser({ password });
     if (pwError) {
       setLoading(false);
+      const msg = (pwError.message || '').toLowerCase();
+      if (msg.includes('session') || (pwError as any).status === 401 || (pwError as any).status === 403) {
+        await supabase.auth.signOut().catch(() => {});
+        toast({
+          title: 'Sessão expirada',
+          description: 'Faça login novamente para definir sua nova senha.',
+          variant: 'destructive',
+        });
+        navigate('/auth', { replace: true });
+        return;
+      }
       toast({ title: 'Erro', description: pwError.message, variant: 'destructive' });
       return;
     }
