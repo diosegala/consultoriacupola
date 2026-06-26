@@ -94,7 +94,10 @@ export default function TrocarSenha() {
       toast({ title: 'Erro', description: flagError.message, variant: 'destructive' });
     } else {
       toast({ title: 'Sucesso', description: 'Senha alterada com sucesso!' });
-      navigate('/');
+      // Hard reload so AuthContext refetches user_roles and picks up the
+      // cleared force_password_change flag — otherwise the app keeps
+      // redirecting back to /trocar-senha using the cached value.
+      window.location.replace('/');
     }
   };
 
