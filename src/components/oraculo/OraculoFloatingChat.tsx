@@ -19,14 +19,23 @@ export function OraculoFloatingChat() {
 
   return (
     <>
-      <Button
-        onClick={() => setOpen(true)}
-        size="icon"
-        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-xl z-50"
-        aria-label="Abrir Oráculo"
-      >
-        <Sparkles className="h-6 w-6" />
-      </Button>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              onClick={() => setOpen(true)}
+              size="icon"
+              className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-xl z-50"
+              aria-label="Abrir Oráculo"
+            >
+              <Sparkles className="h-6 w-6" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="left">
+            <p>Oráculo da Cupola</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
 
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col">
