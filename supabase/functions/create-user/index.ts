@@ -60,6 +60,13 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (role !== "consultor" && role !== "director") {
+      return new Response(JSON.stringify({ error: "Papel inválido. Use 'consultor' ou 'director'." }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Create user with admin API
     const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
       email,
