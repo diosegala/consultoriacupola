@@ -52,6 +52,15 @@ export function useAuthUsers() {
   return useQuery({
     queryKey: ['auth-users'],
     queryFn: async () => {
+      // Revalidate the session against the auth server first. If the local token
+      // refers to a session that no longer exists (e.g. user logged out from
+      // another tab/device), force a clean sign-out instead of bubbling a 401.
+      const { data: { user }, error: userErr } = await supabase.auth.getUser();
+      if (userErr || !user) {
+        await supabase.auth.signOut().catch(() => {});
+        if (typeof window !== 'undefined') window.location.href = '/auth';
+        return [] as AuthUser[];
+      }
       const { data: { session } } = await supabase.auth.getSession();
       const resp = await supabase.functions.invoke('list-auth-users', {
         headers: { Authorization: `Bearer ${session?.access_token}` },
@@ -59,6 +68,7 @@ export function useAuthUsers() {
       if (resp.error) throw resp.error;
       return resp.data as AuthUser[];
     },
+    retry: false,
   });
 }
 
