@@ -94,12 +94,8 @@ export default function MinhasIntegracoes() {
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>
               A conexão com o Google Drive é feita por consultor — cada conta Google é
-              associada a um registro em <strong>Consultores</strong>. Para usar esta página,
-              vincule seu usuário a um consultor em{' '}
-              <Link to="/configuracoes" className="text-primary underline">
-                Configurações &gt; Usuários
-              </Link>
-              .
+              associada a um registro em <strong>Consultores</strong>. Peça a um administrador
+              para vincular seu usuário a um consultor em Configurações &gt; Usuários.
             </p>
             <p>
               Se você é apenas administrador e não atua como consultor, não precisa conectar
