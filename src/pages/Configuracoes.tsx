@@ -77,7 +77,7 @@ export default function Configuracoes() {
   const [createUserDialogOpen, setCreateUserDialogOpen] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
-  const [newUserRole, setNewUserRole] = useState<'consultor' | 'director'>('consultor');
+  const [newUserRole, setNewUserRole] = useState<'' | 'consultor' | 'director'>('');
   const [creatingUser, setCreatingUser] = useState(false);
 
   // Oráculo (Notion sync)
@@ -306,6 +306,10 @@ export default function Configuracoes() {
       toast({ title: 'Erro', description: 'Email e senha são obrigatórios', variant: 'destructive' });
       return;
     }
+    if (newUserRole !== 'consultor' && newUserRole !== 'director') {
+      toast({ title: 'Erro', description: 'Selecione o papel do usuário', variant: 'destructive' });
+      return;
+    }
     if (newUserPassword.length < 8) {
       toast({ title: 'Erro', description: 'A senha deve ter no mínimo 8 caracteres', variant: 'destructive' });
       return;
@@ -326,7 +330,7 @@ export default function Configuracoes() {
       setCreateUserDialogOpen(false);
       setNewUserEmail('');
       setNewUserPassword('');
-      setNewUserRole('consultor');
+      setNewUserRole('');
     } catch (error: any) {
       toast({ title: 'Erro', description: error.message, variant: 'destructive' });
     }
@@ -824,7 +828,14 @@ export default function Configuracoes() {
       </AlertDialog>
 
       {/* Dialog Criar Novo Usuário */}
-      <Dialog open={createUserDialogOpen} onOpenChange={setCreateUserDialogOpen}>
+      <Dialog open={createUserDialogOpen} onOpenChange={(open) => {
+        setCreateUserDialogOpen(open);
+        if (!open) {
+          setNewUserEmail('');
+          setNewUserPassword('');
+          setNewUserRole('');
+        }
+      }}>
         <DialogContent className="bg-card border-border">
           <DialogHeader>
             <DialogTitle className="text-foreground">Criar Novo Usuário</DialogTitle>
@@ -840,10 +851,10 @@ export default function Configuracoes() {
               <p className="text-xs text-muted-foreground">O usuário será obrigado a trocar a senha no primeiro acesso.</p>
             </div>
             <div className="space-y-2">
-              <Label className="text-foreground">Papel</Label>
+              <Label className="text-foreground">Papel *</Label>
               <Select value={newUserRole} onValueChange={(v) => setNewUserRole(v as 'consultor' | 'director')}>
                 <SelectTrigger className="bg-input border-border">
-                  <SelectValue />
+                  <SelectValue placeholder="Selecione o papel" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="consultor">Consultor</SelectItem>
@@ -851,10 +862,20 @@ export default function Configuracoes() {
                 </SelectContent>
               </Select>
             </div>
+            {newUserEmail && newUserRole && (
+              <div className="rounded-md border border-border bg-secondary/40 p-3 text-sm text-foreground">
+                Será criado <strong>{newUserEmail}</strong> como{' '}
+                <strong>{newUserRole === 'director' ? 'Diretor' : 'Consultor'}</strong>.
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateUserDialogOpen(false)} className="border-border">Cancelar</Button>
-            <Button onClick={handleCreateUser} disabled={creatingUser} className="bg-primary text-primary-foreground">
+            <Button
+              onClick={handleCreateUser}
+              disabled={creatingUser || !newUserEmail || !newUserPassword || !newUserRole}
+              className="bg-primary text-primary-foreground"
+            >
               {creatingUser && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Criar Usuário
             </Button>
