@@ -1,7 +1,7 @@
 import { Draggable } from '@hello-pangea/dnd';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MapPin, MessageSquarePlus, CalendarIcon, CheckSquare, MessageSquare, AlertTriangle, Clock } from 'lucide-react';
+import { MapPin, MessageSquarePlus, CalendarIcon, CheckSquare, MessageSquare, AlertTriangle, Clock, RefreshCw } from 'lucide-react';
 import { format, isPast, addDays, isBefore } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
@@ -32,6 +32,8 @@ export function KanbanCard({ projeto, index, onRegistrarReuniao, onClick }: Kanb
   const now = new Date();
   const isOverdue = dueDate && isPast(dueDate) && dueDate.toDateString() !== now.toDateString();
   const isSoon = dueDate && !isOverdue && isBefore(dueDate, addDays(now, 3));
+  const isRenovacao = projeto.tipo === 'renovacao';
+  const diasParaFim = dueDate ? Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
 
   const checkDone = projeto._checklist_done ?? 0;
   const checkTotal = projeto._checklist_total ?? 0;
@@ -55,10 +57,17 @@ export function KanbanCard({ projeto, index, onRegistrarReuniao, onClick }: Kanb
           <div
             className={cn(
               'kanban-card p-3 space-y-2 cursor-grab active:cursor-grabbing',
-              snapshot.isDragging && 'kanban-card-dragging'
+              snapshot.isDragging && 'kanban-card-dragging',
+              isRenovacao && 'border-l-4 border-l-amber-500'
             )}
             onClick={() => onClick(projeto)}
           >
+            {isRenovacao && (
+              <Badge variant="outline" className="text-[10px] bg-amber-500/15 text-amber-600 border-amber-500/30 gap-1">
+                <RefreshCw className="h-3 w-3" />
+                Renovação{diasParaFim !== null && diasParaFim >= 0 ? ` · ${diasParaFim}d` : ''}
+              </Badge>
+            )}
             {/* Tags */}
             {projeto._tags && projeto._tags.length > 0 && (
               <div className="flex flex-wrap gap-1">
