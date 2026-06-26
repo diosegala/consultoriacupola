@@ -25,6 +25,8 @@ import {
   TipoConsultoriaComContratos, CRM
 } from '@/hooks/useDadosAuxiliares';
 import { useUserRoles, useAuthUsers, useAddUserRole, useDeleteUserRole } from '@/hooks/useUserRoles';
+import { useConsultores } from '@/hooks/useConsultores';
+import { useConsultorUsers, useCreateConsultorUser, useDeleteConsultorUser } from '@/hooks/useConsultorUser';
 import { useAgentePrompts, useUpdateAgentePrompt } from '@/hooks/useAgentePrompts';
 import { useParseDocumento } from '@/hooks/useProjetoDocumentos';
 import { useAuth } from '@/contexts/AuthContext';
@@ -51,6 +53,14 @@ export default function Configuracoes() {
   const { data: authUsers } = useAuthUsers();
   const addUserRole = useAddUserRole();
   const deleteUserRole = useDeleteUserRole();
+
+  // Consultor linking
+  const { data: consultores } = useConsultores();
+  const { data: consultorLinks } = useConsultorUsers();
+  const createConsultorLink = useCreateConsultorUser();
+  const deleteConsultorLink = useDeleteConsultorUser();
+  const [linkingUserId, setLinkingUserId] = useState<string | null>(null);
+  const [linkConsultorId, setLinkConsultorId] = useState('');
 
   // Dialog states - Tipos
   const [tipoDialogOpen, setTipoDialogOpen] = useState(false);
@@ -220,6 +230,33 @@ export default function Configuracoes() {
     ...r,
     email: authUsers?.find(u => u.id === r.user_id)?.email || r.user_id,
   })) || [];
+
+  const getConsultorLink = (userId: string) =>
+    consultorLinks?.find(l => l.user_id === userId);
+
+  const handleLinkConsultor = async (userId: string) => {
+    if (!linkConsultorId) {
+      toast({ title: 'Erro', description: 'Selecione um consultor', variant: 'destructive' });
+      return;
+    }
+    try {
+      await createConsultorLink.mutateAsync({ userId, consultorId: linkConsultorId });
+      toast({ title: 'Sucesso', description: 'Consultor vinculado' });
+      setLinkingUserId(null);
+      setLinkConsultorId('');
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+    }
+  };
+
+  const handleUnlinkConsultor = async (linkId: string) => {
+    try {
+      await deleteConsultorLink.mutateAsync(linkId);
+      toast({ title: 'Sucesso', description: 'Vínculo removido' });
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+    }
+  };
 
   // Tipo handlers
   const openNewTipoDialog = () => { setEditingTipo(null); setTipoNome(''); setTipoDialogOpen(true); };
@@ -420,17 +457,66 @@ export default function Configuracoes() {
                       <TableRow className="border-border hover:bg-transparent">
                         <TableHead className="text-muted-foreground">Email</TableHead>
                         <TableHead className="text-muted-foreground">Papel</TableHead>
+                        <TableHead className="text-muted-foreground">Consultor vinculado</TableHead>
                         <TableHead className="text-muted-foreground text-right w-[100px]">Ações</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {enrichedRoles.map(role => (
+                      {enrichedRoles.map(role => {
+                        const link = getConsultorLink(role.user_id);
+                        const isConsultorRole = role.role === 'consultor';
+                        return (
                         <TableRow key={role.id} className="border-border">
                           <TableCell className="font-medium text-foreground">{role.email}</TableCell>
                           <TableCell>
                             <Badge className={role.role === 'admin' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}>
                               {role.role === 'admin' ? 'Admin' : role.role === 'director' ? 'Diretor' : 'Consultor'}
                             </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {!isConsultorRole ? (
+                              <span className="text-muted-foreground text-xs">—</span>
+                            ) : link ? (
+                              <div className="flex items-center gap-2">
+                                <span className="text-foreground text-sm">{link.consultores?.nome}</span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={() => handleUnlinkConsultor(link.id)}
+                                >
+                                  Desvincular
+                                </Button>
+                              </div>
+                            ) : linkingUserId === role.user_id ? (
+                              <div className="flex items-center gap-2">
+                                <Select value={linkConsultorId} onValueChange={setLinkConsultorId}>
+                                  <SelectTrigger className="h-8 w-[180px] bg-input border-border">
+                                    <SelectValue placeholder="Selecione" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {consultores?.filter(c => c.ativo).map(c => (
+                                      <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <Button size="sm" className="h-8" onClick={() => handleLinkConsultor(role.user_id)} disabled={createConsultorLink.isPending}>
+                                  Salvar
+                                </Button>
+                                <Button size="sm" variant="ghost" className="h-8" onClick={() => { setLinkingUserId(null); setLinkConsultorId(''); }}>
+                                  Cancelar
+                                </Button>
+                              </div>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 border-border"
+                                onClick={() => { setLinkingUserId(role.user_id); setLinkConsultorId(''); }}
+                              >
+                                Vincular consultor
+                              </Button>
+                            )}
                           </TableCell>
                           <TableCell className="text-right">
                             {role.user_id !== user?.id && (
@@ -445,7 +531,8 @@ export default function Configuracoes() {
                             )}
                           </TableCell>
                         </TableRow>
-                      ))}
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 )}
