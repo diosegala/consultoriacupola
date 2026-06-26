@@ -268,6 +268,49 @@ export default function Dashboard() {
         </Card>
       </div>
 
+      {/* Renovações KPIs */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card
+          className="bg-card border-border cursor-pointer transition-all hover:scale-[1.02] hover:border-amber-500/50"
+          onClick={() => navigate('/projetos')}
+        >
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Renovações em andamento
+            </CardTitle>
+            <RefreshCw className="h-4 w-4 text-amber-500" />
+          </CardHeader>
+          <CardContent>
+            {loadingRenovacoes ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <div className="text-3xl font-bold text-amber-600">{renovacoesKPIs?.emAndamento ?? 0}</div>
+            )}
+            <p className="text-xs text-muted-foreground mt-1">cards em Ciclo ou Negociação</p>
+          </CardContent>
+        </Card>
+
+        <Card
+          className="bg-card border-border cursor-pointer transition-all hover:scale-[1.02] hover:border-primary/50"
+          onClick={() => navigate('/projetos')}
+        >
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Renovações fechadas no mês
+            </CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            {loadingRenovacoes ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <div className="text-3xl font-bold text-primary">{renovacoesKPIs?.fechadasMes ?? 0}</div>
+            )}
+            <p className="text-xs text-muted-foreground mt-1">movidos para "Renovação Fechada"</p>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Gráfico MRR */}
       <Card className="bg-card border-border">
         <CardHeader className="flex flex-row items-center justify-between">
