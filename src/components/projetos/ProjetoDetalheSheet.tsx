@@ -65,12 +65,12 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
   const [isParsing, setIsParsing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    if (open) {
+    if (open && isAdmin) {
       supabase.functions.invoke('list-auth-users').then(({ data }) => {
         if (Array.isArray(data)) setAuthUsers(data);
       });
     }
-  }, [open]);
+  }, [open, isAdmin]);
 
   const userMap = useMemo(() => {
     const map = new Map<string, string>();
