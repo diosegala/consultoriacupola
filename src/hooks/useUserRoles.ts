@@ -48,7 +48,8 @@ export function useCurrentUserRole() {
   });
 }
 
-export function useAuthUsers() {
+export function useAuthUsers(options: { enabled?: boolean } = {}) {
+  const { enabled = true } = options;
   return useQuery({
     queryKey: ['auth-users'],
     queryFn: async () => {
@@ -69,6 +70,7 @@ export function useAuthUsers() {
       return resp.data as AuthUser[];
     },
     retry: false,
+    enabled,
   });
 }
 
