@@ -1,38 +1,51 @@
-## Problema
+## Diagnóstico
 
-No diálogo **Criar Novo Usuário** (`src/pages/Configuracoes.tsx`), o campo "Papel" tem um valor pré-selecionado (`consultor` por padrão) e, pior, **o estado nunca é resetado quando o diálogo fecha/reabre**. Se em uma criação anterior você escolheu "Diretor", na próxima vez que abrir o diálogo o campo continuará marcado como "Diretor" — e como o `<Select>` já mostra um valor, parece que "nada foi selecionado", mas na verdade o valor antigo é enviado. Foi o que aconteceu com a Vivian.
+Confirmei no banco:
+- `diosegala@gmail.com` → role `consultor`, `force_password_change = false`, vinculado ao consultor **Denise** (`d3428f5d…`).
+- Esse consultor não tem **nenhum projeto** (`count = 0`).
 
-Além disso, os campos Email e Senha também ficam preenchidos com o que foi digitado anteriormente.
+Ou seja: dados estão coerentes, o usuário deveria cair em `/projetos` com um Kanban vazio. A "tela preta" indica um **erro de render não capturado** que está derrubando a árvore React inteira (some até a sidebar). Causas mais prováveis:
 
-## Plano de correção
+1. **Não existe ErrorBoundary no topo da app.** O `ErrorBoundary` atual só envolve o `<Outlet />` dentro do `AppLayout`. Se algo no `AppLayout`, `Sidebar`, `AuthProvider` ou `OraculoFloatingChat` quebra durante o render, nada é capturado e a tela fica preta (bg-background) sem conteúdo.
+2. **`AppLayout` usa `window.location.pathname` (não-reativo)** para decidir o redirect do consultor. Em transições isso pode causar redirect em loop entre `/` → `/projetos` → `/` enquanto a árvore reconcilia, e em certos timings o `<Navigate>` é renderizado dentro de um efeito de hidratação que estoura.
+3. **`Sidebar.NavLink` lista rotas como `/oraculo` e `/integracoes`** para consultor — `/integracoes` não está nas rotas (existe `/integracoes` ok), mas vale revalidar.
+4. **`OraculoFloatingChat` está sempre montado** no `AppLayout`, e seu hook `useOraculoContext` chama `useLocation()` fora de rota — ok, está dentro do Router, então não é isso. Mas se o painel tentar render `OraculoChatPanel` com algum dado faltante, pode quebrar.
+5. **`useProjetos` faz embed de `projeto_checklist_responsaveis`** cuja RLS só permite `is_authorized_user`. Para consultor isso vira embed vazio (ok), mas se PostgREST devolver erro, o React Query só guarda — não derruba a UI.
 
-### 1. Não pré-selecionar papel
-- Mudar `newUserRole` para aceitar `'' | 'consultor' | 'director'` e inicializar como `''`.
-- Mostrar placeholder "Selecione o papel" no Select.
-- Bloquear o botão **Criar Usuário** enquanto papel, email ou senha estiverem vazios.
+A causa #1 explica perfeitamente o sintoma "tela 100% preta sem sidebar". Sem boundary global, qualquer throw em provider/layout vira tela em branco.
 
-### 2. Resetar o formulário ao abrir/fechar
-- Ao abrir o diálogo: limpar email, senha e papel.
-- Ao fechar (cancelar ou sucesso): limpar tudo de novo.
+## Plano de auditoria + correção
 
-### 3. Confirmação visual antes de criar
-- Mostrar um resumo logo acima do botão: "Será criado **email@exemplo.com** como **Consultor / Diretor**." Isso evita ambiguidade na hora de confirmar.
+### 1. ErrorBoundary global (corrige o sintoma e dá visibilidade real do erro)
+- Mover/duplicar o `ErrorBoundary` para envolver **toda** a árvore dentro do `<BrowserRouter>` em `src/App.tsx`. Assim, qualquer crash mostra a stack em vez de tela preta — e no próximo report do usuário já vamos ter o erro real.
 
-### 4. Validação no backend (defesa em profundidade)
-- Em `supabase/functions/create-user/index.ts`, validar que `role` está em `['consultor', 'director']` e retornar 400 caso contrário (hoje aceita qualquer string).
+### 2. Tornar o redirect do consultor reativo
+Em `src/components/layout/AppLayout.tsx`:
+- Trocar `window.location.pathname` por `useLocation().pathname`.
+- Mover a lista de rotas restritas para uma constante fora do componente.
+- Em vez de retornar `<Navigate>` no meio do render do layout, fazer a verificação via `useEffect` + `navigate('/projetos', { replace: true })` ou um `<Navigate>` apenas se ainda não estamos em rota permitida — evita re-render em cascata.
 
-### 5. Correção pontual da Vivian
-- Após o ajuste, alterar manualmente o papel da Vivian de `director` para `consultor` via update na tabela de papéis (confirmando o email com você antes).
+### 3. Endurecer o `AuthContext`
+- Tratar erro de `fetchUserRole` (atualmente ignora `error`): logar e ainda assim setar `roleLoading=false` para não travar.
+- Garantir que se a sessão expirar durante a navegação, o `AppLayout` cai em `/auth` em vez de renderizar sidebar com `user` nulo.
+
+### 4. Defender o `KanbanBoard` e dependências
+- `useProjetos`: já tolera array vazio. Adicionar `console.error` no `onError` da query para diagnóstico.
+- `useConsultores`: chamado mesmo para consultor (que não usa o filtro). Gate com `enabled: !isConsultor` para evitar request desnecessário e qualquer side effect.
+- `KanbanCard`: revisar acessos a `projeto.clientes?.cidade` etc. (já estão com `?.`, ok).
+
+### 5. Audit complementar (rápido, mesma passagem)
+- `OraculoFloatingChat`: garantir que não quebra quando `OraculoChatPanel` recebe `conversaId=null`.
+- `Sidebar`: confirmar todos os `to` do `consultorMenuItems` existem em `App.tsx` (`/projetos`, `/agenda`, `/oraculo`, `/minhas-tarefas`, `/integracoes` — todos ok).
+- `Agenda`, `MinhasTarefas`, `Oraculo`, `MinhasIntegracoes`: validar guard inicial quando `consultor_id` ausente para não jogar exception.
+- Revisar `Auth.tsx`: após login, redirecionar para `/projetos` se for consultor (evita o ping-pong via `/`).
+
+### 6. Validação
+- Após aplicar, pedir ao usuário para reproduzir e checar:
+  - Se a tela preta sumiu (deve aparecer o board vazio).
+  - Se o ErrorBoundary capturar algo, ele agora mostrará a mensagem/stack — me envia para correção pontual.
 
 ## Detalhes técnicos
-
-Arquivos afetados:
-- `src/pages/Configuracoes.tsx` — estado do diálogo + reset on open/close + validação de submit + resumo de confirmação.
-- `supabase/functions/create-user/index.ts` — validação de `role`.
-- Update de dados: ajustar `user_roles` da Vivian (preciso confirmar o email cadastrado).
-
-Nada muda no fluxo de vínculo `consultor_user` (continua sendo feito separadamente na aba "Vincular Consultor").
-
-## Pergunta antes de implementar
-
-Confirma que o email da Vivian é o cadastrado no sistema? Posso buscar pelo primeiro nome se preferir. E o papel correto dela é **Consultor**, certo?
+- Arquivos editados: `src/App.tsx`, `src/components/layout/AppLayout.tsx`, `src/components/layout/ErrorBoundary.tsx` (export reutilizável), `src/contexts/AuthContext.tsx`, `src/components/projetos/KanbanBoard.tsx`, `src/hooks/useProjetos.ts`, `src/pages/Auth.tsx`.
+- Sem alterações de schema/migrations.
+- Sem mudança de regras de negócio — só estabilidade, captura de erros e correção do redirect não-reativo.

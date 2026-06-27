@@ -21,15 +21,15 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   
-  const { signIn, user } = useAuth();
+  const { signIn, user, userRole, roleLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (user) {
-      navigate('/');
+    if (user && !roleLoading) {
+      navigate(userRole === 'consultor' ? '/projetos' : '/', { replace: true });
     }
-  }, [user, navigate]);
+  }, [user, userRole, roleLoading, navigate]);
 
   const validateForm = () => {
     try {
@@ -65,9 +65,8 @@ export default function Auth() {
           : error.message,
         variant: 'destructive',
       });
-    } else {
-      navigate('/');
     }
+    // Redirect handled by useEffect once userRole loads
   };
 
 

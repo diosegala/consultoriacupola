@@ -32,14 +32,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUserRole = async (userId: string) => {
     setRoleLoading(true);
-    const { data } = await supabase
-      .from('user_roles')
-      .select('role, force_password_change')
-      .eq('user_id', userId)
-      .single();
-    setUserRole(data?.role ?? null);
-    setForcePasswordChange((data as any)?.force_password_change ?? false);
-    setRoleLoading(false);
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role, force_password_change')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (error) {
+        console.error('[AuthContext] fetchUserRole error', error);
+      }
+      setUserRole(data?.role ?? null);
+      setForcePasswordChange((data as any)?.force_password_change ?? false);
+    } catch (e) {
+      console.error('[AuthContext] fetchUserRole exception', e);
+      setUserRole(null);
+      setForcePasswordChange(false);
+    } finally {
+      setRoleLoading(false);
+    }
   };
 
   useEffect(() => {
