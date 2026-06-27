@@ -50,7 +50,7 @@ export default function Configuracoes() {
 
   // User roles (admin only)
   const { data: userRoles, isLoading: loadingRoles } = useUserRoles();
-  const { data: authUsers } = useAuthUsers();
+  const { data: authUsers } = useAuthUsers({ enabled: isAdmin });
   const addUserRole = useAddUserRole();
   const deleteUserRole = useDeleteUserRole();
 
