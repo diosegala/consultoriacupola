@@ -1,12 +1,15 @@
-import { Outlet, Navigate } from 'react-router-dom';
+import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sidebar } from './Sidebar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { OraculoFloatingChat } from '@/components/oraculo/OraculoFloatingChat';
 import { ErrorBoundary } from './ErrorBoundary';
 
+const RESTRICTED_FOR_CONSULTOR = ['/', '/clientes', '/contratos', '/consultores', '/configuracoes', '/reunioes'];
+
 export function AppLayout() {
   const { user, loading, roleLoading, userRole, forcePasswordChange } = useAuth();
+  const location = useLocation();
 
   if (loading || (user && roleLoading)) {
     return (
@@ -31,9 +34,8 @@ export function AppLayout() {
 
   // Consultors accessing restricted routes get redirected to /projetos
   const isConsultor = userRole === 'consultor';
-  const restrictedPaths = ['/', '/clientes', '/contratos', '/consultores', '/configuracoes'];
-  const currentPath = window.location.pathname;
-  if (isConsultor && restrictedPaths.some(p => currentPath === p || (p !== '/' && currentPath.startsWith(p)))) {
+  const currentPath = location.pathname;
+  if (isConsultor && RESTRICTED_FOR_CONSULTOR.some(p => currentPath === p || (p !== '/' && currentPath.startsWith(p)))) {
     return <Navigate to="/projetos" replace />;
   }
 

@@ -27,6 +27,7 @@ import NotFound from "./pages/NotFound";
 import QuestionarioPublico from "./pages/QuestionarioPublico";
 import Agenda from "./pages/Agenda";
 import Oraculo from "./pages/Oraculo";
+import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 
 const queryClient = new QueryClient();
 
@@ -37,6 +38,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <ErrorBoundary>
           <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
@@ -63,6 +65,7 @@ const App = () => (
             <Route path="/consultores/:id/relatorio" element={<RelatorioConsultor />} />
             <Route path="/clientes/:id/relatorio" element={<RelatorioCliente />} />
           </Routes>
+          </ErrorBoundary>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
