@@ -34,6 +34,7 @@ export interface GCalListResponse {
   calendars: GCalCalendar[];
   events: GCalEvent[];
   missingScope?: boolean;
+  notConnected?: boolean;
 }
 
 export function useGCalEvents(timeMin: string, timeMax: string, calendarIds?: string[]) {
@@ -52,6 +53,9 @@ export function useGCalEvents(timeMin: string, timeMax: string, calendarIds?: st
             if (body?.error === 'missing_scope') {
               return { email: '', calendars: [], events: [], missingScope: true };
             }
+            if (typeof body?.error === 'string' && /não conectado|not connected/i.test(body.error)) {
+              return { email: '', calendars: [], events: [], notConnected: true };
+            }
             throw new Error(body?.error || body?.message || error.message);
           }
         } catch (parseErr) {
@@ -60,10 +64,14 @@ export function useGCalEvents(timeMin: string, timeMax: string, calendarIds?: st
         throw error;
       }
       if (data?.error === 'missing_scope') return { email: '', calendars: [], events: [], missingScope: true };
+      if (typeof data?.error === 'string' && /não conectado|not connected/i.test(data.error)) {
+        return { email: '', calendars: [], events: [], notConnected: true };
+      }
       if (data?.error) throw new Error(data.error);
       return data as GCalListResponse;
     },
     refetchInterval: 60_000,
+    retry: false,
   });
 }
 
