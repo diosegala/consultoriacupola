@@ -12,6 +12,7 @@ import { Loader2, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useConsultores } from '@/hooks/useConsultores';
 import { useAuthUsers } from '@/hooks/useUserRoles';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   useConsultorUsers, useCreateConsultorUser, useDeleteConsultorUser,
 } from '@/hooks/useConsultorUser';
@@ -23,8 +24,9 @@ interface Props {
 
 export function VincularConsultorDialog({ open, onOpenChange }: Props) {
   const { toast } = useToast();
+  const { isAdmin } = useAuth();
   const { data: consultores } = useConsultores();
-  const { data: authUsers } = useAuthUsers();
+  const { data: authUsers } = useAuthUsers({ enabled: open && isAdmin });
   const { data: vinculos, isLoading } = useConsultorUsers();
   const createLink = useCreateConsultorUser();
   const deleteLink = useDeleteConsultorUser();
