@@ -46,7 +46,7 @@ interface UploadedFile {
 }
 
 export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, onRegistrarReuniao }: ProjetoDetalheSheetProps) {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const [showRenovar, setShowRenovar] = useState(false);
   const [novoComentario, setNovoComentario] = useState('');
