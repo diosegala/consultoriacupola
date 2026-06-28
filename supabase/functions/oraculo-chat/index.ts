@@ -11,7 +11,11 @@ function buildSystemPrompt(context: string, contextoPagina?: string) {
   const contextoBloco = contextoPagina
     ? `\n\nCONTEXTO DA CONSULTA ATUAL (use para personalizar a resposta):\n${contextoPagina}\n`
     : "";
-  return `Você é o Oráculo da Cupola, um especialista em mercado imobiliário, vendas, gestão e melhores práticas do setor.
+  return `Você é o Oráculo da Cupola, um consultor sênior treinado no MÉTODO CUPOLA — metodologia proprietária da Cupola Consultoria para o mercado imobiliário (incorporadoras, construtoras, imobiliárias).
+
+ORIGEM DAS RESPOSTAS (PRIORIDADE):
+1. Sempre que houver "BASE DE CONHECIMENTO CUPOLA" abaixo, FUNDAMENTE a resposta nela — é a fonte oficial do método.
+2. Se a pergunta não se relacionar à base, responda com seu conhecimento geral sobre gestão imobiliária, deixando claro que é orientação geral.
 
 COMO RESPONDER (OBRIGATÓRIO):
 - SINTETIZE e REFORMULE todas as informações com suas próprias palavras
@@ -28,11 +32,28 @@ FORMATO:
 
 PROIBIDO:
 - Copiar textos literalmente
-- Mencionar "contexto", "base de conhecimento" ou "documentos"
+ - Mencionar literalmente "contexto", "base de conhecimento" ou "documentos" (apenas USE essas informações)
 - Introduções como "Com base em..." ou "De acordo com..."
 - Respostas com mais de 400 palavras
 - Promover treinamentos ou produtos comerciais
 ${contextoBloco}${context}`;
+}
+
+async function gerarEmbedding(texto: string): Promise<number[] | null> {
+  const apiKey = Deno.env.get("OPENAI_API_KEY");
+  if (!apiKey) return null;
+  try {
+    const res = await fetch("https://api.openai.com/v1/embeddings", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "text-embedding-3-small", input: texto.slice(0, 4000) }),
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.data[0].embedding as number[];
+  } catch {
+    return null;
+  }
 }
 
 Deno.serve(async (req) => {
@@ -117,34 +138,50 @@ Deno.serve(async (req) => {
 
     // Busca documentos relevantes
     const lastMessage = messages[messages.length - 1];
-    const keywords = lastMessage.content.toLowerCase()
-      .replace(/[^\w\sÀ-ÿ]/g, " ")
-      .split(/\s+/)
-      .filter((w) => w.length > 3)
-      .slice(0, 4);
-
-    let relevantDocs: Array<{ title: string; content: string }> = [];
-    if (keywords.length > 0) {
-      const conditions = keywords.map((k) => `content.ilike.%${k}%,title.ilike.%${k}%`).join(",");
-      const { data } = await service
-        .from("notion_documents")
-        .select("title, content")
-        .or(conditions)
-        .limit(3);
-      relevantDocs = data || [];
-    }
-    if (relevantDocs.length === 0) {
-      const { data } = await service.from("notion_documents").select("title, content").limit(2);
-      relevantDocs = data || [];
-    }
-
     let context = "";
-    if (relevantDocs.length > 0) {
-      context = "\n\nINFORMAÇÕES DE REFERÊNCIA (use como base, NÃO copie):\n\n";
-      relevantDocs.forEach((d) => {
-        const trunc = d.content && d.content.length > 1500 ? d.content.slice(0, 1500) + "..." : d.content;
-        context += `[${d.title}]\n${trunc}\n\n`;
+    let usouRag = false;
+
+    // 1) RAG semântico em oraculo_knowledge (Método CUPOLA)
+    const queryEmbedding = await gerarEmbedding(lastMessage.content);
+    if (queryEmbedding) {
+      const { data: chunks, error: ragErr } = await service.rpc("buscar_conhecimento", {
+        query_embedding: queryEmbedding as any,
+        match_count: 5,
       });
+      if (ragErr) console.error("buscar_conhecimento erro:", ragErr);
+      const relevantes = (chunks || []).filter((c: any) => (c.similarity ?? 0) > 0.3);
+      if (relevantes.length > 0) {
+        usouRag = true;
+        context = "\n\n=== BASE DE CONHECIMENTO CUPOLA ===\n";
+        relevantes.forEach((c: any) => {
+          const trunc = c.conteudo && c.conteudo.length > 1500 ? c.conteudo.slice(0, 1500) + "..." : c.conteudo;
+          context += `\n[${c.titulo}]${c.categoria ? ` (${c.categoria})` : ""}\n${trunc}\n`;
+        });
+        context += "\n===\n\nUse este conhecimento para fundamentar suas respostas. Se a pergunta não se relacionar com o conteúdo acima, responda com base no seu conhecimento geral sobre gestão imobiliária.\n";
+      }
+    }
+
+    // 2) Fallback: notion_documents (legado por keyword)
+    if (!usouRag) {
+      const keywords = lastMessage.content.toLowerCase()
+        .replace(/[^\w\sÀ-ÿ]/g, " ")
+        .split(/\s+/)
+        .filter((w) => w.length > 3)
+        .slice(0, 4);
+      let relevantDocs: Array<{ title: string; content: string }> = [];
+      if (keywords.length > 0) {
+        const conditions = keywords.map((k) => `content.ilike.%${k}%,title.ilike.%${k}%`).join(",");
+        const { data } = await service
+          .from("notion_documents").select("title, content").or(conditions).limit(3);
+        relevantDocs = data || [];
+      }
+      if (relevantDocs.length > 0) {
+        context = "\n\nINFORMAÇÕES DE REFERÊNCIA (use como base, NÃO copie):\n\n";
+        relevantDocs.forEach((d) => {
+          const trunc = d.content && d.content.length > 1500 ? d.content.slice(0, 1500) + "..." : d.content;
+          context += `[${d.title}]\n${trunc}\n\n`;
+        });
+      }
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -186,6 +223,8 @@ Deno.serve(async (req) => {
       async start(controller) {
         // emite conversa_id como evento inicial
         controller.enqueue(encoder.encode(`event: conversa\ndata: ${JSON.stringify({ conversa_id: conversaId })}\n\n`));
+        // emite metadados de RAG
+        controller.enqueue(encoder.encode(`event: meta\ndata: ${JSON.stringify({ usou_rag: usouRag })}\n\n`));
         let buffer = "";
         try {
           while (true) {
