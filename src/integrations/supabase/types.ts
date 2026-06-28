@@ -689,6 +689,33 @@ export type Database = {
         }
         Relationships: []
       }
+      oraculo_knowledge: {
+        Row: {
+          categoria: string | null
+          conteudo: string
+          created_at: string
+          embedding: string | null
+          id: string
+          titulo: string
+        }
+        Insert: {
+          categoria?: string | null
+          conteudo: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          titulo: string
+        }
+        Update: {
+          categoria?: string | null
+          conteudo?: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          titulo?: string
+        }
+        Relationships: []
+      }
       oraculo_mensagens: {
         Row: {
           content: string
@@ -1466,6 +1493,16 @@ export type Database = {
     }
     Functions: {
       aplicar_baixa_contratos_pagos: { Args: never; Returns: undefined }
+      buscar_conhecimento: {
+        Args: { match_count?: number; query_embedding: string }
+        Returns: {
+          categoria: string
+          conteudo: string
+          id: string
+          similarity: number
+          titulo: string
+        }[]
+      }
       criar_cards_renovacao: { Args: never; Returns: number }
       get_consultor_id_for_user: { Args: { _user_id: string }; Returns: string }
       has_role: {
