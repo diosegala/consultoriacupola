@@ -23,15 +23,17 @@ function chunkText(text: string): string[] {
   return chunks;
 }
 
-async function gerarEmbedding(texto: string, apiKey: string): Promise<number[]> {
-  const res = await fetch("https://api.openai.com/v1/embeddings", {
+async function gerarEmbedding(texto: string, model: string, dimensions: number, lovableKey: string): Promise<number[]> {
+  const body: Record<string, unknown> = { model, input: texto.slice(0, 8000) };
+  if (model.startsWith("openai/")) body.dimensions = dimensions;
+  const res = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
     method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "text-embedding-3-small", input: texto.slice(0, 8000) }),
+    headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     const t = await res.text();
-    throw new Error(`OpenAI embeddings ${res.status}: ${t}`);
+    throw new Error(`Lovable embeddings ${res.status}: ${t}`);
   }
   const json = await res.json();
   return json.data[0].embedding as number[];
@@ -49,30 +51,39 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const openaiKey = Deno.env.get("OPENAI_API_KEY");
-    if (!openaiKey) {
-      return new Response(JSON.stringify({ error: "OPENAI_API_KEY não configurada" }), {
+    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+    if (!lovableKey) {
+      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY não configurada" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const userClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: userData } = await userClient.auth.getUser();
-    if (!userData?.user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
     const service = createClient(supabaseUrl, serviceKey);
-    const { data: roleRow } = await service
-      .from("user_roles").select("role").eq("user_id", userData.user.id).eq("role", "admin").maybeSingle();
-    if (!roleRow) {
-      return new Response(JSON.stringify({ error: "Forbidden" }), {
-        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    const token = authHeader.replace("Bearer ", "").trim();
+    const isServiceRole = token === serviceKey;
+    if (!isServiceRole) {
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
       });
+      const { data: userData } = await userClient.auth.getUser();
+      if (!userData?.user) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { data: roleRow } = await service
+        .from("user_roles").select("role").eq("user_id", userData.user.id).eq("role", "admin").maybeSingle();
+      if (!roleRow) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
+
+    const { data: settings } = await service
+      .from("oraculo_settings").select("embedding_model, embedding_dimensions").eq("id", true).maybeSingle();
+    const embModel = settings?.embedding_model || "openai/text-embedding-3-small";
+    const embDims = settings?.embedding_dimensions || 1536;
 
     const body = await req.json().catch(() => ({}));
     const forceAll: boolean = !!body?.force;
@@ -112,7 +123,7 @@ Deno.serve(async (req) => {
         const chunks = chunkText(d.content);
         for (let i = 0; i < chunks.length; i++) {
           const chunk = chunks[i];
-          const embedding = await gerarEmbedding(`${d.title}\n\n${chunk}`, openaiKey);
+          const embedding = await gerarEmbedding(`${d.title}\n\n${chunk}`, embModel, embDims, lovableKey);
           const { error: insErr } = await service.from("oraculo_knowledge").insert({
             titulo: d.title || "(Sem título)",
             conteudo: chunk,
