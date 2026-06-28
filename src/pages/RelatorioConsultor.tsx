@@ -1,338 +1,270 @@
-import { useParams, useNavigate } from 'react-router-dom';
-import { useConsultoresComStats } from '@/hooks/useConsultores';
-import { useReunioesByConsultor } from '@/hooks/useReunioes';
-import { Loader2, ArrowLeft, Printer } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { format, parseISO } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import cupolaLogo from '@/assets/cupola-logo-branca.png';
+import { useMemo, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useConsultoresComStats } from "@/hooks/useConsultores";
+import { useRelatorioConsultor, type RelatorioPeriodo } from "@/hooks/useRelatorioConsultor";
+import { Loader2, ArrowLeft, FileDown, AlertTriangle, CalendarIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format, subDays, startOfYear } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
+import {
+  ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid,
+  BarChart, Bar,
+} from "recharts";
+import jsPDF from "jspdf";
 
-// Types
-interface MeetingCriteria {
-  empathy: number;
-  clarity: number;
-  proactivity: number;
-  technical: number;
-  results: number;
+type PresetKey = "30d" | "90d" | "ano" | "custom";
+
+function buildPeriodo(preset: PresetKey, custom: { from?: Date; to?: Date }): RelatorioPeriodo {
+  const hoje = new Date();
+  if (preset === "30d") return { from: subDays(hoje, 30), to: hoje };
+  if (preset === "90d") return { from: subDays(hoje, 90), to: hoje };
+  if (preset === "ano") return { from: startOfYear(hoje), to: hoje };
+  return { from: custom.from ?? subDays(hoje, 30), to: custom.to ?? hoje };
 }
 
-interface Meeting {
-  client: string;
-  date: string;
-  score: number;
-  criteria: MeetingCriteria;
-  summary: string;
-  strengths: string[];
-  improvements: string[];
-}
-
-interface ReportData {
-  consultant: string;
-  generatedAt: string;
-  meetings: Meeting[];
-}
-
-const criteriaLabels: Record<keyof MeetingCriteria, string> = {
-  empathy: 'Empatia e Escuta',
-  clarity: 'Clareza na Comunicação',
-  proactivity: 'Proatividade',
-  technical: 'Domínio Técnico',
-  results: 'Orient. p/ Resultados',
-};
-
-const criteriaKeysFromAnalise: Record<string, keyof MeetingCriteria> = {
-  empatia: 'empathy',
-  clareza: 'clarity',
-  proatividade: 'proactivity',
-  dominio_tecnico: 'technical',
-  orientacao_resultados: 'results',
-};
-
-function computeStats(meetings: Meeting[]) {
-  const allCriteria: (keyof MeetingCriteria)[] = ['empathy', 'clarity', 'proactivity', 'technical', 'results'];
-  
-  const avgByCriteria = allCriteria.map(key => {
-    const avg = meetings.reduce((sum, m) => sum + m.criteria[key], 0) / meetings.length;
-    return { key, avg: Math.round(avg * 10) / 10 };
-  });
-
-  const sorted = [...avgByCriteria].sort((a, b) => b.avg - a.avg);
-  const highest = sorted[0];
-  const lowest = sorted[sorted.length - 1];
-
-  const avgScore = Math.round((meetings.reduce((s, m) => s + m.score, 0) / meetings.length) * 10) / 10;
-
-  const bestMeeting = meetings.reduce((best, m) => m.score > best.score ? m : best, meetings[0]);
-
-  return { avgScore, avgByCriteria: sorted, highest, lowest, bestMeeting };
-}
-
-// -- COMPONENTS --
-
-function ReportHeader({ data }: { data: ReportData }) {
-  return (
-    <div className="bg-cupola-dark border-b-[3px] border-cupola-green px-8 py-6 flex items-center justify-between">
-      <div>
-        <div className="flex items-center gap-2 mb-2">
-          <img src={cupolaLogo} alt="Cupola" className="h-5 opacity-90" />
-        </div>
-        <h1 className="text-white text-xl font-bold uppercase tracking-wider">
-          Relatório de Desempenho
-        </h1>
-        <p className="text-white/55 text-sm mt-1">{data.consultant}</p>
-      </div>
-      <div className="text-right">
-        <p className="text-[10px] uppercase tracking-[2px] text-cupola-muted mb-1">Gerado em</p>
-        <p className="text-white font-bold text-sm">{data.generatedAt}</p>
-        <span className="inline-block mt-2 text-[10px] uppercase tracking-[1.5px] text-cupola-green border border-[rgba(176,249,10,0.35)] bg-[rgba(176,249,10,0.12)] rounded-full px-3 py-1">
-          {data.meetings.length} reuniões analisadas
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function ScoreHero({ data }: { data: ReportData }) {
-  const stats = computeStats(data.meetings);
-  return (
-    <div className="bg-cupola-mid border border-[rgba(176,249,10,0.15)] rounded-[14px] p-6 flex flex-col md:flex-row items-center gap-0">
-      {/* Score Médio */}
-      <div className="flex-shrink-0 text-center px-8 py-4">
-        <p className="text-[72px] font-bold leading-none text-cupola-green">{stats.avgScore}</p>
-        <p className="text-[10px] uppercase tracking-[2.5px] text-cupola-muted mt-2">Score Médio</p>
-      </div>
-
-      <div className="hidden md:block w-px self-stretch bg-[rgba(176,249,10,0.2)]" />
-
-      {/* Meta Cards */}
-      <div className="flex-1 flex flex-col md:flex-row gap-3 px-6 py-4">
-        <MetaCard value={stats.highest.avg.toFixed(1)} label={criteriaLabels[stats.highest.key]} />
-        <MetaCard value={stats.lowest.avg.toFixed(1)} label={`${criteriaLabels[stats.lowest.key]} (menor)`} />
-        <MetaCard value={stats.bestMeeting.score.toFixed(1)} label={`${stats.bestMeeting.client} — melhor reunião`} />
-      </div>
-    </div>
-  );
-}
-
-function MetaCard({ value, label }: { value: string; label: string }) {
-  return (
-    <div className="bg-[rgba(176,249,10,0.06)] border border-[rgba(176,249,10,0.15)] rounded-[10px] p-3.5 flex-1 text-center">
-      <p className="text-[26px] font-bold text-cupola-green">{value}</p>
-      <p className="text-[11px] text-cupola-muted mt-1">{label}</p>
-    </div>
-  );
-}
-
-function CriteriaAverages({ data }: { data: ReportData }) {
-  const stats = computeStats(data.meetings);
-  return (
-    <div className="bg-cupola-card border border-cupola-border rounded-[14px] p-[26px_32px]">
-      <h2 className="text-[10px] font-bold uppercase tracking-[2.5px] text-cupola-muted pb-3 border-b border-cupola-border mb-5">
-        Média por Critério
-      </h2>
-      <div className="space-y-3">
-        {stats.avgByCriteria.map(({ key, avg }) => {
-          const isLowest = key === stats.lowest.key;
-          const barColor = isLowest ? 'bg-[#7a8a2a]' : 'bg-cupola-teal';
-          const textColor = isLowest ? 'text-[#7a8a2a]' : 'text-cupola-teal';
-          return (
-            <div key={key} className="flex items-center gap-4">
-              <span className="text-[13px] text-[#4a5a4a] min-w-[210px]">{criteriaLabels[key]}</span>
-              <div className="flex-1 bg-[#eaf0e0] rounded h-[7px] overflow-hidden">
-                <div className={`h-full rounded ${barColor}`} style={{ width: `${(avg / 10) * 100}%` }} />
-              </div>
-              <span className={`text-[16px] font-bold ${textColor} min-w-[32px] text-right`}>{avg.toFixed(1)}</span>
-              {isLowest && (
-                <span className="text-[9px] font-bold uppercase bg-[#f5f5e0] text-[#7a7a1a] rounded-full px-2 py-0.5">
-                  A evoluir
-                </span>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function ScoreEvolution({ data }: { data: ReportData }) {
-  const sorted = [...data.meetings].sort((a, b) => a.date.localeCompare(b.date));
-  const maxScore = Math.max(...sorted.map(m => m.score));
-  return (
-    <div className="bg-cupola-card border border-cupola-border rounded-[14px] p-[26px_32px]">
-      <h2 className="text-[10px] font-bold uppercase tracking-[2.5px] text-cupola-muted pb-3 border-b border-cupola-border mb-5">
-        Evolução do Score por Sessão
-      </h2>
-      <div className="flex items-end justify-between gap-4 mt-4" style={{ height: 140 }}>
-        {sorted.map((m, i) => {
-          const barH = (m.score / 10) * 90;
-          const opacity = m.score === maxScore ? 1 : 0.5 + (m.score / maxScore) * 0.5;
-          return (
-            <div key={i} className="flex-1 flex flex-col items-center justify-end">
-              <span className="text-[18px] font-bold text-cupola-teal mb-1">{m.score.toFixed(1)}</span>
-              <div
-                className="w-full max-w-[60px] bg-cupola-teal rounded-t-[6px]"
-                style={{ height: barH, opacity }}
-              />
-              <p className="text-[11px] font-bold uppercase text-cupola-teal mt-2">{m.date.split(' de ')[0]}/{m.date.split(' de ')[1]?.substring(0, 3)}</p>
-              <p className="text-[12px] text-cupola-muted">{m.client}</p>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function MeetingCard({ meeting }: { meeting: Meeting }) {
-  const criteriaKeys: (keyof MeetingCriteria)[] = ['empathy', 'clarity', 'proactivity', 'technical', 'results'];
-  return (
-    <div className="rounded-[14px] overflow-hidden border border-cupola-border">
-      {/* Header */}
-      <div className="bg-cupola-mid border-b-2 border-cupola-green px-7 py-5 flex items-center justify-between">
-        <div>
-          <h3 className="text-[20px] font-bold uppercase text-white">{meeting.client}</h3>
-          <p className="text-[12px] text-cupola-muted mt-1">{meeting.date}</p>
-        </div>
-        <span className="text-[28px] font-bold text-cupola-green bg-[rgba(176,249,10,0.1)] border border-[rgba(176,249,10,0.3)] rounded-[30px] px-5 py-1">
-          {meeting.score.toFixed(1)}
-        </span>
-      </div>
-
-      {/* Body */}
-      <div className="bg-cupola-card p-[22px_28px]">
-        {/* Resumo */}
-        <p className="text-[13px] text-[#4a5a4a] leading-[1.7] pb-5 border-b border-cupola-border">
-          {meeting.summary}
-        </p>
-
-        {/* Sub-critérios grid */}
-        <div className="grid grid-cols-5 max-md:grid-cols-3 gap-2 my-5">
-          {criteriaKeys.map(key => (
-            <div key={key} className="bg-[#f2f8ea] border border-[#dceacc] rounded-[10px] p-2.5 text-center">
-              <p className="text-[22px] font-bold text-cupola-teal">{meeting.criteria[key].toFixed(1)}</p>
-              <p className="text-[10px] text-cupola-muted leading-[1.3]">{criteriaLabels[key]}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Pontos fortes e melhorias */}
-        <div className="grid grid-cols-2 max-md:grid-cols-1 gap-6 mt-4">
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <span className="w-2 h-2 rounded-full bg-[#4a9c4a]" />
-              <span className="text-[10px] font-bold uppercase tracking-[2px] text-[#1a5a2a]">Pontos Fortes</span>
-            </div>
-            {meeting.strengths.map((s, i) => (
-              <p key={i} className="text-[12px] text-[#4a5a4a] bg-[#f7faf2] rounded-[7px] px-3 py-2 mb-1.5 leading-[1.55] border-l-2 border-[#4a9c4a]">
-                {s}
-              </p>
-            ))}
-          </div>
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <span className="w-2 h-2 rounded-full bg-[#c8a030]" />
-              <span className="text-[10px] font-bold uppercase tracking-[2px] text-[#7a5a1a]">A Evoluir</span>
-            </div>
-            {meeting.improvements.map((s, i) => (
-              <p key={i} className="text-[12px] text-[#4a5a4a] bg-[#f7faf2] rounded-[7px] px-3 py-2 mb-1.5 leading-[1.55] border-l-2 border-[#c8a030]">
-                {s}
-              </p>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// -- MAIN PAGE --
-
-function transformReunioes(reunioes: any[]): Meeting[] {
-  return reunioes
-    .filter((r: any) => r.status_analise === 'concluido' && r.analise_ia)
-    .map((r: any) => {
-      const analise = r.analise_ia as any;
-      const criterios = analise || {};
-
-      const criteria: MeetingCriteria = {
-        empathy: 0, clarity: 0, proactivity: 0, technical: 0, results: 0,
-      };
-      for (const [dbKey, mappedKey] of Object.entries(criteriaKeysFromAnalise)) {
-        criteria[mappedKey] = Number(criterios[dbKey]?.nota ?? criterios[dbKey] ?? 0);
-      }
-
-      return {
-        client: r.clientes?.nome || 'Cliente',
-        date: format(parseISO(r.data_reuniao), "d 'de' MMMM 'de' yyyy", { locale: ptBR }),
-        score: Number(r.score_ia ?? 0),
-        criteria,
-        summary: r.resumo_ia || analise?.resumo || 'Sem resumo disponível.',
-        strengths: analise?.pontos_fortes || [],
-        improvements: analise?.pontos_melhoria || [],
-      } as Meeting;
-    });
+function fmtData(d: string | null): string {
+  if (!d) return "—";
+  try { return format(new Date(d), "dd/MM/yyyy"); } catch { return "—"; }
 }
 
 export default function RelatorioConsultor() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { data: consultores, isLoading: loadingConsultor } = useConsultoresComStats();
-  const { data: reunioes, isLoading: loadingReunioes } = useReunioesByConsultor(id);
+  const { data: consultores, isLoading: loadingConsultores } = useConsultoresComStats();
 
-  const consultor = consultores?.find(c => c.id === id);
+  const [preset, setPreset] = useState<PresetKey>("90d");
+  const [customRange, setCustomRange] = useState<{ from?: Date; to?: Date }>({});
+  const periodo = useMemo(() => buildPeriodo(preset, customRange), [preset, customRange]);
 
-  if (loadingConsultor || loadingReunioes) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-cupola-surface">
-        <Loader2 className="h-8 w-8 animate-spin text-cupola-teal" />
-      </div>
-    );
-  }
+  const { data, isLoading } = useRelatorioConsultor(id, periodo);
+  const consultor = consultores?.find((c) => c.id === id);
 
-  if (!consultor || !reunioes) {
-    return (
-      <div className="text-center py-24 text-cupola-muted">Consultor não encontrado</div>
-    );
-  }
+  const exportarPdf = () => {
+    if (!consultor || !data) return;
+    const doc = new jsPDF();
+    const periodoLabel = `${format(periodo.from, "dd/MM/yyyy")} a ${format(periodo.to, "dd/MM/yyyy")}`;
 
-  const meetings = transformReunioes(reunioes);
-  if (meetings.length === 0) {
-    return (
-      <div className="text-center py-24 text-cupola-muted">Nenhuma reunião analisada encontrada.</div>
-    );
-  }
+    doc.setFontSize(16);
+    doc.text(`Relatório de Performance — ${consultor.nome}`, 14, 18);
+    doc.setFontSize(10);
+    doc.text(`Período: ${periodoLabel}`, 14, 26);
+    doc.text(`Gerado em ${format(new Date(), "dd/MM/yyyy HH:mm")}`, 14, 32);
 
-  const reportData: ReportData = {
-    consultant: consultor.nome,
-    generatedAt: format(new Date(), "d 'de' MMMM 'de' yyyy", { locale: ptBR }),
-    meetings,
+    doc.setFontSize(12);
+    doc.text("Visão geral", 14, 44);
+    doc.setFontSize(10);
+    const linhas = [
+      `• Reuniões realizadas: ${data.reunioes_total}`,
+      `• Score médio (IA): ${data.score_medio != null ? data.score_medio.toFixed(1) : "—"}`,
+      `• Documentos gerados: ${data.documentos_total}`,
+      `• Taxa de conclusão do checklist: ${data.checklist_taxa}% (${data.checklist_concluidos}/${data.checklist_total})`,
+      `• Clientes ativos: ${data.clientes_ativos}`,
+      `• Clientes encerrados no período: ${data.clientes_encerrados_no_periodo}`,
+    ];
+    linhas.forEach((l, i) => doc.text(l, 14, 52 + i * 6));
+
+    let y = 52 + linhas.length * 6 + 8;
+    doc.setFontSize(12);
+    doc.text("Portfólio ativo", 14, y);
+    y += 6;
+    doc.setFontSize(9);
+    doc.text("Cliente", 14, y);
+    doc.text("Etapa", 70, y);
+    doc.text("Última reunião", 115, y);
+    doc.text("Próxima", 150, y);
+    doc.text("Score", 180, y);
+    y += 4;
+    doc.line(14, y, 200, y);
+    y += 4;
+
+    data.portfolio.forEach((p) => {
+      if (y > 280) { doc.addPage(); y = 20; }
+      const alerta = p.em_alerta ? "! " : "  ";
+      doc.text(alerta + (p.cliente_nome || "").slice(0, 28), 14, y);
+      doc.text((p.etapa || "—").slice(0, 22), 70, y);
+      doc.text(fmtData(p.ultima_reuniao), 115, y);
+      doc.text(fmtData(p.proxima_reuniao), 150, y);
+      doc.text(p.score_cliente_medio != null ? p.score_cliente_medio.toFixed(1) : "—", 180, y);
+      y += 5;
+    });
+
+    doc.save(`relatorio-${consultor.nome.replace(/\s+/g, "_").toLowerCase()}-${format(new Date(), "yyyyMMdd")}.pdf`);
   };
 
+  if (loadingConsultores) {
+    return <div className="flex items-center justify-center h-[60vh]"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  }
+  if (!consultor) {
+    return <div className="text-center py-24 text-muted-foreground">Consultor não encontrado</div>;
+  }
+
   return (
-    <div className="min-h-screen bg-cupola-surface" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
-      {/* Toolbar - hidden on print */}
-      <div className="print:hidden sticky top-0 z-50 bg-cupola-dark border-b border-cupola-green/30 px-6 py-3 flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={() => navigate(`/consultores/${id}`)} className="text-white hover:text-cupola-green">
-          <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
-        </Button>
-        <Button onClick={() => window.print()} className="bg-cupola-green text-cupola-dark hover:bg-cupola-green/90 font-bold uppercase tracking-wider text-sm">
-          <Printer className="h-4 w-4 mr-2" /> Baixar PDF
-        </Button>
+    <div className="space-y-6 animate-fade-in">
+      {/* Header / Toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={() => navigate(`/consultores/${id}`)}>
+            <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold">{consultor.nome}</h1>
+            <p className="text-sm text-muted-foreground">Relatório de performance</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Select value={preset} onValueChange={(v) => setPreset(v as PresetKey)}>
+            <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="30d">Últimos 30 dias</SelectItem>
+              <SelectItem value="90d">Últimos 90 dias</SelectItem>
+              <SelectItem value="ano">Este ano</SelectItem>
+              <SelectItem value="custom">Personalizado</SelectItem>
+            </SelectContent>
+          </Select>
+          {preset === "custom" && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="justify-start text-left font-normal">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {customRange.from
+                    ? `${format(customRange.from, "dd/MM/yy")} → ${customRange.to ? format(customRange.to, "dd/MM/yy") : "?"}`
+                    : "Selecionar período"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="range"
+                  selected={{ from: customRange.from, to: customRange.to }}
+                  onSelect={(r) => setCustomRange({ from: r?.from, to: r?.to })}
+                  locale={ptBR}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
+          )}
+          <Button onClick={exportarPdf} disabled={!data}>
+            <FileDown className="h-4 w-4 mr-2" /> Exportar PDF
+          </Button>
+        </div>
       </div>
 
-      {/* Report Content */}
-      <div className="max-w-[900px] mx-auto py-8 px-4 print:py-0 print:px-0 print:max-w-none space-y-6">
-        <ReportHeader data={reportData} />
-        <ScoreHero data={reportData} />
-        <CriteriaAverages data={reportData} />
-        <ScoreEvolution data={reportData} />
+      {isLoading || !data ? (
+        <div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin" /></div>
+      ) : (
+        <>
+          {/* SEÇÃO 1 — Visão geral */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <KpiCard label="Reuniões realizadas" value={String(data.reunioes_total)} hint={`no período (${data.clientes_ativos} clientes ativos)`} />
+            <KpiCard label="Score médio (IA)" value={data.score_medio != null ? data.score_medio.toFixed(1) : "—"} hint="média ponderada das reuniões" />
+            <KpiCard label="Documentos gerados" value={String(data.documentos_total)} hint="diagnósticos, OKRs, briefings" />
+            <KpiCard label="Checklist concluído" value={`${data.checklist_taxa}%`} hint={`${data.checklist_concluidos}/${data.checklist_total} itens`} />
+          </div>
 
-        {/* Meeting Cards - reverse chronological */}
-        {[...meetings].reverse().map((m, i) => (
-          <MeetingCard key={i} meeting={m} />
-        ))}
-      </div>
+          {/* SEÇÃO 2 — Evolução mensal */}
+          <Card>
+            <CardHeader><CardTitle className="text-base">Evolução mensal</CardTitle></CardHeader>
+            <CardContent style={{ height: 320 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={data.evolucao_mensal} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="label" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} allowDecimals={false} />
+                  <YAxis yAxisId="right" orientation="right" stroke="hsl(var(--muted-foreground))" fontSize={12} domain={[0, 10]} />
+                  <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} />
+                  <Legend />
+                  <Line yAxisId="left" type="monotone" dataKey="reunioes" name="Reuniões" stroke="hsl(var(--primary))" strokeWidth={2} />
+                  <Line yAxisId="right" type="monotone" dataKey="score_medio" name="Score médio" stroke="#7c3aed" strokeWidth={2} connectNulls />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* SEÇÃO 3 — Documentos por tipo */}
+          <Card>
+            <CardHeader><CardTitle className="text-base">Documentos por tipo</CardTitle></CardHeader>
+            <CardContent style={{ height: 280 }}>
+              {data.documentos_por_tipo.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-8 text-center">Nenhum documento gerado no período.</p>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data.documentos_por_tipo}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="label" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} allowDecimals={false} />
+                    <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} />
+                    <Bar dataKey="total" name="Quantidade" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* SEÇÃO 4 — Portfólio atual */}
+          <Card>
+            <CardHeader><CardTitle className="text-base">Portfólio atual ({data.portfolio.length} clientes ativos)</CardTitle></CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Etapa</TableHead>
+                    <TableHead>Última reunião</TableHead>
+                    <TableHead>Próxima reunião</TableHead>
+                    <TableHead className="text-center">Score cliente</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.portfolio.length === 0 ? (
+                    <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Sem clientes ativos</TableCell></TableRow>
+                  ) : (
+                    data.portfolio.map((p) => (
+                      <TableRow key={p.cliente_id} className={cn(p.em_alerta && "bg-destructive/10 hover:bg-destructive/15")}>
+                        <TableCell>
+                          <button className="font-medium hover:underline" onClick={() => navigate(`/clientes/${p.cliente_id}`)}>
+                            {p.cliente_nome}
+                          </button>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{p.etapa || "—"}</TableCell>
+                        <TableCell>{fmtData(p.ultima_reuniao)}</TableCell>
+                        <TableCell>{fmtData(p.proxima_reuniao)}</TableCell>
+                        <TableCell className="text-center">{p.score_cliente_medio != null ? p.score_cliente_medio.toFixed(1) : "—"}</TableCell>
+                        <TableCell>
+                          {p.em_alerta ? (
+                            <Badge variant="destructive" className="gap-1"><AlertTriangle className="h-3 w-3" /> Atenção</Badge>
+                          ) : (
+                            <Badge variant="secondary">Em dia</Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
+  );
+}
+
+function KpiCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+        <p className="text-3xl font-bold mt-2">{value}</p>
+        {hint && <p className="text-xs text-muted-foreground mt-1">{hint}</p>}
+      </CardContent>
+    </Card>
   );
 }
