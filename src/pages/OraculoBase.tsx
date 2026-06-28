@@ -14,6 +14,9 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Plus, Trash2, Loader2, BookOpen, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Info } from "lucide-react";
 
 interface Doc {
   id: string;
@@ -23,6 +26,29 @@ interface Doc {
   source?: string | null;
   notion_page_id?: string | null;
 }
+
+interface Settings {
+  embedding_model: string;
+  embedding_dimensions: number;
+  chat_provider: "lovable" | "anthropic";
+  chat_model: string;
+  ultima_sincronizacao_auto: string | null;
+}
+
+const EMBEDDING_OPTIONS: { value: string; label: string; dims: number; desc: string }[] = [
+  { value: "openai/text-embedding-3-small", label: "OpenAI 3-small (1536d)", dims: 1536, desc: "Padrão atual. Bom equilíbrio custo/qualidade." },
+  { value: "openai/text-embedding-3-large", label: "OpenAI 3-large (1536d)", dims: 1536, desc: "Maior qualidade, mesma dimensão — não exige reindexação." },
+];
+
+const CHAT_OPTIONS: { provider: "lovable" | "anthropic"; value: string; label: string; desc: string }[] = [
+  { provider: "lovable", value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash (padrão)", desc: "Rápido e barato." },
+  { provider: "lovable", value: "google/gemini-3-flash-preview", label: "Gemini 3 Flash (preview)", desc: "Geração mais recente." },
+  { provider: "lovable", value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", desc: "Mais robusto." },
+  { provider: "lovable", value: "openai/gpt-5-mini", label: "OpenAI GPT-5 mini", desc: "OpenAI com custo controlado." },
+  { provider: "lovable", value: "openai/gpt-5", label: "OpenAI GPT-5", desc: "Mais poderoso da OpenAI." },
+  { provider: "anthropic", value: "claude-3-5-sonnet-latest", label: "Claude 3.5 Sonnet (BYOK)", desc: "Requer ANTHROPIC_API_KEY configurado em Secrets." },
+  { provider: "anthropic", value: "claude-opus-4-5", label: "Claude Opus 4.5 (BYOK)", desc: "Requer ANTHROPIC_API_KEY configurado em Secrets." },
+];
 
 export default function OraculoBase() {
   const { isAdmin } = useAuth();
@@ -44,6 +70,35 @@ export default function OraculoBase() {
       if (error) throw error;
       return (data || []) as Doc[];
     },
+  });
+
+  const settingsQuery = useQuery({
+    queryKey: ["oraculo-settings"],
+    enabled: isAdmin,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("oraculo_settings")
+        .select("embedding_model, embedding_dimensions, chat_provider, chat_model, ultima_sincronizacao_auto")
+        .eq("id", true)
+        .maybeSingle();
+      if (error) throw error;
+      return data as Settings;
+    },
+  });
+
+  const updateSettings = useMutation({
+    mutationFn: async (changes: Partial<Settings>) => {
+      const { error } = await supabase
+        .from("oraculo_settings")
+        .update(changes)
+        .eq("id", true);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Configurações atualizadas");
+      qc.invalidateQueries({ queryKey: ["oraculo-settings"] });
+    },
+    onError: (e: any) => toast.error(e?.message || "Erro ao salvar"),
   });
 
   const indexar = useMutation({
@@ -94,6 +149,7 @@ export default function OraculoBase() {
 
   const total = docsQuery.data?.length ?? 0;
   const totalNotion = docsQuery.data?.filter((d) => d.source === "notion").length ?? 0;
+  const settings = settingsQuery.data;
 
   if (!isAdmin) {
     return (
@@ -119,7 +175,7 @@ export default function OraculoBase() {
           <Button variant="outline" onClick={() => navigate("/oraculo")}>Voltar ao chat</Button>
           <Button variant="outline" onClick={() => indexarNotion.mutate(false)} disabled={indexarNotion.isPending}>
             {indexarNotion.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-            Indexar Notion
+            Indexar agora
           </Button>
           <Button onClick={() => setOpen(true)}>
             <Plus className="h-4 w-4 mr-2" /> Adicionar documento
@@ -130,12 +186,90 @@ export default function OraculoBase() {
       <Card>
         <CardContent className="py-4 text-sm text-muted-foreground space-y-1">
           <p>
-            O Oráculo consulta automaticamente o conteúdo do Notion já sincronizado (tabela <code>notion_documents</code>).
-            Clique em <strong>Indexar Notion</strong> para gerar embeddings das páginas novas ou atualizadas.
+            Sincronização <strong>automática diária às 02:00 (BRT)</strong> — busca alterações no Notion e atualiza a base do Oráculo.
+            {settings?.ultima_sincronizacao_auto && (
+              <> Última execução automática: <strong>{format(new Date(settings.ultima_sincronizacao_auto), "dd/MM/yyyy HH:mm")}</strong>.</>
+            )}
           </p>
-          <p className="text-xs">
-            Dica: rode <strong>Sincronizar Notion</strong> em Configurações primeiro para puxar as últimas alterações das páginas.
-          </p>
+          <p className="text-xs">Use <strong>Indexar agora</strong> para forçar uma sincronização imediata sob demanda.</p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Modelos de IA</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {settingsQuery.isLoading || !settings ? (
+            <div className="py-4 text-center"><Loader2 className="h-5 w-5 animate-spin mx-auto" /></div>
+          ) : (
+            <>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Modelo de embeddings (indexação e busca)</Label>
+                  <Select
+                    value={settings.embedding_model}
+                    onValueChange={(value) => {
+                      const opt = EMBEDDING_OPTIONS.find((o) => o.value === value);
+                      if (!opt) return;
+                      const needsReindex = opt.dims !== settings.embedding_dimensions;
+                      if (needsReindex && !confirm("Alterar para um modelo de dimensão diferente exige reindexar toda a base. Continuar?")) return;
+                      updateSettings.mutate({ embedding_model: value, embedding_dimensions: opt.dims });
+                    }}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {EMBEDDING_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          <div className="flex flex-col">
+                            <span>{o.label}</span>
+                            <span className="text-xs text-muted-foreground">{o.desc}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Modelo de chat (respostas)</Label>
+                  <Select
+                    value={settings.chat_model}
+                    onValueChange={(value) => {
+                      const opt = CHAT_OPTIONS.find((o) => o.value === value);
+                      if (!opt) return;
+                      updateSettings.mutate({ chat_model: value, chat_provider: opt.provider });
+                    }}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {CHAT_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          <div className="flex flex-col">
+                            <span>{o.label}</span>
+                            <span className="text-xs text-muted-foreground">{o.desc}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {settings.chat_provider === "anthropic" && (
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    Claude é cobrado diretamente pela Anthropic. Garanta que o secret <code>ANTHROPIC_API_KEY</code> esteja configurado.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <p className="text-xs text-muted-foreground">
+                Embeddings e chat passam pelo <strong>Lovable AI Gateway</strong> (sem cota da OpenAI). Apenas Claude usa a API direta da Anthropic.
+              </p>
+            </>
+          )}
         </CardContent>
       </Card>
 
