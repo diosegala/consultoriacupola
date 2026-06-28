@@ -16,7 +16,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Search, Plus, Trash2, Loader2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, Plus, Trash2, Loader2, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useClientes, useDeleteCliente, ClienteComDetalhes } from '@/hooks/useClientes';
 import { useConsultores } from '@/hooks/useConsultores';
 import { useTiposConsultoria } from '@/hooks/useDadosAuxiliares';
@@ -314,7 +315,23 @@ export default function Clientes() {
                         }
                       </TableCell>
                       <TableCell>
-                        <StatusBadge status={cliente.status} />
+                        <div className="flex items-center gap-2">
+                          <StatusBadge status={cliente.status} />
+                          {cliente._projeto_status_cliente &&
+                            cliente._projeto_status_cliente !== cliente.status && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    Status divergente — etapa do Kanban "{cliente._projeto_etapa_nome}" indica
+                                    <strong> {cliente._projeto_status_cliente}</strong>. Verifique o Kanban.
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {cliente.contrato_ativo?.data_fim 
