@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { OraculoFloatingChat } from '@/components/oraculo/OraculoFloatingChat';
 import { ErrorBoundary } from './ErrorBoundary';
 
-const RESTRICTED_FOR_CONSULTOR = ['/', '/clientes', '/contratos', '/consultores', '/configuracoes', '/reunioes'];
+const RESTRICTED_FOR_CONSULTOR = ['/', '/clientes', '/contratos', '/consultores', '/configuracoes'];
 
 export function AppLayout() {
   const { user, loading, roleLoading, userRole, forcePasswordChange } = useAuth();

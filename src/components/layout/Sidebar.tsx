@@ -40,6 +40,7 @@ const consultorMenuItems = [
   { to: '/meu-painel', icon: LayoutDashboard, label: 'Meu Painel' },
   { to: '/projetos', icon: Kanban, label: 'Projetos' },
   { to: '/agenda', icon: CalendarDays, label: 'Agenda' },
+  { to: '/reunioes', icon: Video, label: 'Reuniões' },
   { to: '/oraculo', icon: Sparkles, label: 'Oráculo' },
   { to: '/minhas-tarefas', icon: ListChecks, label: 'Minhas tarefas' },
   { to: '/integracoes', icon: Link2, label: 'Minhas Integrações' },
