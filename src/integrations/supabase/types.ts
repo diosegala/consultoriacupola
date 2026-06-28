@@ -91,6 +91,38 @@ export type Database = {
           },
         ]
       }
+      checklist_templates: {
+        Row: {
+          created_at: string
+          id: string
+          ordem: number
+          tipo_consultoria_id: string
+          titulo: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ordem?: number
+          tipo_consultoria_id: string
+          titulo: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ordem?: number
+          tipo_consultoria_id?: string
+          titulo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_templates_tipo_consultoria_id_fkey"
+            columns: ["tipo_consultoria_id"]
+            isOneToOne: false
+            referencedRelation: "tipos_consultoria"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cliente_aliases: {
         Row: {
           alias: string
