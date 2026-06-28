@@ -5,17 +5,19 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-async function gerarEmbedding(texto: string): Promise<number[]> {
-  const apiKey = Deno.env.get("OPENAI_API_KEY");
-  if (!apiKey) throw new Error("OPENAI_API_KEY não configurada");
-  const res = await fetch("https://api.openai.com/v1/embeddings", {
+async function gerarEmbedding(texto: string, model: string, dimensions: number): Promise<number[]> {
+  const apiKey = Deno.env.get("LOVABLE_API_KEY");
+  if (!apiKey) throw new Error("LOVABLE_API_KEY não configurada");
+  const body: Record<string, unknown> = { model, input: texto.slice(0, 8000) };
+  if (model.startsWith("openai/")) body.dimensions = dimensions;
+  const res = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "text-embedding-3-small", input: texto.slice(0, 8000) }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     const t = await res.text();
-    throw new Error(`OpenAI embeddings ${res.status}: ${t}`);
+    throw new Error(`Lovable embeddings ${res.status}: ${t}`);
   }
   const json = await res.json();
   return json.data[0].embedding as number[];
@@ -62,7 +64,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    const embedding = await gerarEmbedding(`${titulo}\n\n${conteudo}`);
+    const { data: settings } = await service
+      .from("oraculo_settings").select("embedding_model, embedding_dimensions").eq("id", true).maybeSingle();
+    const embModel = settings?.embedding_model || "openai/text-embedding-3-small";
+    const embDims = settings?.embedding_dimensions || 1536;
+    const embedding = await gerarEmbedding(`${titulo}\n\n${conteudo}`, embModel, embDims);
     const { data, error } = await service
       .from("oraculo_knowledge")
       .insert({ titulo, conteudo, categoria, embedding: embedding as any })

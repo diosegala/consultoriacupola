@@ -760,6 +760,39 @@ export type Database = {
           },
         ]
       }
+      oraculo_settings: {
+        Row: {
+          chat_model: string
+          chat_provider: string
+          embedding_dimensions: number
+          embedding_model: string
+          id: boolean
+          ultima_sincronizacao_auto: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          chat_model?: string
+          chat_provider?: string
+          embedding_dimensions?: number
+          embedding_model?: string
+          id?: boolean
+          ultima_sincronizacao_auto?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          chat_model?: string
+          chat_provider?: string
+          embedding_dimensions?: number
+          embedding_model?: string
+          id?: boolean
+          ultima_sincronizacao_auto?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       pausas_contrato: {
         Row: {
           cliente_id: string

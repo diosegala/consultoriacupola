@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.questionario-save]
 verify_jwt = false
+
+[functions.oraculo-cron-daily]
+verify_jwt = false

@@ -39,19 +39,23 @@ PROIBIDO:
 ${contextoBloco}${context}`;
 }
 
-async function gerarEmbedding(texto: string): Promise<number[] | null> {
-  const apiKey = Deno.env.get("OPENAI_API_KEY");
-  if (!apiKey) return null;
+async function gerarEmbedding(texto: string, model: string, dimensions: number, lovableKey: string): Promise<number[] | null> {
   try {
-    const res = await fetch("https://api.openai.com/v1/embeddings", {
+    const body: Record<string, unknown> = { model, input: texto.slice(0, 4000) };
+    if (model.startsWith("openai/")) body.dimensions = dimensions;
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
       method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "text-embedding-3-small", input: texto.slice(0, 4000) }),
+      headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error("Embeddings error:", res.status, await res.text());
+      return null;
+    }
     const json = await res.json();
     return json.data[0].embedding as number[];
-  } catch {
+  } catch (e) {
+    console.error("Embeddings exception:", e);
     return null;
   }
 }
@@ -101,6 +105,14 @@ Deno.serve(async (req) => {
     }
 
     const service = createClient(supabaseUrl, serviceKey);
+    const { data: settings } = await service
+      .from("oraculo_settings")
+      .select("embedding_model, embedding_dimensions, chat_provider, chat_model")
+      .eq("id", true).maybeSingle();
+    const embModel = settings?.embedding_model || "openai/text-embedding-3-small";
+    const embDims = settings?.embedding_dimensions || 1536;
+    const chatProvider = settings?.chat_provider || "lovable";
+    const chatModel = settings?.chat_model || "google/gemini-2.5-flash";
 
     // Cria/garante conversa
     if (!conversaId) {
@@ -142,7 +154,9 @@ Deno.serve(async (req) => {
     let usouRag = false;
 
     // 1) RAG semântico em oraculo_knowledge (Método CUPOLA)
-    const queryEmbedding = await gerarEmbedding(lastMessage.content);
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY não configurada");
+    const queryEmbedding = await gerarEmbedding(lastMessage.content, embModel, embDims, LOVABLE_API_KEY);
     if (queryEmbedding) {
       const { data: chunks, error: ragErr } = await service.rpc("buscar_conhecimento", {
         query_embedding: queryEmbedding as any,
@@ -184,20 +198,74 @@ Deno.serve(async (req) => {
       }
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY não configurada");
+    let aiUrl = "https://ai.gateway.lovable.dev/v1/chat/completions";
+    let aiAuth = `Bearer ${LOVABLE_API_KEY}`;
+    let aiBody: Record<string, unknown> = {
+      model: chatModel,
+      messages: [
+        { role: "system", content: buildSystemPrompt(context, contextoPagina) },
+        ...messages,
+      ],
+      stream: true,
+    };
+    if (chatProvider === "anthropic") {
+      const anthKey = Deno.env.get("ANTHROPIC_API_KEY");
+      if (!anthKey) {
+        return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY não configurada. Configure-a em Secrets para usar Claude." }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      // Anthropic não compartilha o formato OpenAI SSE; fazemos chamada não-streaming e enviamos o texto em um único delta SSE.
+      const anthRes = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": anthKey,
+          "anthropic-version": "2023-06-01",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: chatModel,
+          system: buildSystemPrompt(context, contextoPagina),
+          messages: messages.map((m) => ({ role: m.role, content: m.content })),
+          max_tokens: 2048,
+        }),
+      });
+      if (!anthRes.ok) {
+        const txt = await anthRes.text();
+        console.error("Anthropic error:", anthRes.status, txt);
+        return new Response(JSON.stringify({ error: `Erro Claude: ${anthRes.status}` }), {
+          status: anthRes.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const anthJson = await anthRes.json();
+      const fullText: string = anthJson?.content?.[0]?.text || "";
+      // Salva assistente
+      if (fullText.trim()) {
+        await service.from("oraculo_mensagens").insert({
+          conversa_id: conversaId, role: "assistant", content: fullText,
+        });
+      }
+      // Emite no formato SSE compatível com o cliente
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(`event: conversa\ndata: ${JSON.stringify({ conversa_id: conversaId })}\n\n`));
+          controller.enqueue(encoder.encode(`event: meta\ndata: ${JSON.stringify({ usou_rag: usouRag })}\n\n`));
+          const chunk = { choices: [{ delta: { content: fullText } }] };
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+          controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
+          controller.close();
+        },
+      });
+      return new Response(stream, {
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
+      });
+    }
 
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const aiRes = await fetch(aiUrl, {
       method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: buildSystemPrompt(context, contextoPagina) },
-          ...messages,
-        ],
-        stream: true,
-      }),
+      headers: { Authorization: aiAuth, "Content-Type": "application/json" },
+      body: JSON.stringify(aiBody),
     });
 
     if (!aiRes.ok) {
