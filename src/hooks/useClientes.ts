@@ -11,6 +11,8 @@ export interface ClienteComDetalhes extends Cliente {
   contrato_ativo?: (Tables<'contratos'> & { 
     tipo_consultoria?: Tables<'tipos_consultoria'> | null 
   }) | null;
+  _projeto_status_cliente?: 'novo' | 'ativo' | 'aguardando_renovacao' | 'encerrado' | null;
+  _projeto_etapa_nome?: string | null;
 }
 
 interface UseClientesFilters {
@@ -33,7 +35,8 @@ export function useClientes(filters?: UseClientesFilters) {
           contrato_ativo:contratos!contratos_cliente_id_fkey(
             *,
             tipo_consultoria:tipos_consultoria(*)
-          )
+          ),
+          projetos(updated_at, tipo, projetos_etapas(nome, status_cliente))
         `)
         .order('nome');
 
@@ -53,11 +56,18 @@ export function useClientes(filters?: UseClientesFilters) {
       const { data, error } = await query;
       if (error) throw error;
 
-      // Filtrar para pegar apenas o contrato ativo
-      return (data as any[]).map(cliente => ({
-        ...cliente,
-        contrato_ativo: cliente.contrato_ativo?.find((c: any) => c.ativo) || null
-      })) as ClienteComDetalhes[];
+      // Filtrar para pegar apenas o contrato ativo + projeto mais recente
+      return (data as any[]).map(cliente => {
+        const projetos = (cliente.projetos ?? []) as Array<{ updated_at: string; tipo: string; projetos_etapas: { nome: string; status_cliente: string | null } | null }>;
+        const sorted = [...projetos].sort((a, b) => (b.updated_at ?? '').localeCompare(a.updated_at ?? ''));
+        const principal = sorted.find(p => p.tipo !== 'renovacao') ?? sorted[0];
+        return {
+          ...cliente,
+          contrato_ativo: cliente.contrato_ativo?.find((c: any) => c.ativo) || null,
+          _projeto_status_cliente: principal?.projetos_etapas?.status_cliente ?? null,
+          _projeto_etapa_nome: principal?.projetos_etapas?.nome ?? null,
+        };
+      }) as ClienteComDetalhes[];
     }
   });
 }
