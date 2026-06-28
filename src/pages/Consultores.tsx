@@ -37,6 +37,18 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
+function ResumoMesInline({ consultorId }: { consultorId: string }) {
+  const { data, isLoading } = useResumoMesAtual(consultorId);
+  if (isLoading) return <span className="text-xs text-muted-foreground">carregando…</span>;
+  if (!data) return null;
+  return (
+    <span className="text-xs text-muted-foreground">
+      {data.total_mes} reuni{data.total_mes === 1 ? 'ão' : 'ões'} este mês
+      {data.score_medio_mes != null && ` • score ${data.score_medio_mes.toFixed(1)}`}
+    </span>
+  );
+}
+
 export default function Consultores() {
   const navigate = useNavigate();
   const { toast } = useToast();
