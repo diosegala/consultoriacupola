@@ -180,3 +180,23 @@ export function useCreateProjeto() {
     },
   });
 }
+
+export function useUpdateEtapaStatusCliente() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ etapaId, statusCliente }: {
+      etapaId: string;
+      statusCliente: 'novo' | 'ativo' | 'aguardando_renovacao' | 'encerrado' | null;
+    }) => {
+      const { error } = await supabase
+        .from('projetos_etapas')
+        .update({ status_cliente: statusCliente })
+        .eq('id', etapaId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projetos_etapas'] });
+      queryClient.invalidateQueries({ queryKey: ['projetos'] });
+    },
+  });
+}
