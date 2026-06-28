@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+import { registrarAuditoriaStatusCliente } from '@/lib/auditoria';
 
 export type Contrato = Tables<'contratos'> & { pausado?: boolean };
 export type ContratoInsert = TablesInsert<'contratos'>;
@@ -124,6 +125,14 @@ export function useRenovarContrato() {
       contratoAtualId: string; 
       novoContrato: ContratoInsert 
     }) => {
+      // Snapshot status anterior do cliente
+      const { data: clienteAntes } = await supabase
+        .from('clientes')
+        .select('status')
+        .eq('id', novoContrato.cliente_id)
+        .maybeSingle();
+      const statusAnterior = (clienteAntes?.status as string | undefined) ?? null;
+
       // Desativar contrato atual
       const { error: updateError } = await supabase
         .from('contratos')
@@ -169,7 +178,11 @@ export function useRenovarContrato() {
 
         const projetoNormal = projetosCliente?.find((p: any) => p.tipo !== 'renovacao') ?? projetosCliente?.[0];
 
+        let projetoMovidoId: string | null = null;
+        let etapaAnteriorId: string | null = null;
         if (projetoNormal) {
+          projetoMovidoId = projetoNormal.id;
+          etapaAnteriorId = projetoNormal.etapa_id;
           if (projetoNormal.etapa_id !== etapaAtiva.id) {
             await supabase
               .from('projetos')
@@ -184,16 +197,38 @@ export function useRenovarContrato() {
             .eq('id', novoContrato.cliente_id)
             .maybeSingle();
           if (clienteRow?.consultor_id) {
-            await supabase.from('projetos').insert({
+            const { data: novoProj } = await supabase.from('projetos').insert({
               cliente_id: novoContrato.cliente_id,
               contrato_id: data.id,
               consultor_id: clienteRow.consultor_id,
               etapa_id: etapaAtiva.id,
               ordem_na_etapa: 0,
               tipo: 'normal',
-            });
+            }).select('id').single();
+            projetoMovidoId = novoProj?.id ?? null;
           }
         }
+
+        await registrarAuditoriaStatusCliente({
+          clienteId: novoContrato.cliente_id,
+          origem: 'renovar_contrato',
+          contratoId: data.id,
+          projetoId: projetoMovidoId,
+          etapaAnteriorId,
+          etapaNovaId: etapaAtiva.id,
+          statusAnterior,
+          statusNovo: 'ativo',
+          metadata: { contrato_anterior_id: contratoAtualId },
+        });
+      } else if (novoContrato.cliente_id) {
+        await registrarAuditoriaStatusCliente({
+          clienteId: novoContrato.cliente_id,
+          origem: 'renovar_contrato',
+          contratoId: data.id,
+          statusAnterior,
+          statusNovo: 'ativo',
+          metadata: { contrato_anterior_id: contratoAtualId },
+        });
       }
 
       return data;
