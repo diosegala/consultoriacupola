@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { registrarAuditoriaStatusCliente } from '@/lib/auditoria';
 
 export interface ProjetoEtapa {
   id: string;
@@ -121,6 +122,13 @@ export function useMoverProjeto() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ projetoId, etapaId, ordemNaEtapa }: { projetoId: string; etapaId: string; ordemNaEtapa: number }) => {
+      // Snapshot anterior (para auditoria)
+      const { data: projetoAntes } = await supabase
+        .from('projetos')
+        .select('cliente_id, etapa_id')
+        .eq('id', projetoId)
+        .maybeSingle();
+
       const { error } = await supabase
         .from('projetos')
         .update({ etapa_id: etapaId, ordem_na_etapa: ordemNaEtapa })
@@ -134,18 +142,36 @@ export function useMoverProjeto() {
         .eq('id', etapaId)
         .maybeSingle();
 
+      let statusAnterior: string | null = null;
+      let statusAplicado: string | null = null;
+      const clienteId = projetoAntes?.cliente_id ?? null;
+
       if (etapa?.status_cliente) {
-        const { data: projeto } = await supabase
-          .from('projetos')
-          .select('cliente_id')
-          .eq('id', projetoId)
-          .maybeSingle();
-        if (projeto?.cliente_id) {
+        if (clienteId) {
+          const { data: clienteRow } = await supabase
+            .from('clientes')
+            .select('status')
+            .eq('id', clienteId)
+            .maybeSingle();
+          statusAnterior = (clienteRow?.status as string | undefined) ?? null;
           await supabase
             .from('clientes')
             .update({ status: etapa.status_cliente })
-            .eq('id', projeto.cliente_id);
+            .eq('id', clienteId);
+          statusAplicado = etapa.status_cliente;
         }
+      }
+
+      if (clienteId) {
+        await registrarAuditoriaStatusCliente({
+          clienteId,
+          origem: 'mover_projeto',
+          projetoId,
+          etapaAnteriorId: projetoAntes?.etapa_id ?? null,
+          etapaNovaId: etapaId,
+          statusAnterior,
+          statusNovo: statusAplicado,
+        });
       }
     },
     onSuccess: () => {
