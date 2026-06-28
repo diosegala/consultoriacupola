@@ -771,6 +771,13 @@ export default function Configuracoes() {
           </TabsContent>
         )}
 
+        {/* Etapas do Kanban (admin only) */}
+        {isAdmin && (
+          <TabsContent value="etapas" className="mt-6 space-y-4">
+            <EtapasKanbanConfig />
+          </TabsContent>
+        )}
+
       </Tabs>
 
       {/* Dialog Tipo de Consultoria */}
