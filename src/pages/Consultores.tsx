@@ -23,9 +23,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Pencil, Trash2, Loader2, Eye } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Eye, BarChart3 } from 'lucide-react';
 import { useConsultoresComStats, useCreateConsultor, useUpdateConsultor, useDeleteConsultor, Consultor } from '@/hooks/useConsultores';
 import { useToast } from '@/hooks/use-toast';
+import { useResumoMesAtual } from '@/hooks/useRelatorioConsultor';
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('pt-BR', {
@@ -34,6 +35,18 @@ function formatCurrency(value: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0
   }).format(value);
+}
+
+function ResumoMesInline({ consultorId }: { consultorId: string }) {
+  const { data, isLoading } = useResumoMesAtual(consultorId);
+  if (isLoading) return <span className="text-xs text-muted-foreground">carregando…</span>;
+  if (!data) return null;
+  return (
+    <span className="text-xs text-muted-foreground">
+      {data.total_mes} reuni{data.total_mes === 1 ? 'ão' : 'ões'} este mês
+      {data.score_medio_mes != null && ` • score ${data.score_medio_mes.toFixed(1)}`}
+    </span>
+  );
 }
 
 export default function Consultores() {
@@ -195,7 +208,12 @@ export default function Consultores() {
                 ) : (
                   consultores?.map(consultor => (
                     <TableRow key={consultor.id} className="border-border">
-                      <TableCell className="font-medium text-foreground">{consultor.nome}</TableCell>
+                      <TableCell className="font-medium text-foreground">
+                        <div className="flex flex-col">
+                          <span>{consultor.nome}</span>
+                          <ResumoMesInline consultorId={consultor.id} />
+                        </div>
+                      </TableCell>
                       <TableCell className="text-muted-foreground">{consultor.email || '-'}</TableCell>
                       <TableCell className="text-center text-foreground">{consultor.clientes_ativos}</TableCell>
                        <TableCell className="text-foreground">{formatCurrency(consultor.mrr_sob_gestao)}</TableCell>
@@ -212,6 +230,15 @@ export default function Consultores() {
                        </TableCell>
                        <TableCell className="text-right">
                          <div className="flex gap-2 justify-end">
+                           <Button
+                             variant="ghost"
+                             size="icon"
+                             className="text-muted-foreground hover:text-foreground"
+                             title="Ver relatório de performance"
+                             onClick={() => navigate(`/consultores/${consultor.id}/relatorio`)}
+                           >
+                             <BarChart3 className="h-4 w-4" />
+                           </Button>
                            <Button
                              variant="ghost"
                              size="icon"
