@@ -46,10 +46,16 @@ function useClientesMatch() {
 function matchCliente(summary: string | null | undefined, items: { id: string; nome: string; needle: string }[] | undefined): ClienteMatch | null {
   if (!summary || !items?.length) return null;
   const hay = summary.toLowerCase();
+  const isWord = (ch: string) => /[\p{L}\p{N}]/u.test(ch);
   for (const it of items) {
     if (it.needle.length < 3) continue;
-    const re = new RegExp(`(^|\\W)${it.needle.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}(\\W|$)`, 'i');
-    if (re.test(hay)) return { id: it.id, nome: it.nome };
+    let idx = 0;
+    while ((idx = hay.indexOf(it.needle, idx)) !== -1) {
+      const before = idx === 0 ? '' : hay[idx - 1];
+      const after = hay[idx + it.needle.length] ?? '';
+      if (!isWord(before) && !isWord(after)) return { id: it.id, nome: it.nome };
+      idx += it.needle.length;
+    }
   }
   return null;
 }
