@@ -7,13 +7,16 @@ import { Label } from '@/components/ui/label';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ChevronDown, ChevronRight, ListChecks } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useClientes } from '@/hooks/useClientes';
 import { useConsultores } from '@/hooks/useConsultores';
 import { useProjetosEtapas, useProjetos, useCreateProjeto } from '@/hooks/useProjetos';
 import { useMyConsultorId } from '@/hooks/useConsultorUser';
+import { useContratoAtivo } from '@/hooks/useContratos';
+import { useChecklistTemplates } from '@/hooks/useChecklistTemplates';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Props {
   open: boolean;
@@ -34,6 +37,11 @@ export function NovoProjetoDialog({ open, onOpenChange }: Props) {
   const [clienteId, setClienteId] = useState('');
   const [consultorId, setConsultorId] = useState('');
   const [etapaId, setEtapaId] = useState('');
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  const { data: contratoAtivo } = useContratoAtivo(clienteId || undefined);
+  const tipoConsultoriaId = contratoAtivo?.tipo_consultoria_id ?? undefined;
+  const { data: templates } = useChecklistTemplates(tipoConsultoriaId);
 
   // Clients that already have a project
   const clientesComProjeto = useMemo(
@@ -58,18 +66,36 @@ export function NovoProjetoDialog({ open, onOpenChange }: Props) {
       return;
     }
 
-    // Find active contract for the client
-    const cliente = clientes?.find((c) => c.id === clienteId);
     try {
-      await createProjeto.mutateAsync({
+      const novoProjeto = await createProjeto.mutateAsync({
         cliente_id: clienteId,
         consultor_id: finalConsultorId,
         etapa_id: etapaId,
       });
-      toast({ title: 'Sucesso', description: 'Projeto criado com sucesso' });
+
+      // Inserir checklist padrão a partir dos templates do tipo de consultoria
+      if (templates && templates.length > 0 && (novoProjeto as any)?.id) {
+        const rows = templates.map((t) => ({
+          projeto_id: (novoProjeto as any).id,
+          titulo: t.titulo,
+          ordem: t.ordem,
+        }));
+        const { error: errChk } = await supabase.from('projeto_checklist').insert(rows);
+        if (errChk) {
+          console.error('Erro ao inserir checklist padrão:', errChk);
+        }
+      }
+
+      toast({
+        title: 'Sucesso',
+        description: templates && templates.length > 0
+          ? `Projeto criado com ${templates.length} item(ns) de checklist padrão`
+          : 'Projeto criado com sucesso',
+      });
       setClienteId('');
       setConsultorId('');
       setEtapaId('');
+      setPreviewOpen(false);
       onOpenChange(false);
     } catch (error: any) {
       toast({ title: 'Erro', description: error.message, variant: 'destructive' });
@@ -129,6 +155,40 @@ export function NovoProjetoDialog({ open, onOpenChange }: Props) {
               </SelectContent>
             </Select>
           </div>
+
+          {clienteId && templates && templates.length > 0 && (
+            <div className="rounded-md border border-border bg-muted/30">
+              <button
+                type="button"
+                onClick={() => setPreviewOpen((v) => !v)}
+                className="w-full flex items-center justify-between px-3 py-2 text-sm"
+              >
+                <span className="flex items-center gap-2">
+                  <ListChecks className="h-4 w-4 text-primary" />
+                  Checklist padrão incluído ({templates.length} {templates.length === 1 ? 'item' : 'itens'})
+                </span>
+                {previewOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </button>
+              {previewOpen && (
+                <ol className="px-4 pb-3 pt-1 space-y-1 text-xs text-muted-foreground list-decimal list-inside max-h-60 overflow-y-auto">
+                  {templates.map((t) => (
+                    <li key={t.id}>{t.titulo}</li>
+                  ))}
+                </ol>
+              )}
+            </div>
+          )}
+
+          {clienteId && !tipoConsultoriaId && (
+            <p className="text-xs text-muted-foreground">
+              Sem contrato ativo ou tipo de consultoria — o projeto será criado sem checklist padrão.
+            </p>
+          )}
+          {clienteId && tipoConsultoriaId && templates && templates.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              Nenhum template de checklist cadastrado para este tipo de consultoria.
+            </p>
+          )}
         </div>
 
         <DialogFooter>
