@@ -6,6 +6,7 @@ export interface ProjetoEtapa {
   nome: string;
   ordem: number;
   ativo: boolean;
+  status_cliente: 'novo' | 'ativo' | 'aguardando_renovacao' | 'encerrado' | null;
 }
 
 export interface Projeto {
@@ -125,9 +126,32 @@ export function useMoverProjeto() {
         .update({ etapa_id: etapaId, ordem_na_etapa: ordemNaEtapa })
         .eq('id', projetoId);
       if (error) throw error;
+
+      // Sincronizar status do cliente conforme mapeamento da etapa
+      const { data: etapa } = await supabase
+        .from('projetos_etapas')
+        .select('status_cliente')
+        .eq('id', etapaId)
+        .maybeSingle();
+
+      if (etapa?.status_cliente) {
+        const { data: projeto } = await supabase
+          .from('projetos')
+          .select('cliente_id')
+          .eq('id', projetoId)
+          .maybeSingle();
+        if (projeto?.cliente_id) {
+          await supabase
+            .from('clientes')
+            .update({ status: etapa.status_cliente })
+            .eq('id', projeto.cliente_id);
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projetos'] });
+      queryClient.invalidateQueries({ queryKey: ['clientes'] });
+      queryClient.invalidateQueries({ queryKey: ['cliente'] });
     },
   });
 }
@@ -152,6 +176,26 @@ export function useCreateProjeto() {
       return data;
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projetos'] });
+    },
+  });
+}
+
+export function useUpdateEtapaStatusCliente() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ etapaId, statusCliente }: {
+      etapaId: string;
+      statusCliente: 'novo' | 'ativo' | 'aguardando_renovacao' | 'encerrado' | null;
+    }) => {
+      const { error } = await supabase
+        .from('projetos_etapas')
+        .update({ status_cliente: statusCliente })
+        .eq('id', etapaId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projetos_etapas'] });
       queryClient.invalidateQueries({ queryKey: ['projetos'] });
     },
   });

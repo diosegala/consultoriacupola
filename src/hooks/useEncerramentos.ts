@@ -140,6 +140,43 @@ export function useEncerrarContrato() {
         }
       }
 
+      // Sincronizar Kanban: mover projeto ativo para a etapa mapeada como 'encerrado'.
+      // Fallback: se nenhuma etapa estiver mapeada como 'encerrado', apenas garante
+      // o status do cliente como 'encerrado'.
+      if (!manterAtivo) {
+        const { data: etapaEncerrada } = await supabase
+          .from('projetos_etapas')
+          .select('id')
+          .eq('status_cliente', 'encerrado')
+          .eq('ativo', true)
+          .order('ordem')
+          .limit(1)
+          .maybeSingle();
+
+        if (etapaEncerrada?.id) {
+          const { data: projetosCliente } = await supabase
+            .from('projetos')
+            .select('id, updated_at')
+            .eq('cliente_id', clienteId)
+            .neq('etapa_id', etapaEncerrada.id)
+            .order('updated_at', { ascending: false })
+            .limit(1);
+          const projeto = projetosCliente?.[0];
+          if (projeto) {
+            await supabase
+              .from('projetos')
+              .update({ etapa_id: etapaEncerrada.id, ordem_na_etapa: 0 })
+              .eq('id', projeto.id);
+          }
+        } else {
+          // Garantia explícita do status quando não há etapa mapeada
+          await supabase
+            .from('clientes')
+            .update({ status: 'encerrado' })
+            .eq('id', clienteId);
+        }
+      }
+
       return { clienteId };
     },
     onSuccess: (data) => {
@@ -149,6 +186,7 @@ export function useEncerrarContrato() {
       queryClient.invalidateQueries({ queryKey: ['all-contratos'] });
       queryClient.invalidateQueries({ queryKey: ['encerramentos'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['projetos'] });
     }
   });
 }

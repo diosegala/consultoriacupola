@@ -29,6 +29,7 @@ import { useConsultores } from '@/hooks/useConsultores';
 import { useConsultorUsers, useCreateConsultorUser, useDeleteConsultorUser } from '@/hooks/useConsultorUser';
 import { useAgentePrompts, useUpdateAgentePrompt } from '@/hooks/useAgentePrompts';
 import { useParseDocumento } from '@/hooks/useProjetoDocumentos';
+import { useProjetosEtapas, useUpdateEtapaStatusCliente } from '@/hooks/useProjetos';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
@@ -397,6 +398,7 @@ export default function Configuracoes() {
           {isAdmin && <TabsTrigger value="agentes">Agentes IA</TabsTrigger>}
           <TabsTrigger value="tipos">Tipos de Consultoria</TabsTrigger>
           <TabsTrigger value="crms">CRMs</TabsTrigger>
+          {isAdmin && <TabsTrigger value="etapas">Etapas do Kanban</TabsTrigger>}
           {isAdmin && <TabsTrigger value="oraculo">Oráculo</TabsTrigger>}
         </TabsList>
 
@@ -769,6 +771,13 @@ export default function Configuracoes() {
           </TabsContent>
         )}
 
+        {/* Etapas do Kanban (admin only) */}
+        {isAdmin && (
+          <TabsContent value="etapas" className="mt-6 space-y-4">
+            <EtapasKanbanConfig />
+          </TabsContent>
+        )}
+
       </Tabs>
 
       {/* Dialog Tipo de Consultoria */}
@@ -970,5 +979,79 @@ export default function Configuracoes() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function EtapasKanbanConfig() {
+  const { toast } = useToast();
+  const { data: etapas, isLoading } = useProjetosEtapas();
+  const updateEtapa = useUpdateEtapaStatusCliente();
+
+  const statusOptions: Array<{ value: 'novo' | 'ativo' | 'aguardando_renovacao' | 'encerrado' | 'none'; label: string }> = [
+    { value: 'none', label: 'Não sincronizar' },
+    { value: 'novo', label: 'Novo' },
+    { value: 'ativo', label: 'Ativo' },
+    { value: 'aguardando_renovacao', label: 'Aguardando Renovação' },
+    { value: 'encerrado', label: 'Encerrado' },
+  ];
+
+  const handleChange = async (etapaId: string, value: string) => {
+    try {
+      await updateEtapa.mutateAsync({
+        etapaId,
+        statusCliente: value === 'none' ? null : (value as any),
+      });
+      toast({ title: 'Mapeamento atualizado' });
+    } catch (e: any) {
+      toast({ title: 'Erro ao atualizar', description: e.message, variant: 'destructive' });
+    }
+  };
+
+  return (
+    <Card className="bg-card border-border">
+      <CardHeader>
+        <CardTitle className="text-foreground text-base">Mapeamento de Etapas → Status do Cliente</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground mb-4">
+          Defina o status que o cliente assume automaticamente quando um projeto entra em cada etapa do Kanban.
+          Etapas marcadas como <strong>Não sincronizar</strong> não alteram o status do cliente.
+        </p>
+        {isLoading ? (
+          <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin" /></div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow className="border-border hover:bg-transparent">
+                <TableHead className="text-muted-foreground">Etapa</TableHead>
+                <TableHead className="text-muted-foreground w-[280px]">Status do Cliente</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {etapas?.map((etapa) => (
+                <TableRow key={etapa.id} className="border-border">
+                  <TableCell className="text-foreground font-medium">{etapa.nome}</TableCell>
+                  <TableCell>
+                    <Select
+                      value={etapa.status_cliente ?? 'none'}
+                      onValueChange={(v) => handleChange(etapa.id, v)}
+                    >
+                      <SelectTrigger className="bg-input border-border">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover border-border">
+                        {statusOptions.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
   );
 }

@@ -1000,6 +1000,7 @@ export type Database = {
           id: string
           nome: string
           ordem: number
+          status_cliente: Database["public"]["Enums"]["status_cliente"] | null
         }
         Insert: {
           ativo?: boolean
@@ -1007,6 +1008,7 @@ export type Database = {
           id?: string
           nome: string
           ordem?: number
+          status_cliente?: Database["public"]["Enums"]["status_cliente"] | null
         }
         Update: {
           ativo?: boolean
@@ -1014,6 +1016,7 @@ export type Database = {
           id?: string
           nome?: string
           ordem?: number
+          status_cliente?: Database["public"]["Enums"]["status_cliente"] | null
         }
         Relationships: []
       }
