@@ -4,15 +4,17 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Trash2, Sparkles, MessageSquare } from "lucide-react";
+import { Plus, Trash2, Sparkles, MessageSquare, BookOpen } from "lucide-react";
 import { OraculoChatPanel } from "@/components/oraculo/OraculoChatPanel";
 import { OraculoMsg } from "@/hooks/useOraculoChat";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 export default function Oraculo() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const queryClient = useQueryClient();
   const conversaId = params.get("c");
@@ -64,9 +66,16 @@ export default function Oraculo() {
           <h2 className="text-sm font-semibold flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" /> Oráculo
           </h2>
-          <Button size="sm" variant="ghost" onClick={() => setParams({})} title="Nova conversa">
-            <Plus className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-1">
+            {isAdmin && (
+              <Button size="sm" variant="ghost" onClick={() => navigate("/oraculo/base")} title="Base de conhecimento">
+                <BookOpen className="h-4 w-4" />
+              </Button>
+            )}
+            <Button size="sm" variant="ghost" onClick={() => setParams({})} title="Nova conversa">
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         <ScrollArea className="flex-1">
           <div className="p-2 space-y-1">
