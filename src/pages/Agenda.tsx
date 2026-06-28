@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 import { addDays, addWeeks, endOfDay, endOfWeek, format, isSameDay, startOfDay, startOfWeek, subWeeks } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -16,8 +18,41 @@ import { useGoogleConnection, useStartGoogleOAuth } from '@/hooks/useGoogleDrive
 import { GCalEvent, useDeleteGCalEvent, useGCalEvents, useRespondGCalInvite } from '@/hooks/useGoogleCalendar';
 import { EventoFormDialog } from '@/components/agenda/EventoFormDialog';
 import { toast } from 'sonner';
+import { Briefcase } from 'lucide-react';
 
 type View = 'week' | 'day' | 'list';
+
+interface ClienteMatch { id: string; nome: string }
+function useClientesMatch() {
+  return useQuery({
+    queryKey: ['agenda-clientes-match'],
+    queryFn: async () => {
+      const [{ data: clientes }, { data: aliases }] = await Promise.all([
+        supabase.from('clientes').select('id, nome'),
+        supabase.from('cliente_aliases' as any).select('cliente_id, alias'),
+      ]);
+      const items: { id: string; nome: string; needle: string }[] = [];
+      (clientes ?? []).forEach((c: any) => items.push({ id: c.id, nome: c.nome, needle: c.nome.toLowerCase() }));
+      (aliases ?? []).forEach((a: any) => {
+        const c = (clientes ?? []).find((x: any) => x.id === a.cliente_id);
+        if (c) items.push({ id: c.id, nome: c.nome, needle: String(a.alias).toLowerCase() });
+      });
+      // Sort by needle length desc (match longer first)
+      items.sort((a, b) => b.needle.length - a.needle.length);
+      return items;
+    },
+  });
+}
+function matchCliente(summary: string | null | undefined, items: { id: string; nome: string; needle: string }[] | undefined): ClienteMatch | null {
+  if (!summary || !items?.length) return null;
+  const hay = summary.toLowerCase();
+  for (const it of items) {
+    if (it.needle.length < 3) continue;
+    const re = new RegExp(`(^|\\W)${it.needle.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}(\\W|$)`, 'i');
+    if (re.test(hay)) return { id: it.id, nome: it.nome };
+  }
+  return null;
+}
 
 function eventStart(ev: GCalEvent) {
   return new Date(ev.start.dateTime || ev.start.date || '');
