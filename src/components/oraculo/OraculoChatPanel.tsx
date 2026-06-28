@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
-import { Send, Loader2, StopCircle } from "lucide-react";
+import { Send, Loader2, StopCircle, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
@@ -75,17 +75,24 @@ export function OraculoChatPanel({ conversaId, initialMessages = [], onConversaC
           )}
           {messages.map((m, i) => (
             <div key={i} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
-              <div className={cn(
-                "max-w-[85%] rounded-lg px-3 py-2 text-sm",
-                m.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted",
-                compact && "text-xs"
-              )}>
-                {m.role === "assistant" ? (
-                  <div className="prose prose-sm dark:prose-invert max-w-none [&>*]:my-1">
-                    <ReactMarkdown>{m.content || "..."}</ReactMarkdown>
-                  </div>
-                ) : (
-                  <p className="whitespace-pre-wrap">{m.content}</p>
+              <div className="max-w-[85%] flex flex-col gap-1">
+                <div className={cn(
+                  "rounded-lg px-3 py-2 text-sm",
+                  m.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted",
+                  compact && "text-xs"
+                )}>
+                  {m.role === "assistant" ? (
+                    <div className="prose prose-sm dark:prose-invert max-w-none [&>*]:my-1">
+                      <ReactMarkdown>{m.content || "..."}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    <p className="whitespace-pre-wrap">{m.content}</p>
+                  )}
+                </div>
+                {m.role === "assistant" && m.usou_rag && (
+                  <Badge variant="outline" className="self-start gap-1 text-[10px] py-0 px-1.5 h-5 border-primary/40 text-primary">
+                    <BookOpen className="h-3 w-3" /> Baseado no Método CUPOLA
+                  </Badge>
                 )}
               </div>
             </div>
