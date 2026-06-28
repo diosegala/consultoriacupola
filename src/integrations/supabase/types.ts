@@ -764,6 +764,7 @@ export type Database = {
         Row: {
           chat_model: string
           chat_provider: string
+          cron_token: string
           embedding_dimensions: number
           embedding_model: string
           id: boolean
@@ -774,6 +775,7 @@ export type Database = {
         Insert: {
           chat_model?: string
           chat_provider?: string
+          cron_token?: string
           embedding_dimensions?: number
           embedding_model?: string
           id?: boolean
@@ -784,6 +786,7 @@ export type Database = {
         Update: {
           chat_model?: string
           chat_provider?: string
+          cron_token?: string
           embedding_dimensions?: number
           embedding_model?: string
           id?: boolean

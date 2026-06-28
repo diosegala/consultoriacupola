@@ -11,16 +11,17 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Apenas service_role pode disparar (pg_cron)
-    const authHeader = req.headers.get("Authorization") || "";
-    const token = authHeader.replace("Bearer ", "").trim();
-    if (token !== serviceKey) {
+    const service = createClient(supabaseUrl, serviceKey);
+
+    // Verifica token interno do cron (lê de oraculo_settings)
+    const headerToken = req.headers.get("x-cron-token") || "";
+    const { data: settings } = await service
+      .from("oraculo_settings").select("cron_token").eq("id", true).maybeSingle();
+    if (!settings?.cron_token || headerToken !== settings.cron_token) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    const service = createClient(supabaseUrl, serviceKey);
 
     const auth = { Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" };
     const start = new Date().toISOString();
