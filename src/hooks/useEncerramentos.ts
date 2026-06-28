@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables, TablesInsert } from '@/integrations/supabase/types';
 import { startOfMonth, endOfMonth, format, addMonths } from 'date-fns';
+import { registrarAuditoriaStatusCliente } from '@/lib/auditoria';
 
 /**
  * Calcula a data em que a última parcela do contrato é (ou foi) paga.
@@ -62,6 +63,14 @@ export function useEncerrarContrato() {
       justificativa?: string;
       mrrPerdido: number;
     }) => {
+      // Snapshot status anterior do cliente
+      const { data: clienteAntes } = await supabase
+        .from('clientes')
+        .select('status')
+        .eq('id', clienteId)
+        .maybeSingle();
+      const statusAnterior = (clienteAntes?.status as string | undefined) ?? null;
+
       // Buscar quantidade de clientes ativos no momento
       const { count: clientesAtivos } = await supabase
         .from('clientes')
@@ -153,16 +162,20 @@ export function useEncerrarContrato() {
           .limit(1)
           .maybeSingle();
 
+        let projetoMovidoId: string | null = null;
+        let etapaAnteriorId: string | null = null;
         if (etapaEncerrada?.id) {
           const { data: projetosCliente } = await supabase
             .from('projetos')
-            .select('id, updated_at')
+            .select('id, updated_at, etapa_id')
             .eq('cliente_id', clienteId)
             .neq('etapa_id', etapaEncerrada.id)
             .order('updated_at', { ascending: false })
             .limit(1);
           const projeto = projetosCliente?.[0];
           if (projeto) {
+            projetoMovidoId = projeto.id;
+            etapaAnteriorId = (projeto as any).etapa_id ?? null;
             await supabase
               .from('projetos')
               .update({ etapa_id: etapaEncerrada.id, ordem_na_etapa: 0 })
@@ -175,6 +188,27 @@ export function useEncerrarContrato() {
             .update({ status: 'encerrado' })
             .eq('id', clienteId);
         }
+
+        await registrarAuditoriaStatusCliente({
+          clienteId,
+          origem: 'encerrar_contrato',
+          contratoId,
+          projetoId: projetoMovidoId,
+          etapaAnteriorId,
+          etapaNovaId: etapaEncerrada?.id ?? null,
+          statusAnterior,
+          statusNovo: 'encerrado',
+          metadata: { classificacao, mrr_perdido: mrrPerdido, manter_ativo: false },
+        });
+      } else {
+        await registrarAuditoriaStatusCliente({
+          clienteId,
+          origem: 'encerrar_contrato',
+          contratoId,
+          statusAnterior,
+          statusNovo: statusAnterior,
+          metadata: { classificacao, mrr_perdido: mrrPerdido, manter_ativo: true },
+        });
       }
 
       return { clienteId };
