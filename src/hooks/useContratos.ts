@@ -149,6 +149,53 @@ export function useRenovarContrato() {
 
       if (clienteError) throw clienteError;
 
+      // Sincronizar Kanban: mover projeto existente para a etapa mapeada como 'ativo'.
+      // Se não houver projeto, criar um novo na primeira etapa ativa.
+      const { data: etapaAtiva } = await supabase
+        .from('projetos_etapas')
+        .select('id')
+        .eq('status_cliente', 'ativo')
+        .eq('ativo', true)
+        .order('ordem')
+        .limit(1)
+        .maybeSingle();
+
+      if (etapaAtiva?.id && novoContrato.cliente_id) {
+        const { data: projetosCliente } = await supabase
+          .from('projetos')
+          .select('id, etapa_id, tipo')
+          .eq('cliente_id', novoContrato.cliente_id)
+          .order('updated_at', { ascending: false });
+
+        const projetoNormal = projetosCliente?.find((p: any) => p.tipo !== 'renovacao') ?? projetosCliente?.[0];
+
+        if (projetoNormal) {
+          if (projetoNormal.etapa_id !== etapaAtiva.id) {
+            await supabase
+              .from('projetos')
+              .update({ etapa_id: etapaAtiva.id, ordem_na_etapa: 0 })
+              .eq('id', projetoNormal.id);
+          }
+        } else {
+          // Sem projeto: buscar consultor do cliente e criar
+          const { data: clienteRow } = await supabase
+            .from('clientes')
+            .select('consultor_id')
+            .eq('id', novoContrato.cliente_id)
+            .maybeSingle();
+          if (clienteRow?.consultor_id) {
+            await supabase.from('projetos').insert({
+              cliente_id: novoContrato.cliente_id,
+              contrato_id: data.id,
+              consultor_id: clienteRow.consultor_id,
+              etapa_id: etapaAtiva.id,
+              ordem_na_etapa: 0,
+              tipo: 'normal',
+            });
+          }
+        }
+      }
+
       return data;
     },
     onSuccess: (data) => {
@@ -158,6 +205,7 @@ export function useRenovarContrato() {
       queryClient.invalidateQueries({ queryKey: ['clientes'] });
       queryClient.invalidateQueries({ queryKey: ['cliente', data.cliente_id] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['projetos'] });
     }
   });
 }
