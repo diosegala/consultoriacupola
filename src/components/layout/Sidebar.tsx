@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { 
-  LayoutDashboard, 
+  LayoutDashboard,
   Users, 
   UserCog, 
   Settings, 
@@ -37,6 +37,7 @@ const adminMenuItems = [
 ];
 
 const consultorMenuItems = [
+  { to: '/meu-painel', icon: LayoutDashboard, label: 'Meu Painel' },
   { to: '/projetos', icon: Kanban, label: 'Projetos' },
   { to: '/agenda', icon: CalendarDays, label: 'Agenda' },
   { to: '/oraculo', icon: Sparkles, label: 'Oráculo' },
