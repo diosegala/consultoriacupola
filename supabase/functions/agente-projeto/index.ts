@@ -70,6 +70,26 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Projeto não encontrado" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // Histórico de documentos do projeto (últimos 5)
+    const { data: docsHistorico } = await supabase
+      .from("projeto_documentos")
+      .select("tipo, conteudo, created_at")
+      .eq("projeto_id", projeto_id)
+      .order("created_at", { ascending: false })
+      .limit(5);
+
+    const relevanciaPorTipo: Record<string, string[]> = {
+      okrs: ["diagnostico", "okrs"],
+      briefing_cliente_oculto: ["diagnostico", "okrs"],
+      diagnostico: ["diagnostico"],
+    };
+    const tiposRelevantes = relevanciaPorTipo[tipo] ?? [];
+    const docsFiltrados = (docsHistorico ?? []).filter((d: any) => tiposRelevantes.includes(d.tipo));
+
+    const historicoSection = docsFiltrados.length
+      ? `\n\nUse os documentos históricos abaixo como contexto para gerar o novo documento. Para OKRs, o diagnóstico mais recente é a referência principal. Para diagnósticos novos, compare com os anteriores e aponte evolução.\n\n=== HISTÓRICO DO PROJETO ===\n${docsFiltrados.map((d: any) => `\n[${d.tipo} — ${new Date(d.created_at).toLocaleDateString("pt-BR")}]:\n${d.conteudo}`).join("\n\n")}\n========================`
+      : "";
+
     const { data: reunioes } = await supabase
       .from("reunioes")
       .select("data_reuniao, duracao_minutos, resumo_ia, score_ia, analise_ia, score_cliente, analise_cliente")
@@ -122,7 +142,7 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
       ? `\n\n## Documento Modelo de Referência\n${documentoModelo}\n\nUse o documento acima como referência de estilo, tom e estrutura.`
       : '';
 
-    const promptCompleto = `${promptBase}\n\n---\n\nINFORMAÇÕES DO CLIENTE:\n\n${contexto}${contextoUsuarioSection}${documentoModeloSection}`;
+    const promptCompleto = `${promptBase}${historicoSection}\n\n---\n\nINFORMAÇÕES DO CLIENTE:\n\n${contexto}${contextoUsuarioSection}${documentoModeloSection}`;
 
     let conteudo = "";
     let lastStatus = 500;
@@ -143,7 +163,7 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
         body: JSON.stringify({
           model: "gpt-4o",
           messages: [
-            { role: "system", content: promptBase },
+            { role: "system", content: `${promptBase}${historicoSection}` },
             { role: "user", content: `${contexto}${contextoUsuarioSection}${documentoModeloSection}` },
           ],
           temperature: 0.7,
