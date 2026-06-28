@@ -692,26 +692,38 @@ export type Database = {
       oraculo_knowledge: {
         Row: {
           categoria: string | null
+          chunk_index: number | null
           conteudo: string
           created_at: string
           embedding: string | null
           id: string
+          last_edited_time: string | null
+          notion_page_id: string | null
+          source: string | null
           titulo: string
         }
         Insert: {
           categoria?: string | null
+          chunk_index?: number | null
           conteudo: string
           created_at?: string
           embedding?: string | null
           id?: string
+          last_edited_time?: string | null
+          notion_page_id?: string | null
+          source?: string | null
           titulo: string
         }
         Update: {
           categoria?: string | null
+          chunk_index?: number | null
           conteudo?: string
           created_at?: string
           embedding?: string | null
           id?: string
+          last_edited_time?: string | null
+          notion_page_id?: string | null
+          source?: string | null
           titulo?: string
         }
         Relationships: []

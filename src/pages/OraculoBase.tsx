@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, Trash2, Loader2, BookOpen } from "lucide-react";
+import { Plus, Trash2, Loader2, BookOpen, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -20,6 +20,8 @@ interface Doc {
   titulo: string;
   categoria: string | null;
   created_at: string;
+  source?: string | null;
+  notion_page_id?: string | null;
 }
 
 export default function OraculoBase() {
@@ -37,7 +39,7 @@ export default function OraculoBase() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("oraculo_knowledge")
-        .select("id, titulo, categoria, created_at")
+        .select("id, titulo, categoria, created_at, source, notion_page_id")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data || []) as Doc[];
@@ -74,7 +76,24 @@ export default function OraculoBase() {
     onError: (e: any) => toast.error(e?.message || "Erro ao excluir"),
   });
 
+  const indexarNotion = useMutation({
+    mutationFn: async (force: boolean) => {
+      const { data, error } = await supabase.functions.invoke("oraculo-indexar-notion", {
+        body: { force },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      return data as { indexed: number; skipped: number; errors: number; chunks: number; total: number };
+    },
+    onSuccess: (r) => {
+      toast.success(`Notion indexado: ${r.indexed} novos/atualizados, ${r.skipped} inalterados, ${r.chunks} trechos${r.errors ? `, ${r.errors} erros` : ""}.`);
+      qc.invalidateQueries({ queryKey: ["oraculo-knowledge"] });
+    },
+    onError: (e: any) => toast.error(e?.message || "Erro ao indexar Notion"),
+  });
+
   const total = docsQuery.data?.length ?? 0;
+  const totalNotion = docsQuery.data?.filter((d) => d.source === "notion").length ?? 0;
 
   if (!isAdmin) {
     return (
@@ -93,16 +112,32 @@ export default function OraculoBase() {
             Base de Conhecimento do Oráculo
           </h1>
           <p className="text-sm text-muted-foreground">
-            {total} documento{total === 1 ? "" : "s"} indexado{total === 1 ? "" : "s"}
+            {total} trecho{total === 1 ? "" : "s"} indexado{total === 1 ? "" : "s"} ({totalNotion} do Notion)
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => navigate("/oraculo")}>Voltar ao chat</Button>
+          <Button variant="outline" onClick={() => indexarNotion.mutate(false)} disabled={indexarNotion.isPending}>
+            {indexarNotion.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+            Indexar Notion
+          </Button>
           <Button onClick={() => setOpen(true)}>
             <Plus className="h-4 w-4 mr-2" /> Adicionar documento
           </Button>
         </div>
       </div>
+
+      <Card>
+        <CardContent className="py-4 text-sm text-muted-foreground space-y-1">
+          <p>
+            O Oráculo consulta automaticamente o conteúdo do Notion já sincronizado (tabela <code>notion_documents</code>).
+            Clique em <strong>Indexar Notion</strong> para gerar embeddings das páginas novas ou atualizadas.
+          </p>
+          <p className="text-xs">
+            Dica: rode <strong>Sincronizar Notion</strong> em Configurações primeiro para puxar as últimas alterações das páginas.
+          </p>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader><CardTitle className="text-base">Documentos</CardTitle></CardHeader>
@@ -116,6 +151,7 @@ export default function OraculoBase() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Título</TableHead>
+                  <TableHead>Origem</TableHead>
                   <TableHead>Categoria</TableHead>
                   <TableHead>Data</TableHead>
                   <TableHead className="w-12"></TableHead>
@@ -125,6 +161,13 @@ export default function OraculoBase() {
                 {docsQuery.data!.map((d) => (
                   <TableRow key={d.id}>
                     <TableCell className="font-medium">{d.titulo}</TableCell>
+                    <TableCell>
+                      {d.source === "notion" ? (
+                        <Badge variant="outline" className="border-primary/40 text-primary">Notion</Badge>
+                      ) : (
+                        <Badge variant="secondary">Manual</Badge>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {d.categoria ? <Badge variant="secondary">{d.categoria}</Badge> : <span className="text-muted-foreground text-xs">—</span>}
                     </TableCell>
