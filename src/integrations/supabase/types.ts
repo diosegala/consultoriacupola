@@ -91,6 +91,73 @@ export type Database = {
           },
         ]
       }
+      auditoria_status_cliente: {
+        Row: {
+          cliente_id: string
+          contrato_id: string | null
+          created_at: string
+          etapa_anterior_id: string | null
+          etapa_nova_id: string | null
+          id: string
+          metadata: Json | null
+          origem: string
+          projeto_id: string | null
+          status_anterior: string | null
+          status_novo: string | null
+          user_id: string | null
+        }
+        Insert: {
+          cliente_id: string
+          contrato_id?: string | null
+          created_at?: string
+          etapa_anterior_id?: string | null
+          etapa_nova_id?: string | null
+          id?: string
+          metadata?: Json | null
+          origem: string
+          projeto_id?: string | null
+          status_anterior?: string | null
+          status_novo?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          cliente_id?: string
+          contrato_id?: string | null
+          created_at?: string
+          etapa_anterior_id?: string | null
+          etapa_nova_id?: string | null
+          id?: string
+          metadata?: Json | null
+          origem?: string
+          projeto_id?: string | null
+          status_anterior?: string | null
+          status_novo?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auditoria_status_cliente_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "auditoria_status_cliente_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "auditoria_status_cliente_projeto_id_fkey"
+            columns: ["projeto_id"]
+            isOneToOne: false
+            referencedRelation: "projetos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       checklist_templates: {
         Row: {
           created_at: string
