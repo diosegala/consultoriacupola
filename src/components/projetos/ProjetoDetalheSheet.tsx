@@ -620,6 +620,7 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
                   ].map(agent => {
                     const isLoading = gerarDocumento.isPending && gerarDocumento.variables?.tipo === agent.tipo;
                     const existingDoc = documentos?.find(d => d.tipo === agent.tipo);
+                    const versoesAnteriores = documentos?.filter(d => d.tipo === agent.tipo).length ?? 0;
                     return (
                       <div key={agent.tipo} className="space-y-1">
                         <div className="flex gap-1">
@@ -642,6 +643,11 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
                             )}
                             {isLoading ? 'Gerando...' : `Gerar ${agent.label}`}
                           </Button>
+                          {versoesAnteriores > 0 && (
+                            <Badge variant="secondary" className="h-7 text-[10px] px-1.5 self-center">
+                              {versoesAnteriores} {versoesAnteriores === 1 ? 'versão anterior' : 'versões anteriores'}
+                            </Badge>
+                          )}
                           {existingDoc && (
                             <Button
                               size="sm"
