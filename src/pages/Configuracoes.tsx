@@ -29,6 +29,7 @@ import { useConsultores } from '@/hooks/useConsultores';
 import { useConsultorUsers, useCreateConsultorUser, useDeleteConsultorUser } from '@/hooks/useConsultorUser';
 import { useAgentePrompts, useUpdateAgentePrompt } from '@/hooks/useAgentePrompts';
 import { useParseDocumento } from '@/hooks/useProjetoDocumentos';
+import { useProjetosEtapas, useUpdateEtapaStatusCliente } from '@/hooks/useProjetos';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
@@ -397,6 +398,7 @@ export default function Configuracoes() {
           {isAdmin && <TabsTrigger value="agentes">Agentes IA</TabsTrigger>}
           <TabsTrigger value="tipos">Tipos de Consultoria</TabsTrigger>
           <TabsTrigger value="crms">CRMs</TabsTrigger>
+          {isAdmin && <TabsTrigger value="etapas">Etapas do Kanban</TabsTrigger>}
           {isAdmin && <TabsTrigger value="oraculo">Oráculo</TabsTrigger>}
         </TabsList>
 
