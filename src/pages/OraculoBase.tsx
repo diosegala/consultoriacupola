@@ -31,16 +31,9 @@ export default function OraculoBase() {
   const [conteudo, setConteudo] = useState("");
   const [categoria, setCategoria] = useState("metodo_cupola");
 
-  if (!isAdmin) {
-    return (
-      <div className="p-6">
-        <p className="text-sm text-muted-foreground">Acesso restrito a administradores.</p>
-      </div>
-    );
-  }
-
   const docsQuery = useQuery({
     queryKey: ["oraculo-knowledge"],
+    enabled: isAdmin,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("oraculo_knowledge")
@@ -82,6 +75,14 @@ export default function OraculoBase() {
   });
 
   const total = docsQuery.data?.length ?? 0;
+
+  if (!isAdmin) {
+    return (
+      <div className="p-6">
+        <p className="text-sm text-muted-foreground">Acesso restrito a administradores.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
