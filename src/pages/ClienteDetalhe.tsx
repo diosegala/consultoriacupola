@@ -15,20 +15,25 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Loader2, ArrowLeft, FileText, Users, Calendar, Pencil, Trash2, BarChart3, Video, CalendarPlus } from 'lucide-react';
+import { Loader2, ArrowLeft, FileText, Users, Calendar, Pencil, Trash2, BarChart3, Video, CalendarPlus, LineChart } from 'lucide-react';
 import { useCliente, useDeleteCliente } from '@/hooks/useClientes';
 import { ContratoTab } from '@/components/cliente/ContratoTab';
 import { OnboardingTab } from '@/components/cliente/OnboardingTab';
 import { AtendimentoTab } from '@/components/cliente/AtendimentoTab';
 import { DesempenhoClienteTab } from '@/components/cliente/DesempenhoClienteTab';
 import { ReunioesClienteTab } from '@/components/cliente/ReunioesClienteTab';
+import { MinhaPerformanceTab } from '@/components/consultor/MinhaPerformanceTab';
 import { ClienteFormDialog } from '@/components/cliente/ClienteFormDialog';
+import { useAuth } from '@/contexts/AuthContext';
+import { useMyConsultorId } from '@/hooks/useConsultorUser';
 import { toast } from 'sonner';
 
 export default function ClienteDetalhe() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: cliente, isLoading, error, refetch } = useCliente(id);
+  const { isAdmin } = useAuth();
+  const { data: myConsultorId } = useMyConsultorId();
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   
@@ -57,6 +62,9 @@ export default function ClienteDetalhe() {
       </div>
     );
   }
+
+  const showPerformance =
+    !!cliente.consultor_id && (isAdmin || myConsultorId === cliente.consultor_id);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -138,6 +146,12 @@ export default function ClienteDetalhe() {
             <BarChart3 className="h-4 w-4" />
             Desempenho
           </TabsTrigger>
+          {showPerformance && (
+            <TabsTrigger value="performance-consultor" className="flex items-center gap-2">
+              <LineChart className="h-4 w-4" />
+              Performance do Consultor
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="contrato" className="mt-6">
@@ -159,6 +173,12 @@ export default function ClienteDetalhe() {
         <TabsContent value="desempenho" className="mt-6">
           <DesempenhoClienteTab clienteId={cliente.id} />
         </TabsContent>
+
+        {showPerformance && (
+          <TabsContent value="performance-consultor" className="mt-6">
+            <MinhaPerformanceTab consultorId={cliente.consultor_id!} clienteId={cliente.id} />
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* Edit Dialog */}
