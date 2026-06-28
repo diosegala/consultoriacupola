@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 export interface OraculoMsg {
   role: "user" | "assistant";
   content: string;
+  usou_rag?: boolean;
 }
 
 export interface SendOptions {
@@ -65,6 +66,8 @@ export function useOraculoChat(initialMessages: OraculoMsg[] = [], initialConver
       const decoder = new TextDecoder();
       let buffer = "";
       let assistant = "";
+      let usouRag = false;
+      let nextEventName: string | null = null;
 
       while (true) {
         const { value, done } = await reader.read();
@@ -74,15 +77,29 @@ export function useOraculoChat(initialMessages: OraculoMsg[] = [], initialConver
         buffer = lines.pop() ?? "";
         for (const raw of lines) {
           const line = raw.trim();
-          if (!line) continue;
-          if (line.startsWith("event: conversa")) continue;
+          if (!line) { nextEventName = null; continue; }
+          if (line.startsWith("event:")) {
+            nextEventName = line.slice(6).trim();
+            continue;
+          }
           if (line.startsWith("data:")) {
             const payload = line.slice(5).trim();
-            if (!payload || payload === "[DONE]") continue;
+            if (!payload || payload === "[DONE]") { nextEventName = null; continue; }
             try {
               const json = JSON.parse(payload);
               if (json.conversa_id) {
                 setConversaId(json.conversa_id);
+                nextEventName = null;
+                continue;
+              }
+              if (nextEventName === "meta" && typeof json.usou_rag === "boolean") {
+                usouRag = json.usou_rag;
+                setMessages((prev) => {
+                  const copy = [...prev];
+                  copy[copy.length - 1] = { ...copy[copy.length - 1], usou_rag: usouRag };
+                  return copy;
+                });
+                nextEventName = null;
                 continue;
               }
               const delta = json?.choices?.[0]?.delta?.content;
@@ -90,7 +107,7 @@ export function useOraculoChat(initialMessages: OraculoMsg[] = [], initialConver
                 assistant += delta;
                 setMessages((prev) => {
                   const copy = [...prev];
-                  copy[copy.length - 1] = { role: "assistant", content: assistant };
+                  copy[copy.length - 1] = { role: "assistant", content: assistant, usou_rag: usouRag };
                   return copy;
                 });
               }
