@@ -1,8 +1,8 @@
 import { Draggable } from '@hello-pangea/dnd';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MapPin, MessageSquarePlus, CalendarIcon, CheckSquare, MessageSquare, AlertTriangle, Clock, RefreshCw } from 'lucide-react';
-import { format, isPast, addDays, isBefore } from 'date-fns';
+import { MapPin, MessageSquarePlus, CalendarIcon, CheckSquare, MessageSquare, AlertTriangle, Clock, RefreshCw, CalendarClock } from 'lucide-react';
+import { format, isPast, addDays, isBefore, differenceInCalendarDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
 import type { Projeto } from '@/hooks/useProjetos';
@@ -21,6 +21,7 @@ interface KanbanCardProps {
     _checklist_total?: number;
     _reunioes_count?: number;
     _tags?: ProjetoCardTag[];
+    _proxima_reuniao?: string | null;
   };
   index: number;
   onRegistrarReuniao: (projeto: Projeto) => void;
@@ -41,6 +42,29 @@ export function KanbanCard({ projeto, index, onRegistrarReuniao, onClick }: Kanb
   const checkOverdue = projeto._checklist_overdue ?? 0;
   const checkSoon = projeto._checklist_soon ?? 0;
   const responsaveis = projeto._checklist_responsaveis ?? [];
+
+  // Próxima reunião do atendimento
+  const proximaReuniao = projeto._proxima_reuniao
+    ? new Date(projeto._proxima_reuniao + 'T00:00:00')
+    : null;
+  const diasReuniao = proximaReuniao ? differenceInCalendarDays(proximaReuniao, now) : null;
+  let reuniaoBadgeClass = 'bg-muted text-muted-foreground border-border';
+  let reuniaoLabel = 'Sem reunião agendada';
+  if (proximaReuniao && diasReuniao !== null) {
+    if (diasReuniao < 0) {
+      reuniaoBadgeClass = 'bg-destructive/15 text-destructive border-destructive/30';
+      reuniaoLabel = `${format(proximaReuniao, 'dd/MM')} · atrasada`;
+    } else if (diasReuniao <= 1) {
+      reuniaoBadgeClass = 'bg-warning/15 text-yellow-600 border-yellow-600/30';
+      reuniaoLabel = diasReuniao === 0 ? `Hoje · ${format(proximaReuniao, 'dd/MM')}` : `Amanhã · ${format(proximaReuniao, 'dd/MM')}`;
+    } else if (diasReuniao <= 7) {
+      reuniaoBadgeClass = 'bg-green-500/15 text-green-600 border-green-600/30';
+      reuniaoLabel = `${format(proximaReuniao, 'dd/MM')} · em ${diasReuniao}d`;
+    } else {
+      reuniaoBadgeClass = 'text-muted-foreground';
+      reuniaoLabel = format(proximaReuniao, 'dd/MM/yyyy');
+    }
+  }
 
   const initials = (nome: string) =>
     nome.split(' ').map(p => p[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
@@ -105,6 +129,16 @@ export function KanbanCard({ projeto, index, onRegistrarReuniao, onClick }: Kanb
                 {format(dueDate, 'dd/MM/yyyy')}
               </Badge>
             )}
+
+            {/* Próxima reunião badge */}
+            <Badge
+              variant="outline"
+              className={cn('text-[10px] font-medium gap-1', reuniaoBadgeClass)}
+              title="Próxima reunião com o cliente"
+            >
+              <CalendarClock className="h-3 w-3" />
+              {reuniaoLabel}
+            </Badge>
 
             {/* Checklist progress bar */}
             {checkTotal > 0 && (

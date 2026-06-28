@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 import { addDays, addWeeks, endOfDay, endOfWeek, format, isSameDay, startOfDay, startOfWeek, subWeeks } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -16,8 +18,47 @@ import { useGoogleConnection, useStartGoogleOAuth } from '@/hooks/useGoogleDrive
 import { GCalEvent, useDeleteGCalEvent, useGCalEvents, useRespondGCalInvite } from '@/hooks/useGoogleCalendar';
 import { EventoFormDialog } from '@/components/agenda/EventoFormDialog';
 import { toast } from 'sonner';
+import { Briefcase } from 'lucide-react';
 
 type View = 'week' | 'day' | 'list';
+
+interface ClienteMatch { id: string; nome: string }
+function useClientesMatch() {
+  return useQuery({
+    queryKey: ['agenda-clientes-match'],
+    queryFn: async () => {
+      const [{ data: clientes }, { data: aliases }] = await Promise.all([
+        supabase.from('clientes').select('id, nome'),
+        supabase.from('cliente_aliases' as any).select('cliente_id, alias'),
+      ]);
+      const items: { id: string; nome: string; needle: string }[] = [];
+      (clientes ?? []).forEach((c: any) => items.push({ id: c.id, nome: c.nome, needle: c.nome.toLowerCase() }));
+      (aliases ?? []).forEach((a: any) => {
+        const c = (clientes ?? []).find((x: any) => x.id === a.cliente_id);
+        if (c) items.push({ id: c.id, nome: c.nome, needle: String(a.alias).toLowerCase() });
+      });
+      // Sort by needle length desc (match longer first)
+      items.sort((a, b) => b.needle.length - a.needle.length);
+      return items;
+    },
+  });
+}
+function matchCliente(summary: string | null | undefined, items: { id: string; nome: string; needle: string }[] | undefined): ClienteMatch | null {
+  if (!summary || !items?.length) return null;
+  const hay = summary.toLowerCase();
+  const isWord = (ch: string) => /[\p{L}\p{N}]/u.test(ch);
+  for (const it of items) {
+    if (it.needle.length < 3) continue;
+    let idx = 0;
+    while ((idx = hay.indexOf(it.needle, idx)) !== -1) {
+      const before = idx === 0 ? '' : hay[idx - 1];
+      const after = hay[idx + it.needle.length] ?? '';
+      if (!isWord(before) && !isWord(after)) return { id: it.id, nome: it.nome };
+      idx += it.needle.length;
+    }
+  }
+  return null;
+}
 
 function eventStart(ev: GCalEvent) {
   return new Date(ev.start.dateTime || ev.start.date || '');
@@ -75,6 +116,7 @@ export default function Agenda() {
 
   const respond = useRespondGCalInvite();
   const del = useDeleteGCalEvent();
+  const { data: matchItems } = useClientesMatch();
 
   async function handleReconnect() {
     const redirectUri = `${window.location.origin}/google-callback`;
@@ -185,10 +227,10 @@ export default function Agenda() {
       {isLoading ? (
         <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>
       ) : view === 'list' ? (
-        <ListaEventos events={events} onEdit={(e) => { setEditEvent(e); setInitialEvent(null); setShowForm(true); }}
+        <ListaEventos events={events} matchItems={matchItems} onEdit={(e) => { setEditEvent(e); setInitialEvent(null); setShowForm(true); }}
           onDelete={(e) => setDeleteEvent(e)} onRespond={(e, r) => respond.mutate({ calendarId: e.calendarId, eventId: e.id, response: r })} />
       ) : (
-        <SemanaGrid days={days} events={events} onSlot={openNew}
+        <SemanaGrid days={days} events={events} matchItems={matchItems} onSlot={openNew}
           onClickEvent={(e) => { setEditEvent(e); setInitialEvent(null); setShowForm(true); }} />
       )}
 
@@ -222,8 +264,8 @@ export default function Agenda() {
   );
 }
 
-function SemanaGrid({ days, events, onSlot, onClickEvent }: {
-  days: Date[]; events: GCalEvent[]; onSlot: (d: Date) => void; onClickEvent: (e: GCalEvent) => void;
+function SemanaGrid({ days, events, matchItems, onSlot, onClickEvent }: {
+  days: Date[]; events: GCalEvent[]; matchItems?: { id: string; nome: string; needle: string }[]; onSlot: (d: Date) => void; onClickEvent: (e: GCalEvent) => void;
 }) {
   const hours = Array.from({ length: 17 }, (_, i) => 6 + i); // 6h-22h
   const today = new Date();
@@ -279,6 +321,7 @@ function SemanaGrid({ days, events, onSlot, onClickEvent }: {
                 const resp = myResponse(ev);
                 const declined = resp === 'declined';
                 const tentative = resp === 'tentative' || resp === 'needsAction';
+                const cliente = matchCliente(ev.summary, matchItems);
                 return (
                   <div key={ev.id}
                     onClick={(evt) => { evt.stopPropagation(); onClickEvent(ev); }}
@@ -289,7 +332,19 @@ function SemanaGrid({ days, events, onSlot, onClickEvent }: {
                       'bg-primary/20 text-foreground border-primary/40 hover:bg-primary/30'
                     }`}>
                     <div className="font-medium truncate leading-tight">{ev.summary}</div>
-                    <div className="opacity-70 leading-tight">{format(s, 'HH:mm')}</div>
+                    <div className="opacity-70 leading-tight flex items-center gap-1">
+                      <span>{format(s, 'HH:mm')}</span>
+                      {cliente && (
+                        <Link
+                          to={`/clientes/${cliente.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-0.5 rounded bg-primary/30 px-1 text-[9px] font-medium text-primary-foreground hover:bg-primary/50"
+                          title={`Cliente CUPOLA: ${cliente.nome}`}
+                        >
+                          <Briefcase className="h-2.5 w-2.5" /> Cliente
+                        </Link>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -330,8 +385,9 @@ function layoutDayEvents(evs: GCalEvent[]): Array<{ ev: GCalEvent; col: number; 
   return result.map(({ ev, col, cols }) => ({ ev, col, cols }));
 }
 
-function ListaEventos({ events, onEdit, onDelete, onRespond }: {
+function ListaEventos({ events, matchItems, onEdit, onDelete, onRespond }: {
   events: GCalEvent[];
+  matchItems?: { id: string; nome: string; needle: string }[];
   onEdit: (e: GCalEvent) => void;
   onDelete: (e: GCalEvent) => void;
   onRespond: (e: GCalEvent, r: 'accepted' | 'declined' | 'tentative') => void;
@@ -353,7 +409,7 @@ function ListaEventos({ events, onEdit, onDelete, onRespond }: {
           </h3>
           <div className="space-y-2">
             {evs.map((ev) => (
-              <EventoCard key={ev.id} event={ev} onEdit={onEdit} onDelete={onDelete} onRespond={onRespond} />
+              <EventoCard key={ev.id} event={ev} cliente={matchCliente(ev.summary, matchItems)} onEdit={onEdit} onDelete={onDelete} onRespond={onRespond} />
             ))}
           </div>
         </div>
@@ -362,8 +418,9 @@ function ListaEventos({ events, onEdit, onDelete, onRespond }: {
   );
 }
 
-function EventoCard({ event, onEdit, onDelete, onRespond }: {
+function EventoCard({ event, cliente, onEdit, onDelete, onRespond }: {
   event: GCalEvent;
+  cliente: ClienteMatch | null;
   onEdit: (e: GCalEvent) => void;
   onDelete: (e: GCalEvent) => void;
   onRespond: (e: GCalEvent, r: 'accepted' | 'declined' | 'tentative') => void;
@@ -380,6 +437,13 @@ function EventoCard({ event, onEdit, onDelete, onRespond }: {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <p className="font-medium text-foreground">{event.summary}</p>
+              {cliente && (
+                <Link to={`/clientes/${cliente.id}`} title={`Abrir ${cliente.nome}`}>
+                  <Badge className="bg-primary/20 text-primary border-primary/30 hover:bg-primary/30">
+                    <Briefcase className="h-3 w-3 mr-1" />Cliente CUPOLA
+                  </Badge>
+                </Link>
+              )}
               {resp === 'accepted' && <Badge className="bg-green-600/20 text-green-500 border-green-600/30"><Check className="h-3 w-3 mr-1" />Confirmado</Badge>}
               {resp === 'declined' && <Badge className="bg-red-600/20 text-red-500 border-red-600/30"><X className="h-3 w-3 mr-1" />Recusado</Badge>}
               {resp === 'tentative' && <Badge className="bg-yellow-600/20 text-yellow-500 border-yellow-600/30"><HelpCircle className="h-3 w-3 mr-1" />Talvez</Badge>}

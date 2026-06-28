@@ -21,7 +21,7 @@ export interface Projeto {
   tipo: 'normal' | 'renovacao';
   created_at: string;
   updated_at: string;
-  clientes?: { nome: string; cidade: string; uf: string };
+  clientes?: { nome: string; cidade: string; uf: string; atendimentos?: Array<{ proxima_reuniao: string | null }> };
   consultores?: { nome: string };
   contratos?: { tipo_consultoria_id: string | null; data_fim: string; remuneracao_mensal: number; remuneracao_total: number; prazo_meses: number; parcelas: number; tipo_vencimento: string } | null;
   _comentarios_count?: number;
@@ -32,6 +32,7 @@ export interface Projeto {
   _checklist_responsaveis?: Array<{ id: string; nome: string }>;
   _reunioes_count?: number;
   _tags?: Array<{ id: string; nome: string; cor: string }>;
+  _proxima_reuniao?: string | null;
 }
 
 export function useProjetosEtapas() {
@@ -57,7 +58,7 @@ export function useProjetos(consultorId?: string) {
         .from('projetos')
         .select(`
           *,
-          clientes(nome, cidade, uf),
+          clientes(nome, cidade, uf, atendimentos(proxima_reuniao)),
           consultores(nome),
           contratos(tipo_consultoria_id, data_fim, remuneracao_mensal, remuneracao_total, prazo_meses, parcelas, tipo_vencimento),
           projeto_tag_vinculo(tag_id, projeto_tags(id, nome, cor)),
@@ -108,6 +109,7 @@ export function useProjetos(consultorId?: string) {
           _checklist_soon: soon,
           _checklist_responsaveis: Array.from(respMap.values()),
           _comentarios_count: (p.projeto_comentarios ?? []).length,
+          _proxima_reuniao: p.clientes?.atendimentos?.[0]?.proxima_reuniao ?? null,
         };
       }) as Projeto[];
     },

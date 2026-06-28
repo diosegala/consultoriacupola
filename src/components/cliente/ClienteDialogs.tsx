@@ -1389,31 +1389,7 @@ export function OnboardingFormDialog({ open, onOpenChange, onboarding, clienteId
   );
 }
 
-export function AtendimentoFormDialog({ open, onOpenChange, atendimento, clienteId }: any) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-card border-border">
-        <DialogHeader>
-          <DialogTitle>Editar Atendimento</DialogTitle>
-        </DialogHeader>
-        <p className="text-muted-foreground">Formulário em desenvolvimento</p>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-export function RegistrarReuniaoDialog({ open, onOpenChange, atendimento, clienteId }: any) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-card border-border">
-        <DialogHeader>
-          <DialogTitle>Registrar Reunião</DialogTitle>
-        </DialogHeader>
-        <p className="text-muted-foreground">Formulário em desenvolvimento</p>
-      </DialogContent>
-    </Dialog>
-  );
-}
+export { AtendimentoFormDialog, RegistrarReuniaoDialog } from './AtendimentoDialogs';
 
 export function FerramentasFormDialog({ open, onOpenChange, ferramentas, clienteId }: any) {
   return (
