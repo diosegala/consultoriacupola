@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Calendar, ExternalLink, AlertTriangle } from 'lucide-react';
 import { useAtendimento, useCreateAtendimento } from '@/hooks/useAtendimentos';
-import { format, parseISO, isBefore, startOfDay } from 'date-fns';
+import { format, parseISO, isBefore, startOfDay, differenceInCalendarDays } from 'date-fns';
 import { AtendimentoFormDialog, RegistrarReuniaoDialog } from './ClienteDialogs';
 
 interface AtendimentoTabProps {
@@ -55,9 +55,35 @@ export function AtendimentoTab({ clienteId }: AtendimentoTabProps) {
   const hoje = startOfDay(new Date());
   const reuniaoAtrasada = atendimento.proxima_reuniao && 
     isBefore(parseISO(atendimento.proxima_reuniao), hoje);
+  const diasAtraso = atendimento.proxima_reuniao
+    ? differenceInCalendarDays(hoje, parseISO(atendimento.proxima_reuniao))
+    : 0;
+  const dessincronizado = diasAtraso > 3;
 
   return (
     <div className="space-y-6">
+      {dessincronizado && (
+        <div className="rounded-md border border-yellow-600/40 bg-yellow-500/10 p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5 shrink-0" />
+            <div className="flex-1 space-y-3">
+              <div>
+                <p className="text-sm font-medium text-foreground">
+                  Reunião prevista para {format(parseISO(atendimento.proxima_reuniao!), 'dd/MM/yyyy')} não foi registrada.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Registre a reunião realizada ou atualize a próxima data prevista.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" onClick={() => setShowReuniao(true)}>Registrar Reunião</Button>
+                <Button size="sm" variant="outline" onClick={() => setShowForm(true)}>Atualizar Data</Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Reuniões */}
       <Card className="bg-card border-border">
         <CardHeader className="flex flex-row items-center justify-between">
