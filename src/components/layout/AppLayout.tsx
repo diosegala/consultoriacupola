@@ -4,6 +4,7 @@ import { Sidebar } from './Sidebar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { OraculoFloatingChat } from '@/components/oraculo/OraculoFloatingChat';
 import { ErrorBoundary } from './ErrorBoundary';
+import { NotificationBell } from './NotificationBell';
 
 const RESTRICTED_FOR_CONSULTOR = ['/', '/clientes', '/contratos', '/consultores', '/configuracoes'];
 
@@ -43,6 +44,11 @@ export function AppLayout() {
     <div className="flex min-h-screen w-full bg-background">
       <Sidebar />
       <main className="flex-1 overflow-auto">
+        <div className="sticky top-0 z-30 flex justify-end px-6 pt-4 pointer-events-none">
+          <div className="pointer-events-auto">
+            <NotificationBell />
+          </div>
+        </div>
         <div className="p-6">
           <ErrorBoundary>
             <Outlet />
