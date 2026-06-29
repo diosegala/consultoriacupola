@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
 import { Sparkles, FileText, Target, ClipboardList, ArrowLeft, Check } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyConsultorId } from '@/hooks/useConsultorUser';
 import { useClientes } from '@/hooks/useClientes';
@@ -44,20 +45,58 @@ export default function Agentes() {
   const { data: myConsultorId, isLoading: loadingMe } = useMyConsultorId();
   const consultorFilter = isConsultor && myConsultorId ? { consultor_id: myConsultorId } : undefined;
   const { data: clientes, isLoading: loadingClientes } = useClientes(consultorFilter);
-  const [agente, setAgente] = useState<AgenteKey | null>(() => {
-    if (typeof window === 'undefined') return null;
-    return (localStorage.getItem('agentes.agente') as AgenteKey | null) || null;
-  });
-  const [clienteId, setClienteId] = useState<string | undefined>(() => {
-    if (typeof window === 'undefined') return undefined;
-    return localStorage.getItem('agentes.clienteId') || undefined;
-  });
+  const [searchParams, setSearchParams] = useSearchParams();
 
+  const VALID_AGENTES: AgenteKey[] = ['diagnostico', 'okrs', 'cliente_oculto'];
+  const urlAgente = searchParams.get('agente') as AgenteKey | null;
+  const urlCliente = searchParams.get('cliente') || undefined;
+  const agente: AgenteKey | null =
+    urlAgente && VALID_AGENTES.includes(urlAgente)
+      ? urlAgente
+      : (typeof window !== 'undefined'
+          ? (localStorage.getItem('agentes.agente') as AgenteKey | null)
+          : null) || null;
+  const clienteId: string | undefined =
+    urlCliente ||
+    (typeof window !== 'undefined'
+      ? localStorage.getItem('agentes.clienteId') || undefined
+      : undefined);
+
+  const updateParams = (next: { agente?: AgenteKey | null; cliente?: string | null }) => {
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        if ('agente' in next) {
+          if (next.agente) params.set('agente', next.agente);
+          else params.delete('agente');
+        }
+        if ('cliente' in next) {
+          if (next.cliente) params.set('cliente', next.cliente);
+          else params.delete('cliente');
+        }
+        return params;
+      },
+      { replace: true },
+    );
+  };
+
+  const setAgente = (next: AgenteKey | null) => updateParams({ agente: next });
+  const setClienteId = (next: string | undefined) => updateParams({ cliente: next ?? null });
+
+  // Sincroniza URL com valores hidratados do localStorage no primeiro mount
+  useEffect(() => {
+    const patch: { agente?: AgenteKey | null; cliente?: string | null } = {};
+    if (!urlAgente && agente) patch.agente = agente;
+    if (!urlCliente && clienteId) patch.cliente = clienteId;
+    if (Object.keys(patch).length) updateParams(patch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persiste no localStorage como fallback
   useEffect(() => {
     if (agente) localStorage.setItem('agentes.agente', agente);
     else localStorage.removeItem('agentes.agente');
   }, [agente]);
-
   useEffect(() => {
     if (clienteId) localStorage.setItem('agentes.clienteId', clienteId);
     else localStorage.removeItem('agentes.clienteId');
