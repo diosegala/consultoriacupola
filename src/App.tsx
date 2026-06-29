@@ -28,6 +28,7 @@ import QuestionarioPublico from "./pages/QuestionarioPublico";
 import Agenda from "./pages/Agenda";
 import Oraculo from "./pages/Oraculo";
 import OraculoBase from "./pages/OraculoBase";
+import OraculoAdmin from "./pages/OraculoAdmin";
 import MeuPainel from "./pages/MeuPainel";
 import Agentes from "./pages/Agentes";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
@@ -63,6 +64,7 @@ const App = () => (
               <Route path="/agenda" element={<Agenda />} />
               <Route path="/oraculo" element={<Oraculo />} />
               <Route path="/oraculo/base" element={<OraculoBase />} />
+              <Route path="/oraculo/admin" element={<OraculoAdmin />} />
               <Route path="/meu-painel" element={<MeuPainel />} />
               <Route path="/agentes" element={<Agentes />} />
               <Route path="/integracoes" element={<MinhasIntegracoes />} />

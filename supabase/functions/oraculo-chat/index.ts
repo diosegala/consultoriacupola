@@ -319,6 +319,11 @@ Deno.serve(async (req) => {
             await service.from("oraculo_mensagens").insert({
               conversa_id: conversaId, role: "assistant", content: assistantFull,
             });
+          } else {
+            // Resposta vazia do modelo — sinaliza ao cliente para evitar bolha em branco silenciosa
+            controller.enqueue(
+              encoder.encode(`event: erro\ndata: ${JSON.stringify({ error: "O Oráculo não retornou resposta. Tente novamente." })}\n\n`)
+            );
           }
           controller.close();
         }
