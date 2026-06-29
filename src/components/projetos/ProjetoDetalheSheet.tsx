@@ -863,9 +863,9 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
                     gerarDocumento.mutate(
                       { tipo: agentDialog.tipo, projeto_id: projeto.id, contexto_usuario: contextoFinal || undefined },
                       {
-                        onSuccess: (conteudo) => {
+                        onSuccess: (res) => {
                           setAgentDialog(null);
-                          setViewingDoc({ tipo: agentDialog.label, conteudo });
+                          setViewingDoc({ tipo: agentDialog.label, conteudo: res.conteudo });
                           toast.success(`${agentDialog.label} gerado com sucesso!`);
                         },
                       }
