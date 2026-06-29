@@ -15,13 +15,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Loader2, ArrowLeft, FileText, Users, Calendar, Pencil, Trash2, BarChart3, Video, CalendarPlus, LineChart } from 'lucide-react';
+import { Loader2, ArrowLeft, FileText, Users, Calendar, Pencil, Trash2, BarChart3, Video, CalendarPlus, LineChart, Sparkles } from 'lucide-react';
 import { useCliente, useDeleteCliente } from '@/hooks/useClientes';
 import { ContratoTab } from '@/components/cliente/ContratoTab';
 import { OnboardingTab } from '@/components/cliente/OnboardingTab';
 import { AtendimentoTab } from '@/components/cliente/AtendimentoTab';
 import { DesempenhoClienteTab } from '@/components/cliente/DesempenhoClienteTab';
 import { ReunioesClienteTab } from '@/components/cliente/ReunioesClienteTab';
+import { AgentesTab } from '@/components/cliente/AgentesTab';
 import { MinhaPerformanceTab } from '@/components/consultor/MinhaPerformanceTab';
 import { ClienteFormDialog } from '@/components/cliente/ClienteFormDialog';
 import { useAuth } from '@/contexts/AuthContext';
@@ -36,6 +37,12 @@ export default function ClienteDetalhe() {
   const { data: myConsultorId } = useMyConsultorId();
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Aba ativa pode vir da URL (?tab=agentes), usada quando navegamos do ProjetoDetalheSheet
+  const initialTab =
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('tab') || 'contrato'
+      : 'contrato';
   
   const deleteCliente = useDeleteCliente();
 
@@ -124,7 +131,7 @@ export default function ClienteDetalhe() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="contrato" className="w-full">
+      <Tabs defaultValue={initialTab} className="w-full">
         <TabsList className="bg-secondary">
           <TabsTrigger value="contrato" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
@@ -141,6 +148,10 @@ export default function ClienteDetalhe() {
           <TabsTrigger value="reunioes" className="flex items-center gap-2">
             <Video className="h-4 w-4" />
             Reuniões
+          </TabsTrigger>
+          <TabsTrigger value="agentes" className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4" />
+            Agentes IA
           </TabsTrigger>
           <TabsTrigger value="desempenho" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
@@ -168,6 +179,10 @@ export default function ClienteDetalhe() {
 
         <TabsContent value="reunioes" className="mt-6">
           <ReunioesClienteTab clienteId={cliente.id} />
+        </TabsContent>
+
+        <TabsContent value="agentes" className="mt-6">
+          <AgentesTab clienteId={cliente.id} />
         </TabsContent>
 
         <TabsContent value="desempenho" className="mt-6">

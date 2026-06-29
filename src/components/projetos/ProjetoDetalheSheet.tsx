@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -47,6 +48,7 @@ interface UploadedFile {
 
 export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, onRegistrarReuniao }: ProjetoDetalheSheetProps) {
   const { user, isAdmin } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [showRenovar, setShowRenovar] = useState(false);
   const [novoComentario, setNovoComentario] = useState('');
@@ -612,62 +614,21 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
                 <h4 className="text-sm font-medium mb-2 flex items-center gap-1">
                   <Sparkles className="h-4 w-4" /> Agentes IA
                 </h4>
-                <div className="space-y-2">
-                  {[
-                    { tipo: 'diagnostico', label: 'Diagnóstico', icon: FileText, placeholder: 'Cole aqui suas anotações da imersão, transcrições de reuniões, observações sobre o cliente, dados relevantes...' },
-                    { tipo: 'okrs', label: 'OKRs', icon: Target, placeholder: 'Cole aqui o diagnóstico, anotações de reuniões, metas discutidas com o cliente, contexto estratégico...' },
-                    { tipo: 'briefing_cliente_oculto', label: 'Briefing Cliente Oculto', icon: ClipboardList, placeholder: 'Cole aqui informações sobre o estabelecimento, tipo de atendimento, pontos críticos observados na imersão...' },
-                  ].map(agent => {
-                    const isLoading = gerarDocumento.isPending && gerarDocumento.variables?.tipo === agent.tipo;
-                    const existingDoc = documentos?.find(d => d.tipo === agent.tipo);
-                    const versoesAnteriores = documentos?.filter(d => d.tipo === agent.tipo).length ?? 0;
-                    return (
-                      <div key={agent.tipo} className="space-y-1">
-                        <div className="flex gap-1">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-xs flex-1 justify-start"
-                            disabled={gerarDocumento.isPending}
-                            onClick={() => {
-                              setContextoUsuario('');
-                              setUploadedFiles([]);
-                              setGdriveUrl('');
-                              setAgentDialog({ tipo: agent.tipo, label: agent.label });
-                            }}
-                          >
-                            {isLoading ? (
-                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                            ) : (
-                              <agent.icon className="h-3 w-3 mr-1" />
-                            )}
-                            {isLoading ? 'Gerando...' : `Gerar ${agent.label}`}
-                          </Button>
-                          {versoesAnteriores > 0 && (
-                            <Badge variant="secondary" className="h-7 text-[10px] px-1.5 self-center">
-                              {versoesAnteriores} {versoesAnteriores === 1 ? 'versão anterior' : 'versões anteriores'}
-                            </Badge>
-                          )}
-                          {existingDoc && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 w-7 p-0"
-                              onClick={() => setViewingDoc({ tipo: agent.label, conteudo: existingDoc.conteudo })}
-                            >
-                              <Eye className="h-3 w-3" />
-                            </Button>
-                          )}
-                        </div>
-                        {existingDoc && (
-                          <p className="text-[10px] text-muted-foreground pl-1">
-                            Último: {format(new Date(existingDoc.created_at), 'dd/MM/yy HH:mm')}
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Os agentes de IA agora vivem na página do cliente, com acesso a questionário, transcrições e anotações.
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 text-xs"
+                  onClick={() => {
+                    if (!projeto?.cliente_id) return;
+                    onOpenChange(false);
+                    navigate(`/clientes/${projeto.cliente_id}?tab=agentes`);
+                  }}
+                >
+                  <Sparkles className="h-3 w-3 mr-1" /> Ir para Agentes IA
+                </Button>
               </div>
             </div>
           </div>
@@ -863,9 +824,9 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
                     gerarDocumento.mutate(
                       { tipo: agentDialog.tipo, projeto_id: projeto.id, contexto_usuario: contextoFinal || undefined },
                       {
-                        onSuccess: (conteudo) => {
+                        onSuccess: (res) => {
                           setAgentDialog(null);
-                          setViewingDoc({ tipo: agentDialog.label, conteudo });
+                          setViewingDoc({ tipo: agentDialog.label, conteudo: res.conteudo });
                           toast.success(`${agentDialog.label} gerado com sucesso!`);
                         },
                       }

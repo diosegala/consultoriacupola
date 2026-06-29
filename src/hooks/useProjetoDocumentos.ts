@@ -4,9 +4,11 @@ import { toast } from 'sonner';
 
 export interface ProjetoDocumento {
   id: string;
-  projeto_id: string;
+  projeto_id: string | null;
+  cliente_id: string | null;
   tipo: string;
   conteudo: string;
+  gdoc_url: string | null;
   created_by: string | null;
   created_at: string;
 }
@@ -20,6 +22,26 @@ export function useProjetoDocumentos(projetoId: string | undefined) {
         .from('projeto_documentos' as any)
         .select('*')
         .eq('projeto_id', projetoId!)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data as unknown as ProjetoDocumento[];
+    },
+  });
+}
+
+/**
+ * Busca documentos vinculados diretamente ao cliente (aba Agentes em ClienteDetalhe).
+ * Não inclui documentos vinculados via projeto — use `useDocumentosCliente` para consolidado.
+ */
+export function useClienteDocumentos(clienteId: string | undefined) {
+  return useQuery({
+    queryKey: ['cliente_documentos', clienteId],
+    enabled: !!clienteId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('projeto_documentos' as any)
+        .select('*')
+        .eq('cliente_id', clienteId!)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data as unknown as ProjetoDocumento[];
@@ -46,9 +68,20 @@ export function useParseDocumento() {
 export function useGerarDocumento() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ tipo, projeto_id, contexto_usuario }: { tipo: string; projeto_id: string; contexto_usuario?: string }) => {
+    mutationFn: async (params: {
+      tipo: string;
+      projeto_id?: string;
+      cliente_id?: string;
+      contexto_usuario?: string;
+      transcricoes_textos?: Array<{ label?: string; conteudo: string }>;
+      questionario_data?: Record<string, unknown> | null;
+      anotacoes_consultor?: string;
+      trimestre?: string;
+      canais_atendimento?: string[];
+      titulo_doc?: string;
+    }) => {
       const { data, error } = await supabase.functions.invoke('agente-projeto', {
-        body: { tipo, projeto_id, contexto_usuario },
+        body: params,
       });
 
       if (error) {
@@ -66,10 +99,15 @@ export function useGerarDocumento() {
       }
 
       if (data?.error) throw new Error(data.error);
-      return data.conteudo as string;
+      return data as { conteudo: string; gdoc_url: string | null };
     },
     onSuccess: (_, vars) => {
-      queryClient.invalidateQueries({ queryKey: ['projeto_documentos', vars.projeto_id] });
+      if (vars.projeto_id) {
+        queryClient.invalidateQueries({ queryKey: ['projeto_documentos', vars.projeto_id] });
+      }
+      if (vars.cliente_id) {
+        queryClient.invalidateQueries({ queryKey: ['cliente_documentos', vars.cliente_id] });
+      }
     },
     onError: (err: Error) => {
       toast.error(`Erro ao gerar documento: ${err.message}`);
