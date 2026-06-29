@@ -1,0 +1,2 @@
+ALTER TABLE public.agentes_ia_rascunhos
+DROP CONSTRAINT IF EXISTS agentes_ia_rascunhos_user_id_fkey;
