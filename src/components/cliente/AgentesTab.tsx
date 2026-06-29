@@ -10,7 +10,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Sparkles, FileText, Target, ClipboardList, ClipboardCheck, Upload, Link as LinkIcon,
-  Trash2, Loader2, ExternalLink, Eye, RefreshCw, ChevronDown, ChevronUp, FileType, FileAudio,
+  Trash2, Loader2, ExternalLink, Eye, ChevronDown, ChevronUp, FileType, FileAudio,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -22,7 +22,6 @@ import {
   useParseDocumento,
   useAgenteRascunho,
   useSalvarAgenteRascunho,
-  useLimparAgenteRascunho,
   type ProjetoDocumento,
 } from '@/hooks/useProjetoDocumentos';
 
@@ -87,7 +86,6 @@ export function AgentesTab({ clienteId }: Props) {
   const { data: documentos } = useClienteDocumentos(clienteId);
   const { data: rascunho, isLoading: loadingRascunho } = useAgenteRascunho<AgentesDraftState>(clienteId);
   const salvarRascunho = useSalvarAgenteRascunho();
-  const limparRascunho = useLimparAgenteRascunho();
   const gerar = useGerarDocumento();
   const parse = useParseDocumento();
   const draftHydratedRef = useRef(false);
