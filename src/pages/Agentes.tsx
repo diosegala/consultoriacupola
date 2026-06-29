@@ -1,28 +1,63 @@
 import { useMemo, useState } from 'react';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, FileText, Target, ClipboardList, ArrowLeft, Check } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyConsultorId } from '@/hooks/useConsultorUser';
 import { useClientes } from '@/hooks/useClientes';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { AgentesTab } from '@/components/cliente/AgentesTab';
+
+type AgenteKey = 'diagnostico' | 'okrs' | 'cliente_oculto';
+
+const AGENTES: Array<{
+  key: AgenteKey;
+  titulo: string;
+  descricao: string;
+  icon: typeof FileText;
+}> = [
+  {
+    key: 'diagnostico',
+    titulo: 'Diagnóstico',
+    descricao: 'Consolida questionário, transcrições e anotações em um diagnóstico estratégico.',
+    icon: FileText,
+  },
+  {
+    key: 'okrs',
+    titulo: 'OKRs',
+    descricao: 'Gera objetivos e key results trimestrais a partir do diagnóstico.',
+    icon: Target,
+  },
+  {
+    key: 'cliente_oculto',
+    titulo: 'Cliente Oculto',
+    descricao: 'Cria briefing de avaliação de canais e personas para cliente oculto.',
+    icon: ClipboardList,
+  },
+];
 
 export default function Agentes() {
   const { isConsultor } = useAuth();
   const { data: myConsultorId, isLoading: loadingMe } = useMyConsultorId();
   const consultorFilter = isConsultor && myConsultorId ? { consultor_id: myConsultorId } : undefined;
   const { data: clientes, isLoading: loadingClientes } = useClientes(consultorFilter);
+  const [agente, setAgente] = useState<AgenteKey | null>(null);
   const [clienteId, setClienteId] = useState<string | undefined>(undefined);
 
+  // Remove clientes inativos (encerrados) da lista
   const ordenados = useMemo(
-    () => [...(clientes ?? [])].sort((a, b) => a.nome.localeCompare(b.nome)),
+    () =>
+      [...(clientes ?? [])]
+        .filter((c) => c.status !== 'encerrado')
+        .sort((a, b) => a.nome.localeCompare(b.nome)),
     [clientes],
   );
 
   const isLoading = loadingClientes || (isConsultor && loadingMe);
+  const agenteAtivo = AGENTES.find((a) => a.key === agente);
 
   return (
     <div className="space-y-6">
@@ -33,47 +68,97 @@ export default function Agentes() {
         <div>
           <h1 className="text-2xl font-bold">Agentes de IA</h1>
           <p className="text-sm text-muted-foreground">
-            Selecione um cliente para gerar Diagnóstico, OKRs e Briefing de Cliente Oculto.
+            {agente
+              ? 'Escolha o cliente que servirá de contexto para o agente.'
+              : 'Escolha qual agente deseja utilizar.'}
           </p>
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Cliente</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <Skeleton className="h-10 w-full max-w-md" />
-          ) : ordenados.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Nenhum cliente disponível.
-            </p>
-          ) : (
-            <Select value={clienteId} onValueChange={setClienteId}>
-              <SelectTrigger className="w-full max-w-md">
-                <SelectValue placeholder="Selecione um cliente…" />
-              </SelectTrigger>
-              <SelectContent>
-                {ordenados.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </CardContent>
-      </Card>
-
-      {clienteId ? (
-        <AgentesTab clienteId={clienteId} />
+      {!agente ? (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {AGENTES.map((a) => {
+            const Icon = a.icon;
+            return (
+              <button
+                key={a.key}
+                type="button"
+                onClick={() => setAgente(a.key)}
+                className="text-left rounded-lg border border-border bg-card p-5 hover:border-primary hover:bg-muted/40 transition-colors"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <Icon className="h-5 w-5 text-primary" />
+                  <h2 className="font-semibold">{a.titulo}</h2>
+                </div>
+                <p className="text-sm text-muted-foreground">{a.descricao}</p>
+              </button>
+            );
+          })}
+        </div>
       ) : (
-        <Card>
-          <CardContent className="py-12 text-center text-sm text-muted-foreground">
-            Selecione um cliente acima para começar.
-          </CardContent>
-        </Card>
+        <>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <div className="flex items-center gap-2">
+                {agenteAtivo && <agenteAtivo.icon className="h-4 w-4 text-primary" />}
+                <CardTitle className="text-base">
+                  Agente: {agenteAtivo?.titulo}
+                </CardTitle>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setAgente(null);
+                  setClienteId(undefined);
+                }}
+              >
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Trocar agente
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <label className="text-sm font-medium">Cliente</label>
+              {isLoading ? (
+                <Skeleton className="h-10 w-full max-w-md" />
+              ) : ordenados.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Nenhum cliente ativo disponível.
+                </p>
+              ) : (
+                <Select value={clienteId} onValueChange={setClienteId}>
+                  <SelectTrigger className="w-full max-w-md">
+                    <SelectValue placeholder="Selecione um cliente…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ordenados.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {clienteId && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1 pt-1">
+                  <Check className="h-3 w-3 text-emerald-500" />
+                  Contexto do cliente carregado abaixo. Role até o painel{' '}
+                  <strong>{agenteAtivo?.titulo}</strong> para gerar.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {clienteId ? (
+            <AgentesTab clienteId={clienteId} />
+          ) : (
+            <Card>
+              <CardContent className="py-12 text-center text-sm text-muted-foreground">
+                Selecione um cliente acima para começar.
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
     </div>
   );
