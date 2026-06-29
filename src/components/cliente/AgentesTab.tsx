@@ -20,6 +20,9 @@ import {
   useClienteDocumentos,
   useGerarDocumento,
   useParseDocumento,
+  useAgenteRascunho,
+  useSalvarAgenteRascunho,
+  useLimparAgenteRascunho,
   type ProjetoDocumento,
 } from '@/hooks/useProjetoDocumentos';
 
@@ -35,6 +38,19 @@ interface Fonte {
   conteudo?: string;
   meta?: string; // nome de arquivo ou url
   errorMsg?: string;
+}
+
+interface AgentesDraftState {
+  fontes?: Fonte[];
+  gdriveUrl?: string;
+  textoColado?: string;
+  textoLabel?: string;
+  anotacoes?: string;
+  okrContexto?: string;
+  okrTrimestre?: string;
+  coCanais?: string[];
+  coPersonas?: 1 | 2;
+  coObservacoes?: string;
 }
 
 const TRIMESTRES = (() => {
@@ -58,8 +74,13 @@ function fileIcon(name: string) {
 export function AgentesTab({ clienteId }: Props) {
   const { data: questionario } = useQuestionarioCliente(clienteId);
   const { data: documentos } = useClienteDocumentos(clienteId);
+  const { data: rascunho, isLoading: loadingRascunho } = useAgenteRascunho<AgentesDraftState>(clienteId);
+  const salvarRascunho = useSalvarAgenteRascunho();
+  const limparRascunho = useLimparAgenteRascunho();
   const gerar = useGerarDocumento();
   const parse = useParseDocumento();
+  const draftHydratedRef = useRef(false);
+  const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Estado das fontes do Diagnóstico
   const [fontes, setFontes] = useState<Fonte[]>([]);
@@ -91,6 +112,66 @@ export function AgentesTab({ clienteId }: Props) {
   // Visualização
   const [viewingDoc, setViewingDoc] = useState<ProjetoDocumento | null>(null);
   const [expandedHistory, setExpandedHistory] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    draftHydratedRef.current = false;
+    setFontes([]);
+    setGdriveUrl('');
+    setTextoColado('');
+    setTextoLabel('');
+    setAnotacoes('');
+    setOkrContexto('');
+    setOkrTrimestre(TRIMESTRES[0]);
+    setCoCanais([]);
+    setCoPersonas(1);
+    setCoObservacoes('');
+  }, [clienteId]);
+
+  useEffect(() => {
+    if (loadingRascunho || draftHydratedRef.current) return;
+
+    const estado = rascunho?.estado;
+    if (estado) {
+      setFontes(Array.isArray(estado.fontes) ? estado.fontes : []);
+      setGdriveUrl(estado.gdriveUrl ?? '');
+      setTextoColado(estado.textoColado ?? '');
+      setTextoLabel(estado.textoLabel ?? '');
+      setAnotacoes(estado.anotacoes ?? '');
+      setOkrContexto(estado.okrContexto ?? '');
+      setOkrTrimestre(estado.okrTrimestre ?? TRIMESTRES[0]);
+      setCoCanais(Array.isArray(estado.coCanais) ? estado.coCanais : []);
+      setCoPersonas(estado.coPersonas === 2 ? 2 : 1);
+      setCoObservacoes(estado.coObservacoes ?? '');
+    }
+
+    draftHydratedRef.current = true;
+  }, [loadingRascunho, rascunho]);
+
+  useEffect(() => {
+    if (!draftHydratedRef.current) return;
+    if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+
+    const estado: AgentesDraftState = {
+      fontes,
+      gdriveUrl,
+      textoColado,
+      textoLabel,
+      anotacoes,
+      okrContexto,
+      okrTrimestre,
+      coCanais,
+      coPersonas,
+      coObservacoes,
+    };
+
+    draftSaveTimerRef.current = setTimeout(() => {
+      salvarRascunho.mutate({ cliente_id: clienteId, estado: estado as Record<string, unknown> });
+    }, 700);
+
+    return () => {
+      if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+    };
+  }, [clienteId, fontes, gdriveUrl, textoColado, textoLabel, anotacoes, okrContexto, okrTrimestre, coCanais, coPersonas, coObservacoes]);
 
   const lastByTipo = useMemo(() => {
     const map = new Map<string, ProjetoDocumento>();
