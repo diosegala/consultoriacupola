@@ -46,21 +46,21 @@ export default function Agentes() {
   const { data: clientes, isLoading: loadingClientes } = useClientes(consultorFilter);
   const [agente, setAgente] = useState<AgenteKey | null>(() => {
     if (typeof window === 'undefined') return null;
-    return (sessionStorage.getItem('agentes.agente') as AgenteKey | null) || null;
+    return (localStorage.getItem('agentes.agente') as AgenteKey | null) || null;
   });
   const [clienteId, setClienteId] = useState<string | undefined>(() => {
     if (typeof window === 'undefined') return undefined;
-    return sessionStorage.getItem('agentes.clienteId') || undefined;
+    return localStorage.getItem('agentes.clienteId') || undefined;
   });
 
   useEffect(() => {
-    if (agente) sessionStorage.setItem('agentes.agente', agente);
-    else sessionStorage.removeItem('agentes.agente');
+    if (agente) localStorage.setItem('agentes.agente', agente);
+    else localStorage.removeItem('agentes.agente');
   }, [agente]);
 
   useEffect(() => {
-    if (clienteId) sessionStorage.setItem('agentes.clienteId', clienteId);
-    else sessionStorage.removeItem('agentes.clienteId');
+    if (clienteId) localStorage.setItem('agentes.clienteId', clienteId);
+    else localStorage.removeItem('agentes.clienteId');
   }, [clienteId]);
 
   // Remove clientes inativos (encerrados) da lista
