@@ -92,6 +92,18 @@ export function useOraculoChat(initialMessages: OraculoMsg[] = [], initialConver
                 nextEventName = null;
                 continue;
               }
+              if (nextEventName === "erro" && json.error) {
+                setError(json.error);
+                setMessages((prev) => {
+                  const copy = [...prev];
+                  if (copy.length && copy[copy.length - 1].role === "assistant" && !copy[copy.length - 1].content) {
+                    copy.pop();
+                  }
+                  return copy;
+                });
+                nextEventName = null;
+                continue;
+              }
               if (nextEventName === "meta" && typeof json.usou_rag === "boolean") {
                 usouRag = json.usou_rag;
                 setMessages((prev) => {
