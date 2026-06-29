@@ -85,9 +85,9 @@ export function AgentesTab({ clienteId }: Props) {
   const { data: questionario } = useQuestionarioCliente(clienteId);
   const { data: documentos } = useClienteDocumentos(clienteId);
   const { data: rascunho, isLoading: loadingRascunho } = useAgenteRascunho<AgentesDraftState>(clienteId);
-  const salvarRascunho = useSalvarAgenteRascunho();
+  const { mutate: salvarRascunho } = useSalvarAgenteRascunho();
   const gerar = useGerarDocumento();
-  const parse = useParseDocumento();
+  const { mutateAsync: parseDocumento } = useParseDocumento();
   const draftHydratedRef = useRef(false);
   const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reparsingDraftIdsRef = useRef<Set<string>>(new Set());
@@ -184,13 +184,13 @@ export function AgentesTab({ clienteId }: Props) {
     localStorage.setItem(draftKey, JSON.stringify(estado));
 
     draftSaveTimerRef.current = setTimeout(() => {
-      salvarRascunho.mutate({ cliente_id: clienteId, estado: estado as Record<string, unknown> });
+      salvarRascunho({ cliente_id: clienteId, estado: estado as Record<string, unknown> });
     }, 700);
 
     return () => {
       if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
     };
-  }, [clienteId, draftKey, fontes, gdriveUrl, textoColado, textoLabel, anotacoes, okrContexto, okrTrimestre, coCanais, coPersonas, coObservacoes]);
+  }, [clienteId, draftKey, fontes, gdriveUrl, textoColado, textoLabel, anotacoes, okrContexto, okrTrimestre, coCanais, coPersonas, coObservacoes, salvarRascunho]);
 
   useEffect(() => {
     if (!draftHydratedRef.current) return;
@@ -201,7 +201,7 @@ export function AgentesTab({ clienteId }: Props) {
 
     pendentesDrive.forEach((fonte) => {
       reparsingDraftIdsRef.current.add(fonte.id);
-      parse.mutateAsync({ gdrive_url: fonte.meta })
+      parseDocumento({ gdrive_url: fonte.meta })
         .then((texto) => {
           setFontes((prev) =>
             prev.map((f) => (f.id === fonte.id ? { ...f, status: 'done', conteudo: texto } : f)),
@@ -213,7 +213,7 @@ export function AgentesTab({ clienteId }: Props) {
           );
         });
     });
-  }, [fontes, parse]);
+  }, [fontes, parseDocumento]);
 
   const lastByTipo = useMemo(() => {
     const map = new Map<string, ProjetoDocumento>();
@@ -251,7 +251,7 @@ export function AgentesTab({ clienteId }: Props) {
       try {
         const buffer = await file.arrayBuffer();
         const b64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
-        const texto = await parse.mutateAsync({
+        const texto = await parseDocumento({
           conteudo_base64: b64,
           nome_arquivo: file.name,
         });
@@ -276,7 +276,7 @@ export function AgentesTab({ clienteId }: Props) {
     }]);
     setGdriveUrl('');
     try {
-      const texto = await parse.mutateAsync({ gdrive_url: url });
+      const texto = await parseDocumento({ gdrive_url: url });
       setFontes((prev) =>
         prev.map((f) => (f.id === id ? { ...f, status: 'done', conteudo: texto } : f)),
       );
