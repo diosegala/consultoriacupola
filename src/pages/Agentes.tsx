@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Sparkles, FileText, Target, ClipboardList, ArrowLeft, Check } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyConsultorId } from '@/hooks/useConsultorUser';
@@ -44,8 +44,24 @@ export default function Agentes() {
   const { data: myConsultorId, isLoading: loadingMe } = useMyConsultorId();
   const consultorFilter = isConsultor && myConsultorId ? { consultor_id: myConsultorId } : undefined;
   const { data: clientes, isLoading: loadingClientes } = useClientes(consultorFilter);
-  const [agente, setAgente] = useState<AgenteKey | null>(null);
-  const [clienteId, setClienteId] = useState<string | undefined>(undefined);
+  const [agente, setAgente] = useState<AgenteKey | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return (sessionStorage.getItem('agentes.agente') as AgenteKey | null) || null;
+  });
+  const [clienteId, setClienteId] = useState<string | undefined>(() => {
+    if (typeof window === 'undefined') return undefined;
+    return sessionStorage.getItem('agentes.clienteId') || undefined;
+  });
+
+  useEffect(() => {
+    if (agente) sessionStorage.setItem('agentes.agente', agente);
+    else sessionStorage.removeItem('agentes.agente');
+  }, [agente]);
+
+  useEffect(() => {
+    if (clienteId) sessionStorage.setItem('agentes.clienteId', clienteId);
+    else sessionStorage.removeItem('agentes.clienteId');
+  }, [clienteId]);
 
   // Remove clientes inativos (encerrados) da lista
   const ordenados = useMemo(
