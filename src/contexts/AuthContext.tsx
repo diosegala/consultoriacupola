@@ -55,6 +55,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        // Ignore token refresh / window-focus revalidation events so we don't
+        // toggle roleLoading and remount the whole app (which would wipe
+        // in-page state like Agentes selection).
+        if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+          setSession(session);
+          setUser(session?.user ?? null);
+          return;
+        }
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
