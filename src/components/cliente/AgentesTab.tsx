@@ -51,6 +51,17 @@ interface AgentesDraftState {
   coCanais?: string[];
   coPersonas?: 1 | 2;
   coObservacoes?: string;
+  savedAt?: string;
+}
+
+function readLocalDraft(key: string): AgentesDraftState | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) as AgentesDraftState : null;
+  } catch {
+    return null;
+  }
 }
 
 const TRIMESTRES = (() => {
@@ -92,6 +103,7 @@ export function AgentesTab({ clienteId }: Props) {
 
   // Persistência local das anotações
   const anotKey = `anotacoes_diagnostico_${clienteId}`;
+  const draftKey = `agentes_ia_draft_${clienteId}`;
   useEffect(() => {
     const stored = localStorage.getItem(anotKey);
     if (stored) setAnotacoes(stored);
@@ -130,7 +142,11 @@ export function AgentesTab({ clienteId }: Props) {
   useEffect(() => {
     if (loadingRascunho || draftHydratedRef.current) return;
 
-    const estado = rascunho?.estado;
+    const localEstado = readLocalDraft(draftKey);
+    const backendEstado = rascunho?.estado;
+    const localTime = localEstado?.savedAt ? Date.parse(localEstado.savedAt) : 0;
+    const backendTime = rascunho?.updated_at ? Date.parse(rascunho.updated_at) : 0;
+    const estado = localTime >= backendTime ? localEstado : backendEstado;
     if (estado) {
       setFontes(Array.isArray(estado.fontes) ? estado.fontes : []);
       setGdriveUrl(estado.gdriveUrl ?? '');
@@ -145,7 +161,7 @@ export function AgentesTab({ clienteId }: Props) {
     }
 
     draftHydratedRef.current = true;
-  }, [loadingRascunho, rascunho]);
+  }, [draftKey, loadingRascunho, rascunho]);
 
   useEffect(() => {
     if (!draftHydratedRef.current) return;
@@ -162,7 +178,10 @@ export function AgentesTab({ clienteId }: Props) {
       coCanais,
       coPersonas,
       coObservacoes,
+      savedAt: new Date().toISOString(),
     };
+
+    localStorage.setItem(draftKey, JSON.stringify(estado));
 
     draftSaveTimerRef.current = setTimeout(() => {
       salvarRascunho.mutate({ cliente_id: clienteId, estado: estado as Record<string, unknown> });
@@ -171,7 +190,7 @@ export function AgentesTab({ clienteId }: Props) {
     return () => {
       if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
     };
-  }, [clienteId, fontes, gdriveUrl, textoColado, textoLabel, anotacoes, okrContexto, okrTrimestre, coCanais, coPersonas, coObservacoes]);
+  }, [clienteId, draftKey, fontes, gdriveUrl, textoColado, textoLabel, anotacoes, okrContexto, okrTrimestre, coCanais, coPersonas, coObservacoes]);
 
   const lastByTipo = useMemo(() => {
     const map = new Map<string, ProjetoDocumento>();
@@ -280,6 +299,8 @@ export function AgentesTab({ clienteId }: Props) {
       {
         onSuccess: () => {
           toast.success('Diagnóstico gerado.');
+          localStorage.removeItem(draftKey);
+          localStorage.removeItem(anotKey);
           limparRascunho.mutate(clienteId);
         },
       },
