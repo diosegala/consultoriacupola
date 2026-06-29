@@ -10,7 +10,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Sparkles, FileText, Target, ClipboardList, ClipboardCheck, Upload, Link as LinkIcon,
-  Trash2, Loader2, ExternalLink, Eye, RefreshCw, ChevronDown, ChevronUp, FileType, FileAudio,
+  Trash2, Loader2, ExternalLink, Eye, ChevronDown, ChevronUp, FileType, FileAudio,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -20,6 +20,8 @@ import {
   useClienteDocumentos,
   useGerarDocumento,
   useParseDocumento,
+  useAgenteRascunho,
+  useSalvarAgenteRascunho,
   type ProjetoDocumento,
 } from '@/hooks/useProjetoDocumentos';
 
@@ -35,6 +37,39 @@ interface Fonte {
   conteudo?: string;
   meta?: string; // nome de arquivo ou url
   errorMsg?: string;
+}
+
+interface AgentesDraftState {
+  fontes?: Fonte[];
+  gdriveUrl?: string;
+  textoColado?: string;
+  textoLabel?: string;
+  anotacoes?: string;
+  okrContexto?: string;
+  okrTrimestre?: string;
+  coCanais?: string[];
+  coPersonas?: 1 | 2;
+  coObservacoes?: string;
+  savedAt?: string;
+}
+
+function readLocalDraft(key: string): AgentesDraftState | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) as AgentesDraftState : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalDraft(key: string, estado: AgentesDraftState) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(key, JSON.stringify(estado));
+  } catch {
+    // O rascunho principal fica no backend; o localStorage é apenas contingência.
+  }
 }
 
 const TRIMESTRES = (() => {
@@ -58,8 +93,13 @@ function fileIcon(name: string) {
 export function AgentesTab({ clienteId }: Props) {
   const { data: questionario } = useQuestionarioCliente(clienteId);
   const { data: documentos } = useClienteDocumentos(clienteId);
+  const { data: rascunho, isLoading: loadingRascunho } = useAgenteRascunho<AgentesDraftState>(clienteId);
+  const { mutate: salvarRascunho } = useSalvarAgenteRascunho();
   const gerar = useGerarDocumento();
-  const parse = useParseDocumento();
+  const { mutateAsync: parseDocumento } = useParseDocumento();
+  const draftHydratedRef = useRef(false);
+  const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reparsingDraftIdsRef = useRef<Set<string>>(new Set());
 
   // Estado das fontes do Diagnóstico
   const [fontes, setFontes] = useState<Fonte[]>([]);
@@ -71,13 +111,7 @@ export function AgentesTab({ clienteId }: Props) {
 
   // Persistência local das anotações
   const anotKey = `anotacoes_diagnostico_${clienteId}`;
-  useEffect(() => {
-    const stored = localStorage.getItem(anotKey);
-    if (stored) setAnotacoes(stored);
-  }, [anotKey]);
-  useEffect(() => {
-    if (anotacoes) localStorage.setItem(anotKey, anotacoes);
-  }, [anotKey, anotacoes]);
+  const draftKey = `agentes_ia_draft_${clienteId}`;
 
   // OKRs
   const [okrContexto, setOkrContexto] = useState('');
@@ -91,6 +125,100 @@ export function AgentesTab({ clienteId }: Props) {
   // Visualização
   const [viewingDoc, setViewingDoc] = useState<ProjetoDocumento | null>(null);
   const [expandedHistory, setExpandedHistory] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    draftHydratedRef.current = false;
+    reparsingDraftIdsRef.current = new Set();
+    setFontes([]);
+    setGdriveUrl('');
+    setTextoColado('');
+    setTextoLabel('');
+    setAnotacoes('');
+    setOkrContexto('');
+    setOkrTrimestre(TRIMESTRES[0]);
+    setCoCanais([]);
+    setCoPersonas(1);
+    setCoObservacoes('');
+  }, [clienteId]);
+
+  useEffect(() => {
+    if (loadingRascunho || draftHydratedRef.current) return;
+
+    const localEstado = readLocalDraft(draftKey);
+    const backendEstado = rascunho?.estado;
+    const localTime = localEstado?.savedAt ? Date.parse(localEstado.savedAt) : 0;
+    const backendTime = rascunho?.updated_at ? Date.parse(rascunho.updated_at) : 0;
+    const estado = localTime >= backendTime ? localEstado : backendEstado;
+    if (estado) {
+      setFontes(Array.isArray(estado.fontes) ? estado.fontes : []);
+      setGdriveUrl(estado.gdriveUrl ?? '');
+      setTextoColado(estado.textoColado ?? '');
+      setTextoLabel(estado.textoLabel ?? '');
+      setAnotacoes(estado.anotacoes ?? '');
+      setOkrContexto(estado.okrContexto ?? '');
+      setOkrTrimestre(estado.okrTrimestre ?? TRIMESTRES[0]);
+      setCoCanais(Array.isArray(estado.coCanais) ? estado.coCanais : []);
+      setCoPersonas(estado.coPersonas === 2 ? 2 : 1);
+      setCoObservacoes(estado.coObservacoes ?? '');
+    } else {
+      const legacyAnotacoes = typeof window !== 'undefined' ? localStorage.getItem(anotKey) : null;
+      if (legacyAnotacoes) setAnotacoes(legacyAnotacoes);
+    }
+
+    draftHydratedRef.current = true;
+  }, [anotKey, draftKey, loadingRascunho, rascunho]);
+
+  useEffect(() => {
+    if (!draftHydratedRef.current) return;
+    if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+
+    const estado: AgentesDraftState = {
+      fontes,
+      gdriveUrl,
+      textoColado,
+      textoLabel,
+      anotacoes,
+      okrContexto,
+      okrTrimestre,
+      coCanais,
+      coPersonas,
+      coObservacoes,
+      savedAt: new Date().toISOString(),
+    };
+
+    writeLocalDraft(draftKey, estado);
+
+    draftSaveTimerRef.current = setTimeout(() => {
+      salvarRascunho({ cliente_id: clienteId, estado: estado as Record<string, unknown> });
+    }, 700);
+
+    return () => {
+      if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+    };
+  }, [clienteId, draftKey, fontes, gdriveUrl, textoColado, textoLabel, anotacoes, okrContexto, okrTrimestre, coCanais, coPersonas, coObservacoes, salvarRascunho]);
+
+  useEffect(() => {
+    if (!draftHydratedRef.current) return;
+
+    const pendentesDrive = fontes.filter(
+      (f) => f.origem === 'gdrive' && f.status === 'parsing' && f.meta && !reparsingDraftIdsRef.current.has(f.id),
+    );
+
+    pendentesDrive.forEach((fonte) => {
+      reparsingDraftIdsRef.current.add(fonte.id);
+      parseDocumento({ gdrive_url: fonte.meta })
+        .then((texto) => {
+          setFontes((prev) =>
+            prev.map((f) => (f.id === fonte.id ? { ...f, status: 'done', conteudo: texto } : f)),
+          );
+        })
+        .catch((e: Error) => {
+          setFontes((prev) =>
+            prev.map((f) => (f.id === fonte.id ? { ...f, status: 'error', errorMsg: e.message } : f)),
+          );
+        });
+    });
+  }, [fontes, parseDocumento]);
 
   const lastByTipo = useMemo(() => {
     const map = new Map<string, ProjetoDocumento>();
@@ -128,7 +256,7 @@ export function AgentesTab({ clienteId }: Props) {
       try {
         const buffer = await file.arrayBuffer();
         const b64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
-        const texto = await parse.mutateAsync({
+        const texto = await parseDocumento({
           conteudo_base64: b64,
           nome_arquivo: file.name,
         });
@@ -153,7 +281,7 @@ export function AgentesTab({ clienteId }: Props) {
     }]);
     setGdriveUrl('');
     try {
-      const texto = await parse.mutateAsync({ gdrive_url: url });
+      const texto = await parseDocumento({ gdrive_url: url });
       setFontes((prev) =>
         prev.map((f) => (f.id === id ? { ...f, status: 'done', conteudo: texto } : f)),
       );

@@ -114,3 +114,70 @@ export function useGerarDocumento() {
     },
   });
 }
+
+export interface AgenteRascunhoRecord<T = Record<string, unknown>> {
+  id: string;
+  cliente_id: string;
+  estado: T;
+  updated_at: string;
+}
+
+export function useAgenteRascunho<T = Record<string, unknown>>(clienteId: string | undefined) {
+  return useQuery({
+    queryKey: ['agentes_ia_rascunho', clienteId],
+    enabled: !!clienteId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('agentes_ia_rascunhos' as any)
+        .select('id, cliente_id, estado, updated_at')
+        .eq('cliente_id', clienteId!)
+        .maybeSingle();
+      if (error) throw error;
+      return data as unknown as AgenteRascunhoRecord<T> | null;
+    },
+  });
+}
+
+export function useSalvarAgenteRascunho() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { cliente_id: string; estado: Record<string, unknown> }) => {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData.user) throw new Error('Sessão não encontrada para salvar rascunho');
+
+      const { data, error } = await supabase
+        .from('agentes_ia_rascunhos' as any)
+        .upsert(
+          {
+            user_id: userData.user.id,
+            cliente_id: params.cliente_id,
+            estado: params.estado,
+          },
+          { onConflict: 'user_id,cliente_id' },
+        )
+        .select('id, cliente_id, estado, updated_at')
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['agentes_ia_rascunho', vars.cliente_id] });
+    },
+  });
+}
+
+export function useLimparAgenteRascunho() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (clienteId: string) => {
+      const { error } = await supabase
+        .from('agentes_ia_rascunhos' as any)
+        .delete()
+        .eq('cliente_id', clienteId);
+      if (error) throw error;
+    },
+    onSuccess: (_, clienteId) => {
+      queryClient.invalidateQueries({ queryKey: ['agentes_ia_rascunho', clienteId] });
+    },
+  });
+}

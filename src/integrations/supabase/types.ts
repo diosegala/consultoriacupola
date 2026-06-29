@@ -41,6 +41,41 @@ export type Database = {
         }
         Relationships: []
       }
+      agentes_ia_rascunhos: {
+        Row: {
+          cliente_id: string
+          created_at: string
+          estado: Json
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cliente_id: string
+          created_at?: string
+          estado?: Json
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          cliente_id?: string
+          created_at?: string
+          estado?: Json
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agentes_ia_rascunhos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       atendimentos: {
         Row: {
           cliente_id: string
