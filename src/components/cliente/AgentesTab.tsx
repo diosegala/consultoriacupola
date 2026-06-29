@@ -92,6 +92,7 @@ export function AgentesTab({ clienteId }: Props) {
   const parse = useParseDocumento();
   const draftHydratedRef = useRef(false);
   const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reparsingDraftIdsRef = useRef<Set<string>>(new Set());
 
   // Estado das fontes do Diagnóstico
   const [fontes, setFontes] = useState<Fonte[]>([]);
@@ -127,6 +128,7 @@ export function AgentesTab({ clienteId }: Props) {
 
   useEffect(() => {
     draftHydratedRef.current = false;
+    reparsingDraftIdsRef.current = new Set();
     setFontes([]);
     setGdriveUrl('');
     setTextoColado('');
@@ -191,6 +193,29 @@ export function AgentesTab({ clienteId }: Props) {
       if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
     };
   }, [clienteId, draftKey, fontes, gdriveUrl, textoColado, textoLabel, anotacoes, okrContexto, okrTrimestre, coCanais, coPersonas, coObservacoes]);
+
+  useEffect(() => {
+    if (!draftHydratedRef.current) return;
+
+    const pendentesDrive = fontes.filter(
+      (f) => f.origem === 'gdrive' && f.status === 'parsing' && f.meta && !reparsingDraftIdsRef.current.has(f.id),
+    );
+
+    pendentesDrive.forEach((fonte) => {
+      reparsingDraftIdsRef.current.add(fonte.id);
+      parse.mutateAsync({ gdrive_url: fonte.meta })
+        .then((texto) => {
+          setFontes((prev) =>
+            prev.map((f) => (f.id === fonte.id ? { ...f, status: 'done', conteudo: texto } : f)),
+          );
+        })
+        .catch((e: Error) => {
+          setFontes((prev) =>
+            prev.map((f) => (f.id === fonte.id ? { ...f, status: 'error', errorMsg: e.message } : f)),
+          );
+        });
+    });
+  }, [fontes, parse]);
 
   const lastByTipo = useMemo(() => {
     const map = new Map<string, ProjetoDocumento>();
@@ -299,9 +324,6 @@ export function AgentesTab({ clienteId }: Props) {
       {
         onSuccess: () => {
           toast.success('Diagnóstico gerado.');
-          localStorage.removeItem(draftKey);
-          localStorage.removeItem(anotKey);
-          limparRascunho.mutate(clienteId);
         },
       },
     );
