@@ -566,6 +566,48 @@ export type Database = {
           },
         ]
       }
+      notificacoes: {
+        Row: {
+          created_at: string
+          descricao: string | null
+          entidade_id: string | null
+          entidade_tipo: string | null
+          id: string
+          lida: boolean
+          lida_em: string | null
+          link: string | null
+          tipo: string
+          titulo: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          descricao?: string | null
+          entidade_id?: string | null
+          entidade_tipo?: string | null
+          id?: string
+          lida?: boolean
+          lida_em?: string | null
+          link?: string | null
+          tipo: string
+          titulo: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          descricao?: string | null
+          entidade_id?: string | null
+          entidade_tipo?: string | null
+          id?: string
+          lida?: boolean
+          lida_em?: string | null
+          link?: string | null
+          tipo?: string
+          titulo?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       notion_documents: {
         Row: {
           content: string | null
@@ -1565,7 +1607,12 @@ export type Database = {
         }[]
       }
       criar_cards_renovacao: { Args: never; Returns: number }
+      gerar_notificacoes_contratos_vencendo: { Args: never; Returns: number }
       get_consultor_id_for_user: { Args: { _user_id: string }; Returns: string }
+      get_user_id_for_consultor: {
+        Args: { _consultor_id: string }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
