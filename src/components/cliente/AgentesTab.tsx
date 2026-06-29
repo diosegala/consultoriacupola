@@ -280,6 +280,7 @@ export function AgentesTab({ clienteId }: Props) {
       {
         onSuccess: () => {
           toast.success('Diagnóstico gerado.');
+          limparRascunho.mutate(clienteId);
         },
       },
     );
