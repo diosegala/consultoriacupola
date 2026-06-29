@@ -15,6 +15,7 @@ import { useMinhasTarefasChecklist, useMinhasTarefasTodo, useTarefasAtribuidasPo
 import { useToggleChecklistItem } from '@/hooks/useProjetoChecklist';
 import { useCreateTodoPessoal, useUpdateTodoPessoal, useDeleteTodoPessoal } from '@/hooks/useTodoPessoal';
 import { useAuth } from '@/contexts/AuthContext';
+import { NovaTarefaPessoalDialog } from '@/components/tarefas/NovaTarefaPessoalDialog';
 
 type FiltroStatus = 'aberto' | 'concluido' | 'todos';
 type FiltroPrazo = 'todos' | 'vencidos' | 'hoje' | 'proximos7' | 'sem_prazo';
@@ -83,6 +84,7 @@ export default function MinhasTarefas() {
   const [prazo, setPrazo] = useState<FiltroPrazo>('todos');
   const [search, setSearch] = useState('');
   const [novoTodo, setNovoTodo] = useState('');
+  const [novaTarefaOpen, setNovaTarefaOpen] = useState(false);
 
   // Estado para nova tarefa atribuída
   const [novaAtribTitulo, setNovaAtribTitulo] = useState('');
@@ -102,10 +104,16 @@ export default function MinhasTarefas() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Minhas tarefas</h1>
-        <p className="text-sm text-muted-foreground">Itens de checklist atribuídos a você e seu to-do pessoal.</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Minhas tarefas</h1>
+          <p className="text-sm text-muted-foreground">Itens de checklist atribuídos a você e seu to-do pessoal.</p>
+        </div>
+        <Button onClick={() => setNovaTarefaOpen(true)}>
+          <Plus className="h-4 w-4 mr-1" /> Nova tarefa
+        </Button>
       </div>
+      <NovaTarefaPessoalDialog open={novaTarefaOpen} onOpenChange={setNovaTarefaOpen} />
 
       {/* Filtros */}
       <Card>

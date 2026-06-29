@@ -68,7 +68,7 @@ export function useMinhasTarefasTodo() {
     queryFn: async (): Promise<MinhaTarefaTodo[]> => {
       const { data, error } = await supabase
         .from('todo_pessoal')
-        .select('id, user_id, assigned_by, titulo, concluido, due_date, projeto_id, projetos(id, clientes(nome))')
+        .select('id, user_id, assigned_by, titulo, concluido, due_date, projeto_id, cliente_id, cliente:clientes!todo_pessoal_cliente_id_fkey(nome), projetos(id, clientes(nome))')
         .order('created_at', { ascending: false });
       if (error) throw error;
       return (data ?? [])
@@ -80,7 +80,7 @@ export function useMinhasTarefasTodo() {
         concluido: r.concluido,
         due_date: r.due_date,
         projeto_id: r.projeto_id,
-        cliente_nome: r.projetos?.clientes?.nome ?? null,
+        cliente_nome: r.cliente?.nome ?? r.projetos?.clientes?.nome ?? null,
         assigned_by: r.assigned_by,
         user_id: r.user_id,
       }));
@@ -107,7 +107,7 @@ export function useTarefasAtribuidasPorMim() {
     queryFn: async (): Promise<TarefaAtribuidaPorMim[]> => {
       const { data, error } = await supabase
         .from('todo_pessoal')
-        .select('id, titulo, concluido, due_date, user_id, created_at, projetos(id, clientes(nome))')
+        .select('id, titulo, concluido, due_date, user_id, created_at, cliente:clientes!todo_pessoal_cliente_id_fkey(nome), projetos(id, clientes(nome))')
         .eq('assigned_by', user!.id)
         .order('created_at', { ascending: false });
       if (error) throw error;
@@ -130,7 +130,7 @@ export function useTarefasAtribuidasPorMim() {
         due_date: r.due_date,
         user_id: r.user_id,
         responsavel_nome: nomeByUserId[r.user_id] || null,
-        cliente_nome: r.projetos?.clientes?.nome ?? null,
+        cliente_nome: r.cliente?.nome ?? r.projetos?.clientes?.nome ?? null,
         created_at: r.created_at,
       }));
     },
