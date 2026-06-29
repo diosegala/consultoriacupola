@@ -228,13 +228,6 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
       ? `\n\n## Questionário de Pré-Onboarding (respostas do cliente)\n${JSON.stringify(questionario_data, null, 2)}`
       : '';
 
-    const transcricoesSection = transcricoes_textos && transcricoes_textos.length
-      ? `\n\n## Transcrições das Entrevistas da Imersão\n${transcricoes_textos
-          .slice(0, MAX_TRANSCRICOES)
-          .map((t, i) => `\n### ${t.label || `Transcrição ${i + 1}`}\n${t.conteudo}`)
-          .join("\n")}`
-      : '';
-
     const anotacoesSection = anotacoes_consultor
       ? `\n\n## Anotações do Consultor (visita, contexto in loco)\n${limitarTexto(anotacoes_consultor, MAX_ANOTACOES_CHARS)}`
       : '';
