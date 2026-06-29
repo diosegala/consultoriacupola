@@ -79,7 +79,10 @@ serve(async (req) => {
 
     const promptBase = promptData?.prompt || FALLBACK_PROMPTS[tipo];
     const documentoModelo = promptData?.documento_modelo;
-    const provedor = promptData?.provedor || "gemini";
+    const provedorConfigurado = promptData?.provedor || "anthropic";
+    // Gemini direto está sem cota no projeto; enquanto seguimos apenas com Claude,
+    // qualquer configuração legada em "gemini" deve cair no Anthropic em vez de chamar Google.
+    const provedor = provedorConfigurado === "openai" ? "openai" : "anthropic";
 
     // Resolver contexto: por projeto OU por cliente
     let projeto: any = null;
@@ -286,52 +289,6 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
         lastErrorMessage = anthropicResponse.status === 429
           ? "Limite de requisições da Anthropic atingido. Tente novamente em alguns minutos."
           : `Erro da Anthropic (${anthropicResponse.status}).`;
-      }
-    } else {
-      // Gemini provider
-      const GOOGLE_GEMINI_API_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
-      if (!GOOGLE_GEMINI_API_KEY) {
-        return new Response(JSON.stringify({ error: "GOOGLE_GEMINI_API_KEY não configurada" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-
-      const candidateModels = ["gemini-2.5-pro", "gemini-2.5-flash"];
-
-      for (const model of candidateModels) {
-        const geminiResponse = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GOOGLE_GEMINI_API_KEY}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: promptCompleto }] }],
-              generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
-            }),
-          }
-        );
-
-        if (geminiResponse.ok) {
-          const geminiData = await geminiResponse.json();
-          conteudo = geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-          if (conteudo) break;
-          lastErrorMessage = `O modelo ${model} não retornou conteúdo.`;
-          continue;
-        }
-
-        const errText = await geminiResponse.text();
-        console.error("Gemini API error:", geminiResponse.status, model, errText);
-        lastStatus = geminiResponse.status;
-
-        if (geminiResponse.status === 429) {
-          lastErrorMessage = model === "gemini-2.5-pro"
-            ? "Cota indisponível para Gemini Pro. Tentando fallback."
-            : "Cota indisponível. Verifique billing da API Gemini.";
-          continue;
-        }
-        if (geminiResponse.status === 404) {
-          lastErrorMessage = `Modelo ${model} não disponível.`;
-          continue;
-        }
-        lastErrorMessage = `Erro do Gemini (${geminiResponse.status}).`;
       }
     }
 
