@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -16,7 +17,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Plus, Pencil, Trash2, Loader2, ShieldCheck, KeyRound, Bot, Save, Upload, Sparkles, RefreshCw } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, ShieldCheck, KeyRound, Bot, Save, Upload, Sparkles, RefreshCw, BookOpen } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -36,6 +37,7 @@ import { useToast } from '@/hooks/use-toast';
 export default function Configuracoes() {
   const { toast } = useToast();
   const { isAdmin, user } = useAuth();
+  const navigate = useNavigate();
   
   // Tipos de Consultoria
   const { data: tiposConsultoria, isLoading: loadingTipos } = useTiposConsultoriaComContratos(false);
@@ -763,6 +765,10 @@ export default function Configuracoes() {
                       ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       : <RefreshCw className="h-4 w-4 mr-2" />}
                     Sincronizar Notion agora
+                  </Button>
+                  <Button variant="outline" onClick={() => navigate('/oraculo/base')}>
+                    <BookOpen className="h-4 w-4 mr-2" />
+                    Gerenciar base de conhecimento
                   </Button>
                   {lastSyncResult && <span className="text-xs">{lastSyncResult}</span>}
                 </div>
