@@ -12,6 +12,44 @@ const FALLBACK_PROMPTS: Record<string, string> = {
   briefing_cliente_oculto: "Você é um especialista em cliente oculto. Elabore um briefing completo em markdown.",
 };
 
+const MAX_PROMPT_BASE_CHARS = 4_000;
+const MAX_DOCUMENTO_MODELO_CHARS = 3_000;
+const MAX_HISTORICO_DOC_CHARS = 1_500;
+const MAX_HISTORICO_DOCS = 2;
+const MAX_TRANSCRICAO_CHARS = 5_000;
+const MAX_TRANSCRICOES = 2;
+const MAX_QUESTIONARIO_CHARS = 4_000;
+const MAX_CONTEXTO_USUARIO_CHARS = 2_500;
+const MAX_ANOTACOES_CHARS = 3_000;
+
+function limitarTexto(texto: unknown, limite: number) {
+  if (typeof texto !== "string") return "";
+  const limpo = texto.trim();
+  if (limpo.length <= limite) return limpo;
+  return `${limpo.slice(0, limite)}\n\n[conteúdo truncado automaticamente para respeitar o limite de tokens da IA]`;
+}
+
+function extrairMensagemErroAnthropic(status: number, body: string) {
+  try {
+    const parsed = JSON.parse(body);
+    const message = parsed?.error?.message;
+    if (typeof message === "string") {
+      if (status === 429 && message.includes("input tokens per minute")) {
+        return "O contexto enviado ao Claude ficou maior que o limite por minuto. Reduzi automaticamente o contexto; tente gerar novamente em alguns minutos.";
+      }
+      if (status === 429) {
+        return "Limite de requisições da Anthropic atingido. Tente novamente em alguns minutos.";
+      }
+      return `Erro da Anthropic (${status}): ${message}`;
+    }
+  } catch (_) {
+    // mantém mensagem genérica abaixo
+  }
+  return status === 429
+    ? "Limite de requisições da Anthropic atingido. Tente novamente em alguns minutos."
+    : `Erro da Anthropic (${status}).`;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -77,8 +115,8 @@ serve(async (req) => {
       .eq("tipo", tipo)
       .single();
 
-    const promptBase = promptData?.prompt || FALLBACK_PROMPTS[tipo];
-    const documentoModelo = promptData?.documento_modelo;
+    const promptBase = limitarTexto(promptData?.prompt || FALLBACK_PROMPTS[tipo], MAX_PROMPT_BASE_CHARS);
+    const documentoModelo = limitarTexto(promptData?.documento_modelo, MAX_DOCUMENTO_MODELO_CHARS);
     const provedorConfigurado = promptData?.provedor || "anthropic";
     // Gemini direto está sem cota no projeto; enquanto seguimos apenas com Claude,
     // qualquer configuração legada em "gemini" deve cair no Anthropic em vez de chamar Google.
@@ -138,7 +176,7 @@ serve(async (req) => {
     const docsFiltrados = (docsHistorico ?? []).filter((d: any) => tiposRelevantes.includes(d.tipo));
 
     const historicoSection = docsFiltrados.length
-      ? `\n\nUse os documentos históricos abaixo como contexto para gerar o novo documento. Para OKRs, o diagnóstico mais recente é a referência principal. Para diagnósticos novos, compare com os anteriores e aponte evolução.\n\n=== HISTÓRICO DO PROJETO ===\n${docsFiltrados.map((d: any) => `\n[${d.tipo} — ${new Date(d.created_at).toLocaleDateString("pt-BR")}]:\n${d.conteudo}`).join("\n\n")}\n========================`
+      ? `\n\nUse os documentos históricos abaixo como contexto para gerar o novo documento. Para OKRs, o diagnóstico mais recente é a referência principal. Para diagnósticos novos, compare com os anteriores e aponte evolução.\n\n=== HISTÓRICO DO PROJETO ===\n${docsFiltrados.slice(0, MAX_HISTORICO_DOCS).map((d: any) => `\n[${d.tipo} — ${new Date(d.created_at).toLocaleDateString("pt-BR")}]:\n${limitarTexto(d.conteudo, MAX_HISTORICO_DOC_CHARS)}`).join("\n\n")}\n========================`
       : "";
 
     const { data: reunioes } = await supabase
@@ -189,17 +227,11 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
 
     // Novas seções vindas da aba Agentes (nível cliente)
     const questionarioSection = questionario_data && Object.keys(questionario_data).length
-      ? `\n\n## Questionário de Pré-Onboarding (respostas do cliente)\n${JSON.stringify(questionario_data, null, 2)}`
-      : '';
-
-    const transcricoesSection = transcricoes_textos && transcricoes_textos.length
-      ? `\n\n## Transcrições das Entrevistas da Imersão\n${transcricoes_textos
-          .map((t, i) => `\n### ${t.label || `Transcrição ${i + 1}`}\n${t.conteudo}`)
-          .join("\n")}`
+      ? `\n\n## Questionário de Pré-Onboarding (respostas do cliente)\n${limitarTexto(JSON.stringify(questionario_data, null, 2), MAX_QUESTIONARIO_CHARS)}`
       : '';
 
     const anotacoesSection = anotacoes_consultor
-      ? `\n\n## Anotações do Consultor (visita, contexto in loco)\n${anotacoes_consultor}`
+      ? `\n\n## Anotações do Consultor (visita, contexto in loco)\n${limitarTexto(anotacoes_consultor, MAX_ANOTACOES_CHARS)}`
       : '';
 
     const canaisSection = canais_atendimento && canais_atendimento.length
@@ -211,14 +243,21 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
       : '';
 
     const contextoUsuarioSection = contexto_usuario
-      ? `\n\n## Contexto adicional do consultor\n${contexto_usuario}`
+      ? `\n\n## Contexto adicional do consultor\n${limitarTexto(contexto_usuario, MAX_CONTEXTO_USUARIO_CHARS)}`
       : '';
 
     const documentoModeloSection = documentoModelo
       ? `\n\n## Documento Modelo de Referência\n${documentoModelo}\n\nUse o documento acima como referência de estilo, tom e estrutura.`
       : '';
 
-    const promptCompleto = `${promptBase}${historicoSection}\n\n---\n\nINFORMAÇÕES DO CLIENTE:\n\n${contexto}${questionarioSection}${transcricoesSection}${anotacoesSection}${trimestreSection}${canaisSection}${contextoUsuarioSection}${documentoModeloSection}`;
+    const transcricoesSectionLimitada = transcricoes_textos && transcricoes_textos.length
+      ? `\n\n## Transcrições das Entrevistas da Imersão\n${transcricoes_textos
+          .slice(0, MAX_TRANSCRICOES)
+          .map((t, i) => `\n### ${t.label || `Transcrição ${i + 1}`}\n${limitarTexto(t.conteudo, MAX_TRANSCRICAO_CHARS)}`)
+          .join("\n")}`
+      : '';
+
+    const promptCompleto = `${promptBase}${historicoSection}\n\n---\n\nINFORMAÇÕES DO CLIENTE:\n\n${contexto}${questionarioSection}${transcricoesSectionLimitada}${anotacoesSection}${trimestreSection}${canaisSection}${contextoUsuarioSection}${documentoModeloSection}`;
 
     let conteudo = "";
     let lastStatus = 500;
@@ -240,10 +279,10 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
           model: "gpt-4o",
           messages: [
             { role: "system", content: `${promptBase}${historicoSection}` },
-            { role: "user", content: `${contexto}${questionarioSection}${transcricoesSection}${anotacoesSection}${trimestreSection}${canaisSection}${contextoUsuarioSection}${documentoModeloSection}` },
+            { role: "user", content: `${contexto}${questionarioSection}${transcricoesSectionLimitada}${anotacoesSection}${trimestreSection}${canaisSection}${contextoUsuarioSection}${documentoModeloSection}` },
           ],
           temperature: 0.7,
-          max_tokens: 4096,
+          max_tokens: 3000,
         }),
       });
 
@@ -272,10 +311,10 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-5",
-          max_tokens: 4096,
+          max_tokens: 3000,
           system: `${promptBase}${historicoSection}`,
           messages: [
-            { role: "user", content: `${contexto}${questionarioSection}${transcricoesSection}${anotacoesSection}${trimestreSection}${canaisSection}${contextoUsuarioSection}${documentoModeloSection}` },
+            { role: "user", content: `${contexto}${questionarioSection}${transcricoesSectionLimitada}${anotacoesSection}${trimestreSection}${canaisSection}${contextoUsuarioSection}${documentoModeloSection}` },
           ],
         }),
       });
@@ -286,9 +325,7 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
         const errText = await anthropicResponse.text();
         console.error("Anthropic API error:", anthropicResponse.status, errText);
         lastStatus = anthropicResponse.status;
-        lastErrorMessage = anthropicResponse.status === 429
-          ? "Limite de requisições da Anthropic atingido. Tente novamente em alguns minutos."
-          : `Erro da Anthropic (${anthropicResponse.status}).`;
+        lastErrorMessage = extrairMensagemErroAnthropic(anthropicResponse.status, errText);
       }
     }
 

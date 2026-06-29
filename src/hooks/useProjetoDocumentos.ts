@@ -85,16 +85,23 @@ export function useGerarDocumento() {
       });
 
       if (error) {
-        const message = typeof error.message === 'string' && error.message.includes('{')
-          ? (() => {
-              try {
-                const parsed = JSON.parse(error.message.slice(error.message.indexOf('{')));
-                return parsed.error ?? error.message;
-              } catch {
-                return error.message;
-              }
-            })()
-          : error.message;
+        let message = error.message || 'Erro ao gerar documento';
+        const response = (error as any)?.context;
+        if (response && typeof response.json === 'function') {
+          try {
+            const body = await response.json();
+            if (typeof body?.error === 'string') message = body.error;
+          } catch {
+            // mantém a mensagem original
+          }
+        } else if (typeof error.message === 'string' && error.message.includes('{')) {
+          try {
+            const parsed = JSON.parse(error.message.slice(error.message.indexOf('{')));
+            message = parsed.error ?? error.message;
+          } catch {
+            message = error.message;
+          }
+        }
         throw new Error(message);
       }
 
