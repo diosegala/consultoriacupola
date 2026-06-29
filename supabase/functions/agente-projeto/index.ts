@@ -12,13 +12,15 @@ const FALLBACK_PROMPTS: Record<string, string> = {
   briefing_cliente_oculto: "Você é um especialista em cliente oculto. Elabore um briefing completo em markdown.",
 };
 
-const MAX_PROMPT_BASE_CHARS = 8_000;
-const MAX_DOCUMENTO_MODELO_CHARS = 8_000;
-const MAX_HISTORICO_DOC_CHARS = 4_000;
-const MAX_TRANSCRICAO_CHARS = 7_000;
-const MAX_TRANSCRICOES = 3;
-const MAX_CONTEXTO_USUARIO_CHARS = 4_000;
-const MAX_ANOTACOES_CHARS = 5_000;
+const MAX_PROMPT_BASE_CHARS = 4_000;
+const MAX_DOCUMENTO_MODELO_CHARS = 3_000;
+const MAX_HISTORICO_DOC_CHARS = 1_500;
+const MAX_HISTORICO_DOCS = 2;
+const MAX_TRANSCRICAO_CHARS = 5_000;
+const MAX_TRANSCRICOES = 2;
+const MAX_QUESTIONARIO_CHARS = 4_000;
+const MAX_CONTEXTO_USUARIO_CHARS = 2_500;
+const MAX_ANOTACOES_CHARS = 3_000;
 
 function limitarTexto(texto: unknown, limite: number) {
   if (typeof texto !== "string") return "";
@@ -174,7 +176,7 @@ serve(async (req) => {
     const docsFiltrados = (docsHistorico ?? []).filter((d: any) => tiposRelevantes.includes(d.tipo));
 
     const historicoSection = docsFiltrados.length
-      ? `\n\nUse os documentos históricos abaixo como contexto para gerar o novo documento. Para OKRs, o diagnóstico mais recente é a referência principal. Para diagnósticos novos, compare com os anteriores e aponte evolução.\n\n=== HISTÓRICO DO PROJETO ===\n${docsFiltrados.map((d: any) => `\n[${d.tipo} — ${new Date(d.created_at).toLocaleDateString("pt-BR")}]:\n${limitarTexto(d.conteudo, MAX_HISTORICO_DOC_CHARS)}`).join("\n\n")}\n========================`
+      ? `\n\nUse os documentos históricos abaixo como contexto para gerar o novo documento. Para OKRs, o diagnóstico mais recente é a referência principal. Para diagnósticos novos, compare com os anteriores e aponte evolução.\n\n=== HISTÓRICO DO PROJETO ===\n${docsFiltrados.slice(0, MAX_HISTORICO_DOCS).map((d: any) => `\n[${d.tipo} — ${new Date(d.created_at).toLocaleDateString("pt-BR")}]:\n${limitarTexto(d.conteudo, MAX_HISTORICO_DOC_CHARS)}`).join("\n\n")}\n========================`
       : "";
 
     const { data: reunioes } = await supabase
@@ -225,7 +227,7 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
 
     // Novas seções vindas da aba Agentes (nível cliente)
     const questionarioSection = questionario_data && Object.keys(questionario_data).length
-      ? `\n\n## Questionário de Pré-Onboarding (respostas do cliente)\n${JSON.stringify(questionario_data, null, 2)}`
+      ? `\n\n## Questionário de Pré-Onboarding (respostas do cliente)\n${limitarTexto(JSON.stringify(questionario_data, null, 2), MAX_QUESTIONARIO_CHARS)}`
       : '';
 
     const anotacoesSection = anotacoes_consultor
