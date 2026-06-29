@@ -1439,6 +1439,7 @@ export type Database = {
       todo_pessoal: {
         Row: {
           assigned_by: string | null
+          cliente_id: string | null
           concluido: boolean
           created_at: string
           due_date: string | null
@@ -1451,6 +1452,7 @@ export type Database = {
         }
         Insert: {
           assigned_by?: string | null
+          cliente_id?: string | null
           concluido?: boolean
           created_at?: string
           due_date?: string | null
@@ -1463,6 +1465,7 @@ export type Database = {
         }
         Update: {
           assigned_by?: string | null
+          cliente_id?: string | null
           concluido?: boolean
           created_at?: string
           due_date?: string | null
@@ -1474,6 +1477,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "todo_pessoal_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "todo_pessoal_projeto_id_fkey"
             columns: ["projeto_id"]
