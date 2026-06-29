@@ -63,6 +63,15 @@ function readLocalDraft(key: string): AgentesDraftState | null {
   }
 }
 
+function writeLocalDraft(key: string, estado: AgentesDraftState) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(key, JSON.stringify(estado));
+  } catch {
+    // O rascunho principal fica no backend; o localStorage é apenas contingência.
+  }
+}
+
 const TRIMESTRES = (() => {
   const now = new Date();
   const year = now.getFullYear();
@@ -103,13 +112,6 @@ export function AgentesTab({ clienteId }: Props) {
   // Persistência local das anotações
   const anotKey = `anotacoes_diagnostico_${clienteId}`;
   const draftKey = `agentes_ia_draft_${clienteId}`;
-  useEffect(() => {
-    const stored = localStorage.getItem(anotKey);
-    if (stored) setAnotacoes(stored);
-  }, [anotKey]);
-  useEffect(() => {
-    if (anotacoes) localStorage.setItem(anotKey, anotacoes);
-  }, [anotKey, anotacoes]);
 
   // OKRs
   const [okrContexto, setOkrContexto] = useState('');
@@ -158,10 +160,13 @@ export function AgentesTab({ clienteId }: Props) {
       setCoCanais(Array.isArray(estado.coCanais) ? estado.coCanais : []);
       setCoPersonas(estado.coPersonas === 2 ? 2 : 1);
       setCoObservacoes(estado.coObservacoes ?? '');
+    } else {
+      const legacyAnotacoes = typeof window !== 'undefined' ? localStorage.getItem(anotKey) : null;
+      if (legacyAnotacoes) setAnotacoes(legacyAnotacoes);
     }
 
     draftHydratedRef.current = true;
-  }, [draftKey, loadingRascunho, rascunho]);
+  }, [anotKey, draftKey, loadingRascunho, rascunho]);
 
   useEffect(() => {
     if (!draftHydratedRef.current) return;
@@ -181,7 +186,7 @@ export function AgentesTab({ clienteId }: Props) {
       savedAt: new Date().toISOString(),
     };
 
-    localStorage.setItem(draftKey, JSON.stringify(estado));
+    writeLocalDraft(draftKey, estado);
 
     draftSaveTimerRef.current = setTimeout(() => {
       salvarRascunho({ cliente_id: clienteId, estado: estado as Record<string, unknown> });
