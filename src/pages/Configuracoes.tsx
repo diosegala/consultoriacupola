@@ -689,6 +689,7 @@ export default function Configuracoes() {
                           <SelectContent>
                             <SelectItem value="gemini">Gemini (Google)</SelectItem>
                             <SelectItem value="openai">OpenAI (GPT-4o)</SelectItem>
+                            <SelectItem value="anthropic">Anthropic (Claude)</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>

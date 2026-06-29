@@ -255,6 +255,38 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
           ? "Limite de requisições da OpenAI atingido. Tente novamente em alguns minutos."
           : `Erro da OpenAI (${openaiResponse.status}).`;
       }
+    } else if (provedor === "anthropic") {
+      const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+      if (!ANTHROPIC_API_KEY) {
+        return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY não configurada. Adicione a chave nas configurações para usar Claude." }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const anthropicResponse = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-5",
+          max_tokens: 4096,
+          system: `${promptBase}${historicoSection}`,
+          messages: [
+            { role: "user", content: `${contexto}${questionarioSection}${transcricoesSection}${anotacoesSection}${trimestreSection}${canaisSection}${contextoUsuarioSection}${documentoModeloSection}` },
+          ],
+        }),
+      });
+      if (anthropicResponse.ok) {
+        const anthropicData = await anthropicResponse.json();
+        conteudo = anthropicData.content?.[0]?.text ?? "";
+      } else {
+        const errText = await anthropicResponse.text();
+        console.error("Anthropic API error:", anthropicResponse.status, errText);
+        lastStatus = anthropicResponse.status;
+        lastErrorMessage = anthropicResponse.status === 429
+          ? "Limite de requisições da Anthropic atingido. Tente novamente em alguns minutos."
+          : `Erro da Anthropic (${anthropicResponse.status}).`;
+      }
     } else {
       // Gemini provider
       const GOOGLE_GEMINI_API_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
