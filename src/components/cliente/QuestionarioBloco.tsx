@@ -14,7 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Loader2, Copy, RefreshCw, Eye, ClipboardList } from 'lucide-react';
+import { Loader2, Copy, RefreshCw, Eye, ClipboardList, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
 import {
@@ -101,6 +101,10 @@ export function QuestionarioBloco({ clienteId, compact }: Props) {
 
   return (
     <>
+      <div className="rounded-md border border-primary/30 bg-primary/5 text-primary px-3 py-2 mb-3 text-xs flex items-center gap-2">
+        <Sparkles className="h-3.5 w-3.5 shrink-0" />
+        As respostas deste questionário serão utilizadas automaticamente pelo agente de diagnóstico.
+      </div>
       <Card className="bg-card border-border">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
           <CardTitle className="text-foreground flex items-center gap-2 text-base">
