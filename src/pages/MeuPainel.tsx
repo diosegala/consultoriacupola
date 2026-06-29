@@ -23,6 +23,7 @@ import { useMinhasTarefasChecklist, useMinhasTarefasTodo } from '@/hooks/useMinh
 import { useToggleChecklistItem } from '@/hooks/useProjetoChecklist';
 import { useUpdateTodoPessoal } from '@/hooks/useTodoPessoal';
 import { NovaReuniaoDialog } from '@/components/consultor/NovaReuniaoDialog';
+import { NovaTarefaPessoalDialog } from '@/components/tarefas/NovaTarefaPessoalDialog';
 import { cn } from '@/lib/utils';
 
 function todayISO() {
@@ -143,6 +144,7 @@ export default function MeuPainel() {
   const updateTodo = useUpdateTodoPessoal();
 
   const [novaReuniao, setNovaReuniao] = useState<{ clienteId: string } | null>(null);
+  const [novaTarefaOpen, setNovaTarefaOpen] = useState(false);
 
   const hoje = todayISO();
   const tarefasUrgentes = useMemo(() => {
@@ -279,7 +281,12 @@ export default function MeuPainel() {
                 <ListChecks className="h-4 w-4 text-primary" />
                 Tarefas com prazo hoje ou vencidas
               </CardTitle>
-              <Badge variant="outline">{tarefasUrgentes.length}</Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">{tarefasUrgentes.length}</Badge>
+                <Button size="sm" variant="outline" onClick={() => setNovaTarefaOpen(true)}>
+                  <Plus className="h-3 w-3 mr-1" /> Nova tarefa
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {tarefasUrgentes.length === 0 ? (
@@ -366,6 +373,7 @@ export default function MeuPainel() {
         consultorId={consultorId}
         clienteId={novaReuniao?.clienteId}
       />
+      <NovaTarefaPessoalDialog open={novaTarefaOpen} onOpenChange={setNovaTarefaOpen} />
     </div>
   );
 }
