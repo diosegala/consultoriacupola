@@ -971,30 +971,43 @@ export type Database = {
       }
       projeto_documentos: {
         Row: {
+          cliente_id: string | null
           conteudo: string
           created_at: string
           created_by: string | null
+          gdoc_url: string | null
           id: string
-          projeto_id: string
+          projeto_id: string | null
           tipo: string
         }
         Insert: {
+          cliente_id?: string | null
           conteudo: string
           created_at?: string
           created_by?: string | null
+          gdoc_url?: string | null
           id?: string
-          projeto_id: string
+          projeto_id?: string | null
           tipo: string
         }
         Update: {
+          cliente_id?: string | null
           conteudo?: string
           created_at?: string
           created_by?: string | null
+          gdoc_url?: string | null
           id?: string
-          projeto_id?: string
+          projeto_id?: string | null
           tipo?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "projeto_documentos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "projeto_documentos_projeto_id_fkey"
             columns: ["projeto_id"]
