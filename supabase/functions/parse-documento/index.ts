@@ -85,16 +85,19 @@ Deno.serve(async (req) => {
       textoExtraido = await extractFromGDrive(gdrive_url, accessToken);
     }
     // File upload (base64)
-    else if (conteudo_base64 && tipo) {
+    else if (conteudo_base64) {
+      const tipoDetectado = normalizarTipoArquivo(tipo, nome_arquivo);
       const bytes = Uint8Array.from(atob(conteudo_base64), (c) => c.charCodeAt(0));
 
-      if (tipo === "pdf") {
+      if (tipoDetectado === "pdf") {
         textoExtraido = await extractFromPDF(bytes);
-      } else if (tipo === "docx") {
+      } else if (tipoDetectado === "docx") {
         textoExtraido = await extractFromDOCX(bytes);
+      } else if (tipoDetectado === "txt") {
+        textoExtraido = new TextDecoder().decode(bytes);
       } else {
         return new Response(
-          JSON.stringify({ error: `Tipo não suportado: ${tipo}` }),
+          JSON.stringify({ error: `Tipo não suportado: ${tipo || nome_arquivo || "desconhecido"}. Use Google Docs, PDF, DOCX ou TXT.` }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -102,6 +105,15 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ error: "Envie conteudo_base64+tipo ou gdrive_url" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (pareceHtmlLoginGoogle(textoExtraido)) {
+      return new Response(
+        JSON.stringify({
+          error: "O conteúdo recebido do Google foi uma tela de login, não o documento. Reconecte o Google Drive e confirme que sua conta Cupola tem permissão no arquivo.",
+        }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -139,6 +151,25 @@ async function extractFromDOCX(bytes: Uint8Array): Promise<string> {
   return result.value || "";
 }
 
+function normalizarTipoArquivo(tipo?: string, nomeArquivo?: string): "pdf" | "docx" | "txt" | null {
+  const raw = `${tipo || ""} ${nomeArquivo || ""}`.toLowerCase();
+  if (raw.includes("pdf") || raw.endsWith(".pdf")) return "pdf";
+  if (raw.includes("docx") || raw.includes("wordprocessingml") || raw.endsWith(".docx")) return "docx";
+  if (raw.includes("text/plain") || raw.includes("txt") || raw.endsWith(".txt")) return "txt";
+  return null;
+}
+
+function pareceHtmlLoginGoogle(texto: string) {
+  const inicio = texto.trim().slice(0, 2_000).toLowerCase();
+  return (
+    inicio.startsWith("<!doctype html") ||
+    inicio.startsWith("<html") ||
+    inicio.includes("accounts.google.com") ||
+    inicio.includes("service_login") ||
+    inicio.includes("google accounts")
+  );
+}
+
 async function extractFromGDrive(url: string, accessToken: string | null): Promise<string> {
   // Extract file ID from various Google Drive/Docs URL formats
   let fileId: string | null = null;
@@ -146,6 +177,12 @@ async function extractFromGDrive(url: string, accessToken: string | null): Promi
   // Google Docs: https://docs.google.com/document/d/{ID}/...
   const docsMatch = url.match(/docs\.google\.com\/document\/d\/([a-zA-Z0-9_-]+)/);
   if (docsMatch) fileId = docsMatch[1];
+
+  // Google Sheets / Slides native links
+  if (!fileId) {
+    const nativeMatch = url.match(/docs\.google\.com\/(?:spreadsheets|presentation)\/d\/([a-zA-Z0-9_-]+)/);
+    if (nativeMatch) fileId = nativeMatch[1];
+  }
 
   // Google Drive: https://drive.google.com/file/d/{ID}/...
   if (!fileId) {
@@ -155,8 +192,14 @@ async function extractFromGDrive(url: string, accessToken: string | null): Promi
 
   // Google Drive open: https://drive.google.com/open?id={ID}
   if (!fileId) {
-    const openMatch = url.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);
-    if (openMatch) fileId = openMatch[1];
+    try {
+      const parsed = new URL(url);
+      const id = parsed.searchParams.get("id");
+      if (id && /^[a-zA-Z0-9_-]+$/.test(id)) fileId = id;
+    } catch {
+      const openMatch = url.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);
+      if (openMatch) fileId = openMatch[1];
+    }
   }
 
   if (!fileId) {
@@ -189,26 +232,28 @@ async function extractFromGDrive(url: string, accessToken: string | null): Promi
   // Google Docs / native Google formats → export
   if (mimeType === "application/vnd.google-apps.document") {
     const r = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=text/plain`,
+      `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=${encodeURIComponent("text/plain")}`,
       { headers: { Authorization: `Bearer ${accessToken}` } },
     );
-    if (!r.ok) throw new Error(`Falha ao exportar Google Doc: ${await r.text()}`);
-    return await r.text();
+    if (!r.ok) throw new Error(await googleApiErrorMessage(r, "Falha ao exportar Google Doc"));
+    const texto = await r.text();
+    if (pareceHtmlLoginGoogle(texto)) throw new Error("O Google retornou uma tela de login ao exportar o documento. Confirme a permissão do arquivo para a conta conectada.");
+    return texto;
   }
   if (mimeType === "application/vnd.google-apps.spreadsheet") {
     const r = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=text/csv`,
+      `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=${encodeURIComponent("text/csv")}`,
       { headers: { Authorization: `Bearer ${accessToken}` } },
     );
-    if (!r.ok) throw new Error(`Falha ao exportar Sheets: ${await r.text()}`);
+    if (!r.ok) throw new Error(await googleApiErrorMessage(r, "Falha ao exportar Sheets"));
     return await r.text();
   }
   if (mimeType === "application/vnd.google-apps.presentation") {
     const r = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=text/plain`,
+      `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=${encodeURIComponent("text/plain")}`,
       { headers: { Authorization: `Bearer ${accessToken}` } },
     );
-    if (!r.ok) throw new Error(`Falha ao exportar Slides: ${await r.text()}`);
+    if (!r.ok) throw new Error(await googleApiErrorMessage(r, "Falha ao exportar Slides"));
     return await r.text();
   }
 
@@ -217,7 +262,7 @@ async function extractFromGDrive(url: string, accessToken: string | null): Promi
     `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&supportsAllDrives=true`,
     { headers: { Authorization: `Bearer ${accessToken}` } },
   );
-  if (!dl.ok) throw new Error(`Falha ao baixar arquivo: ${await dl.text()}`);
+  if (!dl.ok) throw new Error(await googleApiErrorMessage(dl, "Falha ao baixar arquivo"));
   const buffer = await dl.arrayBuffer();
   const bytes = new Uint8Array(buffer);
 
@@ -231,8 +276,22 @@ async function extractFromGDrive(url: string, accessToken: string | null): Promi
     return await extractFromDOCX(bytes);
   }
   if (mimeType.startsWith("text/")) {
-    return new TextDecoder().decode(bytes);
+    const texto = new TextDecoder().decode(bytes);
+    if (pareceHtmlLoginGoogle(texto)) throw new Error("O Google retornou uma tela de login em vez do arquivo. Confirme a permissão do arquivo para a conta conectada.");
+    return texto;
   }
 
   throw new Error(`Tipo de arquivo não suportado: ${mimeType}. Use Google Docs, PDF, DOCX ou TXT.`);
+}
+
+async function googleApiErrorMessage(res: Response, prefixo: string) {
+  const text = await res.text();
+  try {
+    const parsed = JSON.parse(text);
+    const message = parsed?.error?.message;
+    if (typeof message === "string") return `${prefixo}: ${message}`;
+  } catch {
+    // usa texto cru abaixo
+  }
+  return `${prefixo} (${res.status}): ${text.slice(0, 300)}`;
 }
