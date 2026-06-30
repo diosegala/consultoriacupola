@@ -1128,6 +1128,21 @@ function SourceCard({
   );
 }
 
+function ProntidaoLinha({ ok, label, warnIfEmpty }: { ok: boolean; label: string; warnIfEmpty?: boolean }) {
+  const Icon = ok ? CheckCircle2 : warnIfEmpty ? AlertCircle : AlertCircle;
+  const color = ok
+    ? 'text-emerald-500'
+    : warnIfEmpty
+      ? 'text-amber-500'
+      : 'text-muted-foreground';
+  return (
+    <div className="flex items-start gap-2">
+      <Icon className={`h-3.5 w-3.5 mt-0.5 ${color}`} />
+      <span>{label}</span>
+    </div>
+  );
+}
+
 function PanelAgente({
   icon: Icon,
   titulo,
