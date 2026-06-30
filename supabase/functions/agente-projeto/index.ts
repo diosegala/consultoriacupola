@@ -319,7 +319,7 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
             { role: "user", content: `${contexto}${questionarioSection}${transcricoesSectionLimitada}${anotacoesSection}${trimestreSection}${canaisSection}${contextoUsuarioSection}${documentoModeloSection}` },
           ],
           temperature: 0.7,
-          max_tokens: 3000,
+          max_tokens: 8000,
         }),
       });
 
@@ -348,7 +348,7 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-5",
-          max_tokens: 3000,
+          max_tokens: 8000,
           system: `${promptBase}${historicoSection}`,
           messages: [
             { role: "user", content: `${contexto}${questionarioSection}${transcricoesSectionLimitada}${anotacoesSection}${trimestreSection}${canaisSection}${contextoUsuarioSection}${documentoModeloSection}` },
