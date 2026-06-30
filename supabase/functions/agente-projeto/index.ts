@@ -29,6 +29,31 @@ function limitarTexto(texto: unknown, limite: number) {
   return `${limpo.slice(0, limite)}\n\n[conteúdo truncado automaticamente para respeitar o limite de tokens da IA]`;
 }
 
+function conteudoInvalidoDeFonte(texto: unknown) {
+  if (typeof texto !== "string") return false;
+  const inicio = texto.trim().slice(0, 2_000).toLowerCase();
+  return (
+    inicio.startsWith("<!doctype html") ||
+    inicio.startsWith("<html") ||
+    inicio.includes("accounts.google.com") ||
+    inicio.includes("service_login") ||
+    inicio.includes("google accounts")
+  );
+}
+
+function documentoGeradoPorFalhaDeAcesso(texto: unknown) {
+  if (typeof texto !== "string") return false;
+  const inicio = texto.trim().slice(0, 1_500).toLowerCase();
+  return (
+    inicio.includes("não consegui acessar") ||
+    inicio.includes("não tenho acesso") ||
+    inicio.includes("tela de login do google") ||
+    inicio.includes("páginas de login do google") ||
+    inicio.includes("html de páginas de login") ||
+    inicio.includes("códigos html de páginas de login")
+  );
+}
+
 function extrairMensagemErroAnthropic(status: number, body: string) {
   try {
     const parsed = JSON.parse(body);
@@ -173,7 +198,9 @@ serve(async (req) => {
       diagnostico: ["diagnostico"],
     };
     const tiposRelevantes = relevanciaPorTipo[tipo] ?? [];
-    const docsFiltrados = (docsHistorico ?? []).filter((d: any) => tiposRelevantes.includes(d.tipo));
+    const docsFiltrados = (docsHistorico ?? []).filter((d: any) =>
+      tiposRelevantes.includes(d.tipo) && !documentoGeradoPorFalhaDeAcesso(d.conteudo),
+    );
 
     const historicoSection = docsFiltrados.length
       ? `\n\nUse os documentos históricos abaixo como contexto para gerar o novo documento. Para OKRs, o diagnóstico mais recente é a referência principal. Para diagnósticos novos, compare com os anteriores e aponte evolução.\n\n=== HISTÓRICO DO PROJETO ===\n${docsFiltrados.slice(0, MAX_HISTORICO_DOCS).map((d: any) => `\n[${d.tipo} — ${new Date(d.created_at).toLocaleDateString("pt-BR")}]:\n${limitarTexto(d.conteudo, MAX_HISTORICO_DOC_CHARS)}`).join("\n\n")}\n========================`
@@ -250,12 +277,22 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
       ? `\n\n## Documento Modelo de Referência\n${documentoModelo}\n\nUse o documento acima como referência de estilo, tom e estrutura.`
       : '';
 
-    const transcricoesSectionLimitada = transcricoes_textos && transcricoes_textos.length
-      ? `\n\n## Transcrições das Entrevistas da Imersão\n${transcricoes_textos
+    const transcricoesValidas = (transcricoes_textos ?? []).filter((t) =>
+      t?.conteudo && !conteudoInvalidoDeFonte(t.conteudo),
+    );
+
+    const transcricoesSectionLimitada = transcricoesValidas.length
+      ? `\n\n## Transcrições das Entrevistas da Imersão\n${transcricoesValidas
           .slice(0, MAX_TRANSCRICOES)
           .map((t, i) => `\n### ${t.label || `Transcrição ${i + 1}`}\n${limitarTexto(t.conteudo, MAX_TRANSCRICAO_CHARS)}`)
           .join("\n")}`
       : '';
+
+    if ((transcricoes_textos?.length ?? 0) > 0 && transcricoesValidas.length === 0 && !questionarioSection && !anotacoesSection && !contextoUsuarioSection) {
+      return new Response(JSON.stringify({
+        error: "As transcrições anexadas não puderam ser lidas corretamente. Reprocesse os links/arquivos antes de gerar o diagnóstico.",
+      }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     const promptCompleto = `${promptBase}${historicoSection}\n\n---\n\nINFORMAÇÕES DO CLIENTE:\n\n${contexto}${questionarioSection}${transcricoesSectionLimitada}${anotacoesSection}${trimestreSection}${canaisSection}${contextoUsuarioSection}${documentoModeloSection}`;
 
