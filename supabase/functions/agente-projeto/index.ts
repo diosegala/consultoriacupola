@@ -10,6 +10,12 @@ const FALLBACK_PROMPTS: Record<string, string> = {
   diagnostico: "Você é um consultor sênior. Elabore um diagnóstico empresarial completo em markdown.",
   okrs: "Você é um especialista em OKRs. Crie OKRs para o próximo trimestre em markdown.",
   briefing_cliente_oculto: "Você é um especialista em cliente oculto. Elabore um briefing completo em markdown.",
+  pre_analise: `Você recebeu transcrições de entrevistas de imersão em uma empresa. NÃO gere o diagnóstico ainda.
+Apenas:
+(1) liste os 10 temas mais recorrentes nas entrevistas com uma frase de resumo cada,
+(2) identifique até 3 tensões ou contradições entre o que diferentes entrevistados disseram sobre o mesmo assunto,
+(3) aponte quais áreas da operação NÃO foram mencionadas e podem ser pontos cegos.
+Seja direto, use tópicos curtos em markdown e não invente informações que não estejam nas fontes.`,
 };
 
 const MAX_PROMPT_BASE_CHARS = 4_000;
@@ -127,10 +133,12 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "tipo e (projeto_id OU cliente_id) são obrigatórios" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const validTypes = ["diagnostico", "okrs", "briefing_cliente_oculto"];
+    const validTypes = ["diagnostico", "okrs", "briefing_cliente_oculto", "pre_analise"];
     if (!validTypes.includes(tipo)) {
-      return new Response(JSON.stringify({ error: "Tipo inválido. Use: diagnostico, okrs, briefing_cliente_oculto" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: "Tipo inválido." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+
+    const isPreAnalise = tipo === "pre_analise";
 
     // Fetch prompt from database using service role
     const serviceClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -409,7 +417,7 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
 
     // Tentar criar Google Doc (best-effort)
     let gdoc_url: string | null = null;
-    if (consultorIdContexto) {
+    if (consultorIdContexto && !isPreAnalise) {
       try {
         const tituloLabel: Record<string, string> = {
           diagnostico: "Diagnóstico",
@@ -429,6 +437,13 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
       } catch (e) {
         console.warn("criar-gdoc threw:", e);
       }
+    }
+
+    if (isPreAnalise) {
+      return new Response(JSON.stringify({ conteudo }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const insertPayload: Record<string, unknown> = {
