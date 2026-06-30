@@ -339,6 +339,7 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
       if (!ANTHROPIC_API_KEY) {
         return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY não configurada. Adicione a chave nas configurações para usar Claude." }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
+      const anthropicModel = "claude-sonnet-4-5";
       const anthropicResponse = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
@@ -347,7 +348,7 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: "claude-sonnet-4-5",
+          model: anthropicModel,
           max_tokens: 8000,
           system: `${promptBase}${historicoSection}`,
           messages: [
@@ -358,11 +359,44 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
       if (anthropicResponse.ok) {
         const anthropicData = await anthropicResponse.json();
         conteudo = anthropicData.content?.[0]?.text ?? "";
+        // Registra uso (best-effort) — preço Claude Sonnet 4.5: $3/MTok in, $15/MTok out
+        try {
+          const usage = anthropicData.usage ?? {};
+          const inTok = Number(usage.input_tokens ?? 0);
+          const outTok = Number(usage.output_tokens ?? 0);
+          const cost = (inTok / 1_000_000) * 3 + (outTok / 1_000_000) * 15;
+          await serviceClient.from("ai_usage_logs").insert({
+            provider: "anthropic",
+            model: anthropicModel,
+            agente_tipo: tipo,
+            input_tokens: inTok,
+            output_tokens: outTok,
+            cost_usd: cost,
+            cliente_id: clienteId,
+            consultor_id: consultorIdContexto,
+            user_id: userId,
+            status: "success",
+          });
+        } catch (logErr) {
+          console.warn("ai_usage_logs insert falhou:", logErr);
+        }
       } else {
         const errText = await anthropicResponse.text();
         console.error("Anthropic API error:", anthropicResponse.status, errText);
         lastStatus = anthropicResponse.status;
         lastErrorMessage = extrairMensagemErroAnthropic(anthropicResponse.status, errText);
+        try {
+          await serviceClient.from("ai_usage_logs").insert({
+            provider: "anthropic",
+            model: "claude-sonnet-4-5",
+            agente_tipo: tipo,
+            cliente_id: clienteId,
+            consultor_id: consultorIdContexto,
+            user_id: userId,
+            status: "error",
+            error_message: lastErrorMessage.slice(0, 500),
+          });
+        } catch (_) { /* ignore */ }
       }
     }
 
