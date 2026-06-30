@@ -26,6 +26,8 @@ import {
 } from '@/hooks/useProjetoDocumentos';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useActiveTimer } from '@/hooks/useActiveTimer';
+import { useRegistrarInteracaoTempo, type TipoAgente } from '@/hooks/useInteracoesTempo';
 
 interface Props {
   clienteId: string;
@@ -111,6 +113,74 @@ export function AgentesTab({ clienteId }: Props) {
   const gerar = useGerarDocumento();
   const { mutateAsync: parseDocumento } = useParseDocumento();
   const queryClient = useQueryClient();
+  const { mutate: registrarTempo } = useRegistrarInteracaoTempo();
+  const activeTimer = useActiveTimer(true);
+
+  // Controle de tempo por agente. Tudo silencioso — sem UI.
+  const tipoStateRef = useRef<Record<TipoAgente, { startedAt: Date; activeBaseline: number } | null>>({
+    diagnostico: null,
+    okrs: null,
+    briefing_cliente_oculto: null,
+  });
+  const tipoFinalizadoRef = useRef<Record<TipoAgente, boolean>>({
+    diagnostico: false,
+    okrs: false,
+    briefing_cliente_oculto: false,
+  });
+  const registrarTempoRef = useRef(registrarTempo);
+  registrarTempoRef.current = registrarTempo;
+  const snapshotRef = useRef(activeTimer.snapshot);
+  snapshotRef.current = activeTimer.snapshot;
+
+  // metadata "última conhecida" para o caso de salvar como interrompido no unmount
+  const metadataRef = useRef({
+    num_transcricoes: 0,
+    num_caracteres_anotacoes: 0,
+    respostas_questionario_usadas: 0,
+  });
+
+  // Inicia/relê baselines ao trocar de cliente
+  useEffect(() => {
+    activeTimer.reset();
+    const snap = snapshotRef.current() ?? { activeSeconds: 0, startedAt: new Date(), endedAt: new Date(), totalSeconds: 0 };
+    const baseline = snap.activeSeconds;
+    const now = new Date();
+    tipoStateRef.current = {
+      diagnostico: { startedAt: now, activeBaseline: baseline },
+      okrs: { startedAt: now, activeBaseline: baseline },
+      briefing_cliente_oculto: { startedAt: now, activeBaseline: baseline },
+    };
+    tipoFinalizadoRef.current = { diagnostico: false, okrs: false, briefing_cliente_oculto: false };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clienteId]);
+
+  // Ao sair da aba/navegar: registra como interrompido tudo o que não foi gerado
+  useEffect(() => {
+    return () => {
+      const snap = snapshotRef.current();
+      if (!snap) return;
+      (Object.keys(tipoStateRef.current) as TipoAgente[]).forEach((tipo) => {
+        const st = tipoStateRef.current[tipo];
+        if (!st || tipoFinalizadoRef.current[tipo]) return;
+        const activeSeconds = Math.max(0, snap.activeSeconds - st.activeBaseline);
+        // ignora ruído: só registra se houve preparação relevante
+        if (activeSeconds < 10) return;
+        const totalSeconds = Math.max(0, Math.round((snap.endedAt.getTime() - st.startedAt.getTime()) / 1000));
+        registrarTempoRef.current({
+          cliente_id: clienteId,
+          tipo,
+          inicio_preparacao: st.startedAt.toISOString(),
+          fim_preparacao: snap.endedAt.toISOString(),
+          duracao_preparacao_segundos: activeSeconds,
+          tempo_total_decorrido_segundos: totalSeconds,
+          duracao_geracao_ia_segundos: null,
+          metadata: { ...metadataRef.current, interrompido: true, motivo: 'saiu_aba' },
+        });
+      });
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clienteId]);
+
   const [importUrl, setImportUrl] = useState('');
   const [importing, setImporting] = useState(false);
   const draftHydratedRef = useRef(false);
@@ -268,6 +338,13 @@ export function AgentesTab({ clienteId }: Props) {
   const podeGerarDiagnostico =
     respostasDisponiveis > 0 || transcricoesProntas.length > 0 || anotacoes.trim().length > 0;
 
+  // mantém metadata "ao vivo" para fallback de unmount
+  metadataRef.current = {
+    num_transcricoes: transcricoesProntas.length,
+    num_caracteres_anotacoes: anotacoes.trim().length,
+    respostas_questionario_usadas: respostasDisponiveis,
+  };
+
   /* ====== Card B helpers ====== */
 
   const handleFiles = async (files: FileList | null) => {
@@ -337,49 +414,77 @@ export function AgentesTab({ clienteId }: Props) {
 
   /* ====== Gerar ====== */
 
+  const finalizarTempo = (tipo: TipoAgente, opts: { iaSegundos: number | null; interrompido: boolean; metaExtra?: Record<string, unknown> }) => {
+    const st = tipoStateRef.current[tipo];
+    if (!st) return;
+    const snap = activeTimer.snapshot();
+    if (!snap) return;
+    const activeSeconds = Math.max(0, snap.activeSeconds - st.activeBaseline);
+    const totalSeconds = Math.max(0, Math.round((snap.endedAt.getTime() - st.startedAt.getTime()) / 1000));
+    registrarTempo({
+      cliente_id: clienteId,
+      tipo,
+      inicio_preparacao: st.startedAt.toISOString(),
+      fim_preparacao: snap.endedAt.toISOString(),
+      duracao_preparacao_segundos: activeSeconds,
+      tempo_total_decorrido_segundos: totalSeconds,
+      duracao_geracao_ia_segundos: opts.iaSegundos,
+      metadata: { ...metadataRef.current, ...(opts.metaExtra ?? {}), interrompido: opts.interrompido },
+    });
+    tipoFinalizadoRef.current[tipo] = true;
+    // Reabre baseline para uma eventual nova geração do mesmo tipo na mesma sessão
+    const snap2 = activeTimer.snapshot();
+    tipoStateRef.current[tipo] = snap2
+      ? { startedAt: new Date(), activeBaseline: snap2.activeSeconds }
+      : null;
+    tipoFinalizadoRef.current[tipo] = false;
+  };
+
+  const gerarComTempo = async (
+    tipo: TipoAgente,
+    payload: Parameters<typeof gerar.mutateAsync>[0],
+    metaExtra?: Record<string, unknown>,
+  ) => {
+    const iaStart = Date.now();
+    try {
+      await gerar.mutateAsync(payload);
+      const iaSegundos = Math.round((Date.now() - iaStart) / 1000);
+      finalizarTempo(tipo, { iaSegundos, interrompido: false, metaExtra });
+      toast.success('Documento gerado.');
+    } catch {
+      const iaSegundos = Math.round((Date.now() - iaStart) / 1000);
+      finalizarTempo(tipo, { iaSegundos, interrompido: true, metaExtra: { ...(metaExtra ?? {}), motivo: 'erro_ia' } });
+    }
+  };
+
   const gerarDiagnostico = () => {
-    gerar.mutate(
-      {
-        tipo: 'diagnostico',
-        cliente_id: clienteId,
-        questionario_data: (questionario?.respostas as Record<string, unknown>) ?? null,
-        transcricoes_textos: transcricoesProntas.map((f) => ({
-          label: f.label, conteudo: f.conteudo!,
-        })),
-        anotacoes_consultor: anotacoes.trim() || undefined,
-      },
-      {
-        onSuccess: () => {
-          toast.success('Diagnóstico gerado.');
-        },
-      },
-    );
+    gerarComTempo('diagnostico', {
+      tipo: 'diagnostico',
+      cliente_id: clienteId,
+      questionario_data: (questionario?.respostas as Record<string, unknown>) ?? null,
+      transcricoes_textos: transcricoesProntas.map((f) => ({ label: f.label, conteudo: f.conteudo! })),
+      anotacoes_consultor: anotacoes.trim() || undefined,
+    });
   };
 
   const gerarOkrs = () => {
     if (!diagnosticoDoc) return;
-    gerar.mutate(
-      {
-        tipo: 'okrs',
-        cliente_id: clienteId,
-        contexto_usuario: okrContexto.trim() || undefined,
-        trimestre: okrTrimestre,
-      },
-      { onSuccess: () => toast.success('OKRs gerados.') },
-    );
+    gerarComTempo('okrs', {
+      tipo: 'okrs',
+      cliente_id: clienteId,
+      contexto_usuario: okrContexto.trim() || undefined,
+      trimestre: okrTrimestre,
+    });
   };
 
   const gerarClienteOculto = () => {
-    gerar.mutate(
-      {
-        tipo: 'briefing_cliente_oculto',
-        cliente_id: clienteId,
-        canais_atendimento: coCanais,
-        contexto_usuario: coObservacoes.trim() || undefined,
-        titulo_doc: `Briefing Cliente Oculto — ${coPersonas} persona(s)`,
-      },
-      { onSuccess: () => toast.success('Briefing gerado.') },
-    );
+    gerarComTempo('briefing_cliente_oculto', {
+      tipo: 'briefing_cliente_oculto',
+      cliente_id: clienteId,
+      canais_atendimento: coCanais,
+      contexto_usuario: coObservacoes.trim() || undefined,
+      titulo_doc: `Briefing Cliente Oculto — ${coPersonas} persona(s)`,
+    });
   };
 
   const importarDiagnostico = async () => {

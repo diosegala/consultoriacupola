@@ -664,6 +664,66 @@ export type Database = {
           },
         ]
       }
+      interacoes_tempo: {
+        Row: {
+          cliente_id: string | null
+          consultor_id: string | null
+          created_at: string
+          duracao_geracao_ia_segundos: number | null
+          duracao_preparacao_segundos: number | null
+          fim_preparacao: string | null
+          id: string
+          inicio_preparacao: string
+          metadata: Json | null
+          tempo_total_decorrido_segundos: number | null
+          tipo: string
+          user_id: string
+        }
+        Insert: {
+          cliente_id?: string | null
+          consultor_id?: string | null
+          created_at?: string
+          duracao_geracao_ia_segundos?: number | null
+          duracao_preparacao_segundos?: number | null
+          fim_preparacao?: string | null
+          id?: string
+          inicio_preparacao: string
+          metadata?: Json | null
+          tempo_total_decorrido_segundos?: number | null
+          tipo: string
+          user_id?: string
+        }
+        Update: {
+          cliente_id?: string | null
+          consultor_id?: string | null
+          created_at?: string
+          duracao_geracao_ia_segundos?: number | null
+          duracao_preparacao_segundos?: number | null
+          fim_preparacao?: string | null
+          id?: string
+          inicio_preparacao?: string
+          metadata?: Json | null
+          tempo_total_decorrido_segundos?: number | null
+          tipo?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interacoes_tempo_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interacoes_tempo_consultor_id_fkey"
+            columns: ["consultor_id"]
+            isOneToOne: false
+            referencedRelation: "consultores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notificacoes: {
         Row: {
           created_at: string
