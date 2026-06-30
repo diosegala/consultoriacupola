@@ -845,6 +845,8 @@ export default function Dashboard() {
           </ScrollArea>
         </DialogContent>
       </Dialog>
+
+      {(isAdmin || isDirector) && <AiUsageSection />}
     </div>
   );
 }
