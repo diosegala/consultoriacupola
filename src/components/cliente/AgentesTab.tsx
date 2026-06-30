@@ -24,6 +24,8 @@ import {
   useSalvarAgenteRascunho,
   type ProjetoDocumento,
 } from '@/hooks/useProjetoDocumentos';
+import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Props {
   clienteId: string;
@@ -108,6 +110,9 @@ export function AgentesTab({ clienteId }: Props) {
   const { mutate: salvarRascunho } = useSalvarAgenteRascunho();
   const gerar = useGerarDocumento();
   const { mutateAsync: parseDocumento } = useParseDocumento();
+  const queryClient = useQueryClient();
+  const [importUrl, setImportUrl] = useState('');
+  const [importing, setImporting] = useState(false);
   const draftHydratedRef = useRef(false);
   const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reparsingDraftIdsRef = useRef<Set<string>>(new Set());
