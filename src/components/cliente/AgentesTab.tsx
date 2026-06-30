@@ -585,6 +585,35 @@ export function AgentesTab({ clienteId }: Props) {
               ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Gerando…</>
               : <><Sparkles className="h-4 w-4 mr-2" /> Gerar Diagnóstico</>}
           </Button>
+
+          <Separator />
+          <div className="rounded-lg border border-dashed border-border bg-muted/10 p-4 space-y-2">
+            <h5 className="text-sm font-medium flex items-center gap-1.5">
+              <LinkIcon className="h-4 w-4" /> Já tem um diagnóstico pronto?
+            </h5>
+            <p className="text-xs text-muted-foreground">
+              Importe um diagnóstico já feito (Google Docs). O conteúdo será extraído
+              e usado como contexto pelos próximos agentes (OKRs, Cliente Oculto).
+            </p>
+            <div className="flex gap-2">
+              <Input
+                value={importUrl}
+                onChange={(e) => setImportUrl(e.target.value)}
+                placeholder="https://docs.google.com/document/d/…"
+                className="text-xs"
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={importarDiagnostico}
+                disabled={!importUrl.trim() || importing}
+              >
+                {importing
+                  ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Importando…</>
+                  : <>Importar</>}
+              </Button>
+            </div>
+          </div>
         </PanelAgente>
 
         {/* OKRs */}
