@@ -282,8 +282,7 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
     );
 
     const transcricoesSectionLimitada = transcricoesValidas.length
-      ? `\n\n## Transcrições das Entrevistas da Imersão\n${transcricoes_textos
-          .filter((t) => t?.conteudo && !conteudoInvalidoDeFonte(t.conteudo))
+      ? `\n\n## Transcrições das Entrevistas da Imersão\n${transcricoesValidas
           .slice(0, MAX_TRANSCRICOES)
           .map((t, i) => `\n### ${t.label || `Transcrição ${i + 1}`}\n${limitarTexto(t.conteudo, MAX_TRANSCRICAO_CHARS)}`)
           .join("\n")}`
