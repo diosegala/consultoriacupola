@@ -670,8 +670,12 @@ export function AgentesTab({ clienteId }: Props) {
             <SourceCard
               titulo="Anotações do Consultor"
               icon={FileText}
-              status={anotacoes.trim() ? 'ok' : 'pending'}
-              statusText={anotacoes.trim() ? 'Anotações registradas' : 'Sem anotações'}
+              status={secoesPreenchidas.length > 0 ? 'ok' : 'pending'}
+              statusText={
+                secoesPreenchidas.length > 0
+                  ? `${secoesPreenchidas.length} de ${SECOES_ANOTACOES.length} seções preenchidas`
+                  : 'Sem anotações'
+              }
             />
           </div>
 
@@ -750,35 +754,69 @@ export function AgentesTab({ clienteId }: Props) {
                 </p>
                 {fontes.map((f) => {
                   const Icon = fileIcon(f.meta ?? f.label);
+                  const palavras = contarPalavras(f.conteudo);
                   return (
-                    <div key={f.id} className="flex items-center gap-2 rounded-md border border-border bg-background p-2">
-                      <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <Input
-                        value={f.label}
-                        onChange={(e) => renomearFonte(f.id, e.target.value)}
-                        className="h-7 text-xs flex-1"
-                      />
-                      {f.status === 'parsing' && (
-                        <Badge variant="secondary" className="text-[10px] gap-1">
-                          <Loader2 className="h-3 w-3 animate-spin" /> processando
-                        </Badge>
-                      )}
-                      {f.status === 'done' && (
-                        <Badge variant="outline" className="text-[10px] text-emerald-500 border-emerald-500/40">
-                          pronto
-                        </Badge>
-                      )}
-                      {f.status === 'error' && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Badge variant="destructive" className="text-[10px]">erro</Badge>
-                          </TooltipTrigger>
-                          <TooltipContent>{f.errorMsg ?? 'Falha ao processar'}</TooltipContent>
-                        </Tooltip>
-                      )}
-                      <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removerFonte(f.id)}>
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+                    <div key={f.id} className="rounded-md border border-border bg-background p-2 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <Input
+                          value={f.label}
+                          onChange={(e) => renomearFonte(f.id, e.target.value)}
+                          className="h-7 text-xs flex-1"
+                        />
+                        {f.status === 'parsing' && (
+                          <Badge variant="secondary" className="text-[10px] gap-1">
+                            <Loader2 className="h-3 w-3 animate-spin" /> processando
+                          </Badge>
+                        )}
+                        {f.status === 'done' && (
+                          <Badge variant="outline" className="text-[10px] text-emerald-500 border-emerald-500/40">
+                            pronto
+                          </Badge>
+                        )}
+                        {f.status === 'error' && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge variant="destructive" className="text-[10px]">erro</Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>{f.errorMsg ?? 'Falha ao processar'}</TooltipContent>
+                          </Tooltip>
+                        )}
+                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removerFonte(f.id)}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2 items-center pl-6">
+                        <Input
+                          value={f.papel ?? ''}
+                          onChange={(e) => atualizarFonte(f.id, { papel: e.target.value })}
+                          placeholder="Papel do entrevistado (ex: Dono/Sócio)"
+                          className="h-7 text-xs"
+                        />
+                        <Input
+                          type="date"
+                          value={f.dataEntrevista ?? ''}
+                          onChange={(e) => atualizarFonte(f.id, { dataEntrevista: e.target.value })}
+                          className="h-7 text-xs w-[140px]"
+                        />
+                        {f.status === 'done' && palavras > 0 && (
+                          <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                            ~{palavras.toLocaleString('pt-BR')} palavras · {formatarMinutosFala(palavras)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-1 pl-6">
+                        {PAPEIS_SUGERIDOS.map((p) => (
+                          <Badge
+                            key={p}
+                            variant={f.papel === p ? 'default' : 'outline'}
+                            className="cursor-pointer text-[10px]"
+                            onClick={() => atualizarFonte(f.id, { papel: p })}
+                          >
+                            {p}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
                   );
                 })}
@@ -786,17 +824,108 @@ export function AgentesTab({ clienteId }: Props) {
             )}
           </div>
 
-          {/* Card C — Anotações */}
+          {/* Card B' — Mapa das fontes (pré-análise) */}
+          <div className="rounded-lg border border-dashed border-border bg-muted/10 p-4 space-y-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div>
+                <h5 className="text-sm font-medium flex items-center gap-1.5">
+                  <Wand2 className="h-4 w-4" /> Mapa das fontes
+                </h5>
+                <p className="text-[11px] text-muted-foreground">
+                  Antes de gerar o diagnóstico, peça à IA um resumo rápido dos temas, tensões e pontos cegos das fontes.
+                </p>
+              </div>
+              <Button size="sm" variant="outline" onClick={mapearFontes} disabled={mapeando}>
+                {mapeando
+                  ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Mapeando…</>
+                  : <><Wand2 className="h-3.5 w-3.5 mr-1.5" /> Mapear fontes</>}
+              </Button>
+            </div>
+            {mapaFontes && (
+              <div>
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                  onClick={() => setMapaExpanded((v) => !v)}
+                >
+                  {mapaExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                  {mapaExpanded ? 'Recolher' : 'Expandir'} mapa
+                </button>
+                {mapaExpanded && (
+                  <div className="mt-2 prose prose-sm dark:prose-invert max-w-none">
+                    <ReactMarkdown>{mapaFontes}</ReactMarkdown>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Card C — Anotações estruturadas por dimensão */}
           <div className="space-y-2">
             <h5 className="text-sm font-medium">Anotações do consultor</h5>
-            <Textarea
-              value={anotacoes}
-              onChange={(e) => setAnotacoes(e.target.value)}
-              rows={4}
-              placeholder="Adicione observações da visita presencial, dados levantados in loco, contexto da praça de atuação e qualquer informação relevante não capturada nas gravações."
-            />
+            <p className="text-[11px] text-muted-foreground">
+              Preencha apenas as seções relevantes. Campos vazios são ignorados ao gerar.
+            </p>
+            <div className="space-y-2">
+              {SECOES_ANOTACOES.map((s) => {
+                const valor = anotacoesSecoes[s.key] ?? '';
+                const preenchida = valor.trim().length > 0;
+                return (
+                  <details
+                    key={s.key}
+                    className="rounded-md border border-border bg-background"
+                    open={preenchida}
+                  >
+                    <summary className="cursor-pointer select-none px-3 py-2 text-xs font-medium flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-2">
+                        {preenchida
+                          ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                          : <span className="h-3.5 w-3.5 rounded-full border border-border inline-block" />}
+                        {s.titulo}
+                      </span>
+                      {preenchida && (
+                        <span className="text-[10px] text-muted-foreground">
+                          {contarPalavras(valor)} palavra(s)
+                        </span>
+                      )}
+                    </summary>
+                    <div className="px-3 pb-3 space-y-1">
+                      <p className="text-[11px] text-muted-foreground italic">{s.guia}</p>
+                      <Textarea
+                        value={valor}
+                        onChange={(e) =>
+                          setAnotacoesSecoes((prev) => ({ ...prev, [s.key]: e.target.value }))
+                        }
+                        rows={3}
+                        placeholder="Escreva o que for relevante…"
+                      />
+                    </div>
+                  </details>
+                );
+              })}
+            </div>
             <p className="text-[10px] text-muted-foreground">
               Salvo automaticamente no seu navegador para não perder ao navegar.
+            </p>
+          </div>
+
+          {/* Checklist de prontidão */}
+          <div className="rounded-lg border border-border bg-muted/10 p-3 space-y-1.5 text-xs">
+            <ProntidaoLinha
+              ok={respostasDisponiveis > 0}
+              label={`Questionário de pré-onboarding: ${respostasDisponiveis} resposta(s) recebida(s)`}
+            />
+            <ProntidaoLinha
+              ok={transcricoesProntas.length > 0}
+              label={`Transcrições: ${transcricoesProntas.length} entrevista(s) (${totalPalavrasTranscricoes.toLocaleString('pt-BR')} palavras no total)`}
+              warnIfEmpty
+            />
+            <ProntidaoLinha
+              ok={secoesPreenchidas.length > 0}
+              label={`Anotações: ${secoesPreenchidas.length} de ${SECOES_ANOTACOES.length} seções preenchidas`}
+            />
+            <p className="text-[11px] text-muted-foreground pt-1">
+              Quanto mais fontes, mais rico o diagnóstico. Você pode gerar agora ou complementar antes.
             </p>
           </div>
 
