@@ -24,6 +24,8 @@ import {
   useSalvarAgenteRascunho,
   type ProjetoDocumento,
 } from '@/hooks/useProjetoDocumentos';
+import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Props {
   clienteId: string;
@@ -108,6 +110,9 @@ export function AgentesTab({ clienteId }: Props) {
   const { mutate: salvarRascunho } = useSalvarAgenteRascunho();
   const gerar = useGerarDocumento();
   const { mutateAsync: parseDocumento } = useParseDocumento();
+  const queryClient = useQueryClient();
+  const [importUrl, setImportUrl] = useState('');
+  const [importing, setImporting] = useState(false);
   const draftHydratedRef = useRef(false);
   const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reparsingDraftIdsRef = useRef<Set<string>>(new Set());
@@ -365,7 +370,6 @@ export function AgentesTab({ clienteId }: Props) {
   };
 
   const gerarClienteOculto = () => {
-    if (!okrsDoc) return;
     gerar.mutate(
       {
         tipo: 'briefing_cliente_oculto',
@@ -376,6 +380,26 @@ export function AgentesTab({ clienteId }: Props) {
       },
       { onSuccess: () => toast.success('Briefing gerado.') },
     );
+  };
+
+  const importarDiagnostico = async () => {
+    const url = importUrl.trim();
+    if (!url) return;
+    setImporting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('importar-documento-agente', {
+        body: { tipo: 'diagnostico', cliente_id: clienteId, gdrive_url: url },
+      });
+      if (error) throw new Error((data as any)?.error ?? error.message);
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast.success('Diagnóstico importado.');
+      setImportUrl('');
+      queryClient.invalidateQueries({ queryKey: ['cliente_documentos', clienteId] });
+    } catch (e: any) {
+      toast.error(`Falha ao importar: ${e.message}`);
+    } finally {
+      setImporting(false);
+    }
   };
 
   const isBusy = (tipo: string) => gerar.isPending && gerar.variables?.tipo === tipo;
@@ -561,6 +585,35 @@ export function AgentesTab({ clienteId }: Props) {
               ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Gerando…</>
               : <><Sparkles className="h-4 w-4 mr-2" /> Gerar Diagnóstico</>}
           </Button>
+
+          <Separator />
+          <div className="rounded-lg border border-dashed border-border bg-muted/10 p-4 space-y-2">
+            <h5 className="text-sm font-medium flex items-center gap-1.5">
+              <LinkIcon className="h-4 w-4" /> Já tem um diagnóstico pronto?
+            </h5>
+            <p className="text-xs text-muted-foreground">
+              Importe um diagnóstico já feito (Google Docs). O conteúdo será extraído
+              e usado como contexto pelos próximos agentes (OKRs, Cliente Oculto).
+            </p>
+            <div className="flex gap-2">
+              <Input
+                value={importUrl}
+                onChange={(e) => setImportUrl(e.target.value)}
+                placeholder="https://docs.google.com/document/d/…"
+                className="text-xs"
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={importarDiagnostico}
+                disabled={!importUrl.trim() || importing}
+              >
+                {importing
+                  ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Importando…</>
+                  : <>Importar</>}
+              </Button>
+            </div>
+          </div>
         </PanelAgente>
 
         {/* OKRs */}
@@ -618,8 +671,6 @@ export function AgentesTab({ clienteId }: Props) {
           onToggleExpand={() =>
             setExpandedHistory((p) => ({ ...p, briefing_cliente_oculto: !p['briefing_cliente_oculto'] }))
           }
-          disabled={!okrsDoc}
-          disabledTooltip="Gere os OKRs primeiro"
         >
           <div className="space-y-3">
             <div>
@@ -633,7 +684,6 @@ export function AgentesTab({ clienteId }: Props) {
                       variant={selected ? 'default' : 'outline'}
                       className="cursor-pointer"
                       onClick={() => {
-                        if (!okrsDoc) return;
                         setCoCanais((prev) =>
                           prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c],
                         );
@@ -653,7 +703,7 @@ export function AgentesTab({ clienteId }: Props) {
                     key={n}
                     variant={coPersonas === n ? 'default' : 'outline'}
                     className="cursor-pointer"
-                    onClick={() => okrsDoc && setCoPersonas(n as 1 | 2)}
+                    onClick={() => setCoPersonas(n as 1 | 2)}
                   >
                     {n} persona{n > 1 ? 's' : ''}
                   </Badge>
@@ -665,10 +715,9 @@ export function AgentesTab({ clienteId }: Props) {
               onChange={(e) => setCoObservacoes(e.target.value)}
               rows={3}
               placeholder="Observações específicas sobre o que deve ser avaliado, contexto da operação, pontos críticos."
-              disabled={!okrsDoc}
             />
           </div>
-          <Button onClick={gerarClienteOculto} disabled={!okrsDoc || isBusy('briefing_cliente_oculto')} className="w-full sm:w-auto">
+          <Button onClick={gerarClienteOculto} disabled={isBusy('briefing_cliente_oculto')} className="w-full sm:w-auto">
             {isBusy('briefing_cliente_oculto')
               ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Gerando…</>
               : <><Sparkles className="h-4 w-4 mr-2" /> Gerar Briefing</>}

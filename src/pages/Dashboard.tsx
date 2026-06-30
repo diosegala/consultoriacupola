@@ -19,6 +19,8 @@ import { useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useAuth } from '@/contexts/AuthContext';
+import { AiUsageSection } from '@/components/dashboard/AiUsageSection';
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('pt-BR', {
@@ -31,6 +33,7 @@ function formatCurrency(value: number): string {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { isAdmin, isDirector } = useAuth();
   const [consultoresSelecionados, setConsultoresSelecionados] = useState<string[]>([]);
   const [showClientesAtivos, setShowClientesAtivos] = useState(false);
   const [showMRR, setShowMRR] = useState(false);
@@ -842,6 +845,8 @@ export default function Dashboard() {
           </ScrollArea>
         </DialogContent>
       </Dialog>
+
+      {(isAdmin || isDirector) && <AiUsageSection />}
     </div>
   );
 }

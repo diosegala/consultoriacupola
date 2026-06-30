@@ -76,6 +76,69 @@ export type Database = {
           },
         ]
       }
+      ai_usage_logs: {
+        Row: {
+          agente_tipo: string | null
+          cliente_id: string | null
+          consultor_id: string | null
+          cost_usd: number
+          created_at: string
+          error_message: string | null
+          id: string
+          input_tokens: number
+          model: string | null
+          output_tokens: number
+          provider: string
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          agente_tipo?: string | null
+          cliente_id?: string | null
+          consultor_id?: string | null
+          cost_usd?: number
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          input_tokens?: number
+          model?: string | null
+          output_tokens?: number
+          provider: string
+          status?: string
+          user_id?: string | null
+        }
+        Update: {
+          agente_tipo?: string | null
+          cliente_id?: string | null
+          consultor_id?: string | null
+          cost_usd?: number
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          input_tokens?: number
+          model?: string | null
+          output_tokens?: number
+          provider?: string
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_logs_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_usage_logs_consultor_id_fkey"
+            columns: ["consultor_id"]
+            isOneToOne: false
+            referencedRelation: "consultores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       atendimentos: {
         Row: {
           cliente_id: string
