@@ -671,8 +671,6 @@ export function AgentesTab({ clienteId }: Props) {
           onToggleExpand={() =>
             setExpandedHistory((p) => ({ ...p, briefing_cliente_oculto: !p['briefing_cliente_oculto'] }))
           }
-          disabled={!okrsDoc}
-          disabledTooltip="Gere os OKRs primeiro"
         >
           <div className="space-y-3">
             <div>
@@ -686,7 +684,6 @@ export function AgentesTab({ clienteId }: Props) {
                       variant={selected ? 'default' : 'outline'}
                       className="cursor-pointer"
                       onClick={() => {
-                        if (!okrsDoc) return;
                         setCoCanais((prev) =>
                           prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c],
                         );
@@ -706,7 +703,7 @@ export function AgentesTab({ clienteId }: Props) {
                     key={n}
                     variant={coPersonas === n ? 'default' : 'outline'}
                     className="cursor-pointer"
-                    onClick={() => okrsDoc && setCoPersonas(n as 1 | 2)}
+                    onClick={() => setCoPersonas(n as 1 | 2)}
                   >
                     {n} persona{n > 1 ? 's' : ''}
                   </Badge>
@@ -718,10 +715,9 @@ export function AgentesTab({ clienteId }: Props) {
               onChange={(e) => setCoObservacoes(e.target.value)}
               rows={3}
               placeholder="Observações específicas sobre o que deve ser avaliado, contexto da operação, pontos críticos."
-              disabled={!okrsDoc}
             />
           </div>
-          <Button onClick={gerarClienteOculto} disabled={!okrsDoc || isBusy('briefing_cliente_oculto')} className="w-full sm:w-auto">
+          <Button onClick={gerarClienteOculto} disabled={isBusy('briefing_cliente_oculto')} className="w-full sm:w-auto">
             {isBusy('briefing_cliente_oculto')
               ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Gerando…</>
               : <><Sparkles className="h-4 w-4 mr-2" /> Gerar Briefing</>}
