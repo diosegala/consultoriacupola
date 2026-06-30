@@ -6,6 +6,39 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+async function getValidGoogleToken(admin: any, userId: string): Promise<string | null> {
+  const { data: cu } = await admin
+    .from("consultor_user").select("consultor_id").eq("user_id", userId).maybeSingle();
+  if (!cu?.consultor_id) return null;
+  const { data: row } = await admin
+    .from("consultor_google_tokens").select("*")
+    .eq("consultor_id", cu.consultor_id).maybeSingle();
+  if (!row) return null;
+  const expired = new Date(row.expires_at).getTime() < Date.now();
+  if (!expired) return row.access_token;
+  try {
+    const r = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: Deno.env.get("GOOGLE_OAUTH_CLIENT_ID")!,
+        client_secret: Deno.env.get("GOOGLE_OAUTH_CLIENT_SECRET")!,
+        refresh_token: row.refresh_token,
+        grant_type: "refresh_token",
+      }),
+    });
+    const data = await r.json();
+    if (!r.ok) return null;
+    const newExpires = new Date(Date.now() + (data.expires_in - 60) * 1000).toISOString();
+    await admin.from("consultor_google_tokens")
+      .update({ access_token: data.access_token, expires_at: newExpires })
+      .eq("consultor_id", cu.consultor_id);
+    return data.access_token;
+  } catch {
+    return null;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -26,6 +59,10 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: authHeader } } }
     );
+    const admin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
 
     const token = authHeader.replace("Bearer ", "");
     const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
@@ -35,6 +72,7 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    const userId = claimsData.claims.sub as string;
 
     const body = await req.json();
     const { tipo, conteudo_base64, nome_arquivo, gdrive_url } = body;
@@ -43,7 +81,8 @@ Deno.serve(async (req) => {
 
     // Google Drive link
     if (gdrive_url) {
-      textoExtraido = await extractFromGDrive(gdrive_url);
+      const accessToken = await getValidGoogleToken(admin, userId);
+      textoExtraido = await extractFromGDrive(gdrive_url, accessToken);
     }
     // File upload (base64)
     else if (conteudo_base64 && tipo) {
@@ -100,7 +139,7 @@ async function extractFromDOCX(bytes: Uint8Array): Promise<string> {
   return result.value || "";
 }
 
-async function extractFromGDrive(url: string): Promise<string> {
+async function extractFromGDrive(url: string, accessToken: string | null): Promise<string> {
   // Extract file ID from various Google Drive/Docs URL formats
   let fileId: string | null = null;
 
@@ -126,38 +165,74 @@ async function extractFromGDrive(url: string): Promise<string> {
     );
   }
 
-  // Try Google Docs export first
-  const exportUrl = `https://docs.google.com/document/d/${fileId}/export?format=txt`;
-  const resp = await fetch(exportUrl, { redirect: "follow" });
-
-  if (resp.ok) {
-    return await resp.text();
+  if (!accessToken) {
+    throw new Error(
+      "Você precisa conectar sua conta Google em /minhas-integracoes para ler arquivos do Google Drive."
+    );
   }
 
-  // Try Google Drive direct download (for shared files)
-  const driveDownload = `https://drive.google.com/uc?export=download&id=${fileId}`;
-  const resp2 = await fetch(driveDownload, { redirect: "follow" });
-
-  if (resp2.ok) {
-    const contentType = resp2.headers.get("content-type") || "";
-    if (contentType.includes("text/")) {
-      return await resp2.text();
-    }
-    // If it's a binary file (PDF/DOCX), extract text
-    const buffer = await resp2.arrayBuffer();
-    const bytes = new Uint8Array(buffer);
-
-    if (contentType.includes("pdf")) {
-      return await extractFromPDF(bytes);
-    }
-    if (contentType.includes("wordprocessingml") || contentType.includes("docx")) {
-      return await extractFromDOCX(bytes);
-    }
-
-    throw new Error("O arquivo do Google Drive não é um formato suportado (PDF, DOCX ou Google Docs).");
-  }
-
-  throw new Error(
-    "Não foi possível acessar o arquivo. Verifique se o compartilhamento está configurado como 'Qualquer pessoa com o link'."
+  // Get file metadata to know mimeType
+  const metaRes = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${fileId}?fields=id,name,mimeType&supportsAllDrives=true`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
   );
+  if (!metaRes.ok) {
+    const errTxt = await metaRes.text();
+    if (metaRes.status === 404) {
+      throw new Error("Arquivo não encontrado ou sem permissão. Confirme que sua conta Google tem acesso a ele.");
+    }
+    throw new Error(`Falha ao acessar arquivo do Drive (${metaRes.status}): ${errTxt.slice(0, 200)}`);
+  }
+  const meta = await metaRes.json();
+  const mimeType: string = meta.mimeType || "";
+
+  // Google Docs / native Google formats → export
+  if (mimeType === "application/vnd.google-apps.document") {
+    const r = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=text/plain`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
+    if (!r.ok) throw new Error(`Falha ao exportar Google Doc: ${await r.text()}`);
+    return await r.text();
+  }
+  if (mimeType === "application/vnd.google-apps.spreadsheet") {
+    const r = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=text/csv`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
+    if (!r.ok) throw new Error(`Falha ao exportar Sheets: ${await r.text()}`);
+    return await r.text();
+  }
+  if (mimeType === "application/vnd.google-apps.presentation") {
+    const r = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=text/plain`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
+    if (!r.ok) throw new Error(`Falha ao exportar Slides: ${await r.text()}`);
+    return await r.text();
+  }
+
+  // Binary files → download via alt=media
+  const dl = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&supportsAllDrives=true`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  if (!dl.ok) throw new Error(`Falha ao baixar arquivo: ${await dl.text()}`);
+  const buffer = await dl.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+
+  if (mimeType === "application/pdf") {
+    return await extractFromPDF(bytes);
+  }
+  if (
+    mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    mimeType.includes("wordprocessingml")
+  ) {
+    return await extractFromDOCX(bytes);
+  }
+  if (mimeType.startsWith("text/")) {
+    return new TextDecoder().decode(bytes);
+  }
+
+  throw new Error(`Tipo de arquivo não suportado: ${mimeType}. Use Google Docs, PDF, DOCX ou TXT.`);
 }
