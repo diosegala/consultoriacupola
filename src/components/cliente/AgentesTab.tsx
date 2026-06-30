@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import {
   Sparkles, FileText, Target, ClipboardList, ClipboardCheck, Upload, Link as LinkIcon,
   Trash2, Loader2, ExternalLink, Eye, ChevronDown, ChevronUp, FileType, FileAudio,
+  Wand2, CheckCircle2, AlertCircle,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -41,14 +42,40 @@ interface Fonte {
   conteudo?: string;
   meta?: string; // nome de arquivo ou url
   errorMsg?: string;
+  papel?: string;          // ex: "Dono/Sócio", "Gestor"
+  dataEntrevista?: string; // YYYY-MM-DD
 }
+
+const PAPEIS_SUGERIDOS = [
+  'Dono/Sócio',
+  'Gestor',
+  'Equipe Comercial',
+  'Equipe Administrativa',
+  'Outro',
+];
+
+interface SecaoAnotacao {
+  key: string;
+  titulo: string;
+  guia: string;
+}
+
+const SECOES_ANOTACOES: SecaoAnotacao[] = [
+  { key: 'pessoas',    titulo: 'Pessoas e liderança',     guia: 'Como você percebeu a dinâmica de liderança e equipe? O que ficou nas entrelinhas?' },
+  { key: 'operacao',   titulo: 'Operação e processos',    guia: 'Onde estão os maiores gargalos do dia a dia? O que está funcionando mal e ninguém comenta abertamente?' },
+  { key: 'tecnologia', titulo: 'Tecnologia e sistemas',   guia: 'Quais ferramentas usam? O que está desconectado, subutilizado ou sendo feito no braço?' },
+  { key: 'cultura',    titulo: 'Cultura e comportamento', guia: 'Qual é o clima da empresa? Há resistência a mudança? Como é a relação entre as áreas?' },
+  { key: 'contexto',   titulo: 'Contexto externo',        guia: 'Como está o mercado local? Concorrência, sazonalidade, oportunidades da praça que impactam esse cliente?' },
+  { key: 'impressao',  titulo: 'Impressão geral do consultor', guia: 'O que mais te chamou atenção? Qual é o maior risco e a maior oportunidade que você viu?' },
+];
 
 interface AgentesDraftState {
   fontes?: Fonte[];
   gdriveUrl?: string;
   textoColado?: string;
   textoLabel?: string;
-  anotacoes?: string;
+  anotacoes?: string;                          // legacy
+  anotacoesSecoes?: Record<string, string>;
   okrContexto?: string;
   okrTrimestre?: string;
   coCanais?: string[];
@@ -103,6 +130,19 @@ function conteudoExtraidoInvalido(conteudo?: string) {
     inicio.includes('service_login') ||
     inicio.includes('google accounts')
   );
+}
+
+function contarPalavras(texto?: string) {
+  if (!texto) return 0;
+  const limpo = texto.trim();
+  if (!limpo) return 0;
+  return limpo.split(/\s+/).length;
+}
+
+function formatarMinutosFala(palavras: number) {
+  // ~150 palavras por minuto de fala
+  const min = Math.max(1, Math.round(palavras / 150));
+  return `~${min} min de fala`;
 }
 
 export function AgentesTab({ clienteId }: Props) {
@@ -192,8 +232,13 @@ export function AgentesTab({ clienteId }: Props) {
   const [gdriveUrl, setGdriveUrl] = useState('');
   const [textoColado, setTextoColado] = useState('');
   const [textoLabel, setTextoLabel] = useState('');
-  const [anotacoes, setAnotacoes] = useState('');
+  const [anotacoesSecoes, setAnotacoesSecoes] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Pré-análise (Mapa das fontes)
+  const [mapaFontes, setMapaFontes] = useState<string>('');
+  const [mapeando, setMapeando] = useState(false);
+  const [mapaExpanded, setMapaExpanded] = useState(true);
 
   // Persistência local das anotações
   const anotKey = `anotacoes_diagnostico_${clienteId}`;
@@ -219,7 +264,8 @@ export function AgentesTab({ clienteId }: Props) {
     setGdriveUrl('');
     setTextoColado('');
     setTextoLabel('');
-    setAnotacoes('');
+    setAnotacoesSecoes({});
+    setMapaFontes('');
     setOkrContexto('');
     setOkrTrimestre(TRIMESTRES[0]);
     setCoCanais([]);
@@ -240,7 +286,12 @@ export function AgentesTab({ clienteId }: Props) {
       setGdriveUrl(estado.gdriveUrl ?? '');
       setTextoColado(estado.textoColado ?? '');
       setTextoLabel(estado.textoLabel ?? '');
-      setAnotacoes(estado.anotacoes ?? '');
+      if (estado.anotacoesSecoes && typeof estado.anotacoesSecoes === 'object') {
+        setAnotacoesSecoes(estado.anotacoesSecoes);
+      } else if (estado.anotacoes) {
+        // migra legacy → impressão geral
+        setAnotacoesSecoes({ impressao: estado.anotacoes });
+      }
       setOkrContexto(estado.okrContexto ?? '');
       setOkrTrimestre(estado.okrTrimestre ?? TRIMESTRES[0]);
       setCoCanais(Array.isArray(estado.coCanais) ? estado.coCanais : []);
@@ -248,7 +299,7 @@ export function AgentesTab({ clienteId }: Props) {
       setCoObservacoes(estado.coObservacoes ?? '');
     } else {
       const legacyAnotacoes = typeof window !== 'undefined' ? localStorage.getItem(anotKey) : null;
-      if (legacyAnotacoes) setAnotacoes(legacyAnotacoes);
+      if (legacyAnotacoes) setAnotacoesSecoes({ impressao: legacyAnotacoes });
     }
 
     draftHydratedRef.current = true;
@@ -263,7 +314,7 @@ export function AgentesTab({ clienteId }: Props) {
       gdriveUrl,
       textoColado,
       textoLabel,
-      anotacoes,
+      anotacoesSecoes,
       okrContexto,
       okrTrimestre,
       coCanais,
@@ -281,7 +332,7 @@ export function AgentesTab({ clienteId }: Props) {
     return () => {
       if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
     };
-  }, [clienteId, draftKey, fontes, gdriveUrl, textoColado, textoLabel, anotacoes, okrContexto, okrTrimestre, coCanais, coPersonas, coObservacoes, salvarRascunho]);
+  }, [clienteId, draftKey, fontes, gdriveUrl, textoColado, textoLabel, anotacoesSecoes, okrContexto, okrTrimestre, coCanais, coPersonas, coObservacoes, salvarRascunho]);
 
   useEffect(() => {
     if (!draftHydratedRef.current) return;
@@ -335,15 +386,45 @@ export function AgentesTab({ clienteId }: Props) {
   const transcricoesProntas = fontes.filter((f) =>
     f.status === 'done' && f.conteudo && !conteudoExtraidoInvalido(f.conteudo),
   );
+
+  const totalPalavrasTranscricoes = useMemo(
+    () => transcricoesProntas.reduce((acc, f) => acc + contarPalavras(f.conteudo), 0),
+    [transcricoesProntas],
+  );
+
+  const secoesPreenchidas = useMemo(
+    () => SECOES_ANOTACOES.filter((s) => (anotacoesSecoes[s.key] ?? '').trim().length > 0),
+    [anotacoesSecoes],
+  );
+
+  const anotacoesConcatenadas = useMemo(() => {
+    if (secoesPreenchidas.length === 0) return '';
+    const blocos = secoesPreenchidas
+      .map((s) => `[${s.titulo}]: ${(anotacoesSecoes[s.key] ?? '').trim()}`)
+      .join('\n\n');
+    return `=== ANOTAÇÕES DO CONSULTOR ===\n${blocos}\n=== FIM DAS ANOTAÇÕES ===`;
+  }, [secoesPreenchidas, anotacoesSecoes]);
+
   const podeGerarDiagnostico =
-    respostasDisponiveis > 0 || transcricoesProntas.length > 0 || anotacoes.trim().length > 0;
+    respostasDisponiveis > 0 || transcricoesProntas.length > 0 || secoesPreenchidas.length > 0;
 
   // mantém metadata "ao vivo" para fallback de unmount
   metadataRef.current = {
     num_transcricoes: transcricoesProntas.length,
-    num_caracteres_anotacoes: anotacoes.trim().length,
+    num_caracteres_anotacoes: anotacoesConcatenadas.length,
     respostas_questionario_usadas: respostasDisponiveis,
   };
+
+  function rotuloTranscricao(f: Fonte) {
+    const papel = (f.papel ?? '').trim();
+    const data = (f.dataEntrevista ?? '').trim();
+    if (!papel && !data) return f.label;
+    const dataFmt = data ? (() => {
+      try { return format(new Date(data + 'T00:00:00'), 'dd/MM/yyyy'); } catch { return data; }
+    })() : '';
+    const partes = [papel || f.label, dataFmt].filter(Boolean).join(' — ');
+    return `ENTREVISTA: ${partes}`;
+  }
 
   /* ====== Card B helpers ====== */
 
@@ -412,6 +493,41 @@ export function AgentesTab({ clienteId }: Props) {
   const renomearFonte = (id: string, label: string) =>
     setFontes((prev) => prev.map((f) => (f.id === id ? { ...f, label } : f)));
 
+  const atualizarFonte = (id: string, patch: Partial<Fonte>) =>
+    setFontes((prev) => prev.map((f) => (f.id === id ? { ...f, ...patch } : f)));
+
+  /* ====== Mapear fontes (pré-análise) ====== */
+
+  const mapearFontes = async () => {
+    if (transcricoesProntas.length === 0 && respostasDisponiveis === 0) {
+      toast.error('Adicione ao menos uma transcrição ou tenha respostas do questionário.');
+      return;
+    }
+    setMapeando(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('agente-projeto', {
+        body: {
+          tipo: 'pre_analise',
+          cliente_id: clienteId,
+          questionario_data: (questionario?.respostas as Record<string, unknown>) ?? null,
+          transcricoes_textos: transcricoesProntas.map((f) => ({
+            label: rotuloTranscricao(f),
+            conteudo: f.conteudo!,
+          })),
+        },
+      });
+      if (error) throw new Error((data as any)?.error ?? error.message);
+      if ((data as any)?.error) throw new Error((data as any).error);
+      setMapaFontes((data as any)?.conteudo ?? '');
+      setMapaExpanded(true);
+      toast.success('Mapa das fontes pronto.');
+    } catch (e: any) {
+      toast.error(`Falha ao mapear: ${e.message}`);
+    } finally {
+      setMapeando(false);
+    }
+  };
+
   /* ====== Gerar ====== */
 
   const finalizarTempo = (tipo: TipoAgente, opts: { iaSegundos: number | null; interrompido: boolean; metaExtra?: Record<string, unknown> }) => {
@@ -462,8 +578,11 @@ export function AgentesTab({ clienteId }: Props) {
       tipo: 'diagnostico',
       cliente_id: clienteId,
       questionario_data: (questionario?.respostas as Record<string, unknown>) ?? null,
-      transcricoes_textos: transcricoesProntas.map((f) => ({ label: f.label, conteudo: f.conteudo! })),
-      anotacoes_consultor: anotacoes.trim() || undefined,
+      transcricoes_textos: transcricoesProntas.map((f) => ({
+        label: rotuloTranscricao(f),
+        conteudo: f.conteudo!,
+      })),
+      anotacoes_consultor: anotacoesConcatenadas || undefined,
     });
   };
 
