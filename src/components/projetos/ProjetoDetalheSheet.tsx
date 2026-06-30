@@ -25,7 +25,7 @@ import { useChecklistResponsaveisByProjeto, useAddChecklistResponsavel, useRemov
 import { useTodoPessoal, useCreateTodoPessoal, useUpdateTodoPessoal, useDeleteTodoPessoal } from '@/hooks/useTodoPessoal';
 import { useReunioesByConsultor } from '@/hooks/useReunioes';
 import { useProjetoTags, useProjetoTagVinculos, useAddTagToProjeto, useRemoveTagFromProjeto, useCreateTag, TAG_COLORS } from '@/hooks/useProjetoTags';
-import { useProjetoDocumentos, useGerarDocumento, useParseDocumento } from '@/hooks/useProjetoDocumentos';
+import { useProjetoDocumentos, useClienteDocumentos, useGerarDocumento, useParseDocumento } from '@/hooks/useProjetoDocumentos';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { RenovarContratoDialog } from '@/components/cliente/ClienteDialogs';
@@ -88,6 +88,7 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
   const { data: allTags } = useProjetoTags();
   const { data: tagVinculos } = useProjetoTagVinculos(projeto?.id);
   const { data: documentos } = useProjetoDocumentos(projeto?.id);
+  const { data: documentosCliente } = useClienteDocumentos(projeto?.cliente_id);
   const { data: contratoAtivo } = useContratoAtivo(projeto?.cliente_id);
   const gerarDocumento = useGerarDocumento();
   const parseDocumento = useParseDocumento();
@@ -614,9 +615,61 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
                 <h4 className="text-sm font-medium mb-2 flex items-center gap-1">
                   <Sparkles className="h-4 w-4" /> Agentes IA
                 </h4>
-                <p className="text-xs text-muted-foreground mb-2">
-                  Os agentes de IA agora vivem na página do cliente, com acesso a questionário, transcrições e anotações.
-                </p>
+                {(() => {
+                  const docsMap = new Map<string, typeof documentosCliente[number]>();
+                  for (const d of [...(documentosCliente ?? []), ...(documentos ?? [])]) {
+                    const existing = docsMap.get(d.tipo);
+                    if (!existing || new Date(d.created_at) > new Date(existing.created_at)) {
+                      docsMap.set(d.tipo, d);
+                    }
+                  }
+                  const tipos: Array<{ tipo: string; label: string }> = [
+                    { tipo: 'diagnostico', label: 'Diagnóstico' },
+                    { tipo: 'okrs', label: 'OKRs' },
+                    { tipo: 'briefing_cliente_oculto', label: 'Briefing Cliente Oculto' },
+                  ];
+                  const items = tipos
+                    .map(t => ({ ...t, doc: docsMap.get(t.tipo) }))
+                    .filter(t => t.doc);
+                  if (items.length === 0) {
+                    return (
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Nenhum documento gerado ainda.
+                      </p>
+                    );
+                  }
+                  return (
+                    <div className="space-y-1.5 mb-2">
+                      {items.map(({ tipo, label, doc }) => (
+                        <div
+                          key={tipo}
+                          className="flex items-center gap-2 p-2 rounded-md bg-muted/50 hover:bg-muted cursor-pointer text-xs"
+                          onClick={() => setViewingDoc({ tipo: label, conteudo: doc!.conteudo })}
+                        >
+                          <FileText className="h-3.5 w-3.5 shrink-0 text-primary" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{label}</p>
+                            <p className="text-[10px] text-muted-foreground">
+                              {format(new Date(doc!.created_at), "dd/MM/yyyy HH:mm")}
+                            </p>
+                          </div>
+                          {doc!.gdoc_url && (
+                            <a
+                              href={doc!.gdoc_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={e => e.stopPropagation()}
+                              className="text-muted-foreground hover:text-primary"
+                              title="Abrir no Google Docs"
+                            >
+                              <LinkIcon className="h-3.5 w-3.5" />
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
                 <Button
                   size="sm"
                   variant="outline"
