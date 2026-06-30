@@ -18,6 +18,7 @@ import {
   BarChart, Bar,
 } from "recharts";
 import jsPDF from "jspdf";
+import { TempoInvestidoSection } from "@/components/consultor/TempoInvestidoSection";
 
 type PresetKey = "30d" | "90d" | "ano" | "custom";
 
@@ -251,6 +252,9 @@ export default function RelatorioConsultor() {
               </Table>
             </CardContent>
           </Card>
+
+          {/* SEÇÃO 5 — Tempo investido */}
+          <TempoInvestidoSection consultorId={id} from={periodo.from} to={periodo.to} />
         </>
       )}
     </div>
