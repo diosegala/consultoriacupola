@@ -370,7 +370,6 @@ export function AgentesTab({ clienteId }: Props) {
   };
 
   const gerarClienteOculto = () => {
-    if (!okrsDoc) return;
     gerar.mutate(
       {
         tipo: 'briefing_cliente_oculto',
@@ -381,6 +380,26 @@ export function AgentesTab({ clienteId }: Props) {
       },
       { onSuccess: () => toast.success('Briefing gerado.') },
     );
+  };
+
+  const importarDiagnostico = async () => {
+    const url = importUrl.trim();
+    if (!url) return;
+    setImporting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('importar-documento-agente', {
+        body: { tipo: 'diagnostico', cliente_id: clienteId, gdrive_url: url },
+      });
+      if (error) throw new Error((data as any)?.error ?? error.message);
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast.success('Diagnóstico importado.');
+      setImportUrl('');
+      queryClient.invalidateQueries({ queryKey: ['cliente_documentos', clienteId] });
+    } catch (e: any) {
+      toast.error(`Falha ao importar: ${e.message}`);
+    } finally {
+      setImporting(false);
+    }
   };
 
   const isBusy = (tipo: string) => gerar.isPending && gerar.variables?.tipo === tipo;
