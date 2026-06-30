@@ -21,7 +21,7 @@ export function useRegistrarInteracaoTempo() {
     mutationFn: async (input: InteracaoTempoInput) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const { error } = await supabase.from('interacoes_tempo').insert({
+      const payload = {
         user_id: user.id,
         consultor_id: consultorId ?? null,
         cliente_id: input.cliente_id,
@@ -31,8 +31,9 @@ export function useRegistrarInteracaoTempo() {
         duracao_preparacao_segundos: input.duracao_preparacao_segundos,
         duracao_geracao_ia_segundos: input.duracao_geracao_ia_segundos ?? null,
         tempo_total_decorrido_segundos: input.tempo_total_decorrido_segundos,
-        metadata: input.metadata ?? {},
-      });
+        metadata: (input.metadata ?? {}) as Record<string, unknown>,
+      };
+      const { error } = await (supabase.from('interacoes_tempo') as any).insert(payload);
       if (error) throw error;
     },
   });
