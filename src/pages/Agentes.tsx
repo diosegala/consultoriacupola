@@ -83,6 +83,14 @@ export default function Agentes() {
   const setAgente = (next: AgenteKey | null) => updateParams({ agente: next });
   const setClienteId = (next: string | undefined) => updateParams({ cliente: next ?? null });
 
+  const handleTrocarAgente = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('agentes.agente');
+      localStorage.removeItem('agentes.clienteId');
+    }
+    setSearchParams(new URLSearchParams(), { replace: true });
+  };
+
   // Sincroniza URL com valores hidratados do localStorage no primeiro mount
   useEffect(() => {
     const patch: { agente?: AgenteKey | null; cliente?: string | null } = {};
@@ -163,10 +171,7 @@ export default function Agentes() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => {
-                  setAgente(null);
-                  setClienteId(undefined);
-                }}
+                onClick={handleTrocarAgente}
               >
                 <ArrowLeft className="h-4 w-4 mr-1" />
                 Trocar agente
