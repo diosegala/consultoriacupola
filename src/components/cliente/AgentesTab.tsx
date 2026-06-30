@@ -90,6 +90,17 @@ function fileIcon(name: string) {
   return FileType;
 }
 
+function conteudoExtraidoInvalido(conteudo?: string) {
+  const inicio = (conteudo ?? '').trim().slice(0, 2000).toLowerCase();
+  return (
+    inicio.startsWith('<!doctype html') ||
+    inicio.startsWith('<html') ||
+    inicio.includes('accounts.google.com') ||
+    inicio.includes('service_login') ||
+    inicio.includes('google accounts')
+  );
+}
+
 export function AgentesTab({ clienteId }: Props) {
   const { data: questionario } = useQuestionarioCliente(clienteId);
   const { data: documentos } = useClienteDocumentos(clienteId);
@@ -201,11 +212,17 @@ export function AgentesTab({ clienteId }: Props) {
     if (!draftHydratedRef.current) return;
 
     const pendentesDrive = fontes.filter(
-      (f) => f.origem === 'gdrive' && f.status === 'parsing' && f.meta && !reparsingDraftIdsRef.current.has(f.id),
+      (f) => f.origem === 'gdrive'
+        && (f.status === 'parsing' || (f.status === 'done' && conteudoExtraidoInvalido(f.conteudo)))
+        && f.meta
+        && !reparsingDraftIdsRef.current.has(f.id),
     );
 
     pendentesDrive.forEach((fonte) => {
       reparsingDraftIdsRef.current.add(fonte.id);
+      setFontes((prev) =>
+        prev.map((f) => (f.id === fonte.id ? { ...f, status: 'parsing', errorMsg: undefined } : f)),
+      );
       parseDocumento({ gdrive_url: fonte.meta })
         .then((texto) => {
           setFontes((prev) =>
@@ -240,7 +257,9 @@ export function AgentesTab({ clienteId }: Props) {
     }).length;
   }, [questionario]);
 
-  const transcricoesProntas = fontes.filter((f) => f.status === 'done' && f.conteudo);
+  const transcricoesProntas = fontes.filter((f) =>
+    f.status === 'done' && f.conteudo && !conteudoExtraidoInvalido(f.conteudo),
+  );
   const podeGerarDiagnostico =
     respostasDisponiveis > 0 || transcricoesProntas.length > 0 || anotacoes.trim().length > 0;
 
