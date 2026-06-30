@@ -155,7 +155,15 @@ function normalizarTipoArquivo(tipo?: string, nomeArquivo?: string): "pdf" | "do
   const raw = `${tipo || ""} ${nomeArquivo || ""}`.toLowerCase();
   if (raw.includes("pdf") || raw.endsWith(".pdf")) return "pdf";
   if (raw.includes("docx") || raw.includes("wordprocessingml") || raw.endsWith(".docx")) return "docx";
-  if (raw.includes("text/plain") || raw.includes("txt") || raw.endsWith(".txt")) return "txt";
+  if (
+    raw.includes("text/plain") ||
+    raw.includes("txt") ||
+    raw.includes("vtt") ||
+    raw.includes("srt") ||
+    raw.endsWith(".txt") ||
+    raw.endsWith(".vtt") ||
+    raw.endsWith(".srt")
+  ) return "txt";
   return null;
 }
 
