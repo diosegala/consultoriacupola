@@ -55,7 +55,19 @@ export function useParseDocumento() {
       const { data, error } = await supabase.functions.invoke('parse-documento', {
         body: params,
       });
-      if (error) throw new Error(error.message || 'Erro ao processar documento');
+      if (error) {
+        let message = error.message || 'Erro ao processar documento';
+        const response = (error as any)?.context;
+        if (response && typeof response.json === 'function') {
+          try {
+            const body = await response.json();
+            if (typeof body?.error === 'string') message = body.error;
+          } catch {
+            // mantém a mensagem original
+          }
+        }
+        throw new Error(message);
+      }
       if (data?.error) throw new Error(data.error);
       return data.texto as string;
     },
