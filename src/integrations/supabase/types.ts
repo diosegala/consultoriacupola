@@ -664,6 +664,36 @@ export type Database = {
           },
         ]
       }
+      insights_agregados: {
+        Row: {
+          conteudo: Json
+          created_at: string
+          filtros: Json | null
+          gerado_por: string | null
+          id: string
+          periodo_analisado: string | null
+          tipo: string
+        }
+        Insert: {
+          conteudo: Json
+          created_at?: string
+          filtros?: Json | null
+          gerado_por?: string | null
+          id?: string
+          periodo_analisado?: string | null
+          tipo: string
+        }
+        Update: {
+          conteudo?: Json
+          created_at?: string
+          filtros?: Json | null
+          gerado_por?: string | null
+          id?: string
+          periodo_analisado?: string | null
+          tipo?: string
+        }
+        Relationships: []
+      }
       interacoes_tempo: {
         Row: {
           cliente_id: string | null
@@ -858,6 +888,56 @@ export type Database = {
             columns: ["contrato_id"]
             isOneToOne: false
             referencedRelation: "contratos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      oportunidades_produto: {
+        Row: {
+          created_at: string
+          criado_por: string | null
+          descricao: string
+          evidencia: string | null
+          id: string
+          notas: string | null
+          origem_insight_id: string | null
+          potencial_demanda: string | null
+          status: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          criado_por?: string | null
+          descricao: string
+          evidencia?: string | null
+          id?: string
+          notas?: string | null
+          origem_insight_id?: string | null
+          potencial_demanda?: string | null
+          status?: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          criado_por?: string | null
+          descricao?: string
+          evidencia?: string | null
+          id?: string
+          notas?: string | null
+          origem_insight_id?: string | null
+          potencial_demanda?: string | null
+          status?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oportunidades_produto_origem_insight_id_fkey"
+            columns: ["origem_insight_id"]
+            isOneToOne: false
+            referencedRelation: "insights_agregados"
             referencedColumns: ["id"]
           },
         ]
