@@ -276,6 +276,14 @@ Retorne a análise usando a função fornecida. Seja conciso nos textos.`;
       });
 
       if (clienteClaude.ok) {
+        await logAiUsage({
+          admin: supabase,
+          agente_tipo: "analise_reuniao_cliente",
+          user_id: user.id,
+          cliente_id: reuniao.cliente_id ?? null,
+          consultor_id: reuniao.consultor_id ?? null,
+          usage: clienteClaude.usage,
+        });
         if (clienteClaude.toolInput || clienteClaude.text) {
           analiseCliente = clienteClaude.toolInput ?? parseAIResponse(clienteClaude.text || "");
           analiseCliente.participacao_ativa = Number(analiseCliente.participacao_ativa) || 0;
@@ -294,6 +302,15 @@ Retorne a análise usando a função fornecida. Seja conciso nos textos.`;
         }
       } else {
         console.error("Erro na análise do cliente:", clienteClaude.status, clienteClaude.errorMessage);
+        await logAiUsage({
+          admin: supabase,
+          agente_tipo: "analise_reuniao_cliente",
+          user_id: user.id,
+          cliente_id: reuniao.cliente_id ?? null,
+          consultor_id: reuniao.consultor_id ?? null,
+          status: "error",
+          error_message: clienteClaude.errorMessage ?? null,
+        });
       }
     } catch (clienteErr) {
       console.error("Erro na análise do cliente (não crítico):", clienteErr);
