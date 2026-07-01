@@ -13,6 +13,9 @@ import {
   Video,
   FileText,
   Plus,
+  Sparkles,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { format, addDays, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -25,6 +28,36 @@ import { useUpdateTodoPessoal } from '@/hooks/useTodoPessoal';
 import { NovaReuniaoDialog } from '@/components/consultor/NovaReuniaoDialog';
 import { NovaTarefaPessoalDialog } from '@/components/tarefas/NovaTarefaPessoalDialog';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
+
+const TIPOS_PROATIVOS = ['sem_contato', 'checklist_parado', 'okr_sem_progresso', 'contrato_sem_renovacao'] as const;
+type TipoProativo = (typeof TIPOS_PROATIVOS)[number];
+
+const TIPO_META: Record<TipoProativo, { label: string; className: string }> = {
+  sem_contato: { label: 'Reengajar', className: 'bg-destructive/15 text-destructive border-destructive/30' },
+  checklist_parado: { label: 'Checklist parado', className: 'bg-yellow-500/15 text-yellow-600 border-yellow-600/30' },
+  okr_sem_progresso: { label: 'OKRs parados', className: 'bg-orange-500/15 text-orange-500 border-orange-500/30' },
+  contrato_sem_renovacao: { label: 'Renovação', className: 'bg-primary/15 text-primary border-primary/30' },
+};
+
+function useAcoesSugeridas(userId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['meu-painel', 'acoes-sugeridas', userId],
+    enabled: !!userId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('notificacoes')
+        .select('id, tipo, titulo, descricao, link, entidade_id, entidade_tipo, metadata, created_at')
+        .eq('user_id', userId!)
+        .eq('lida', false)
+        .in('tipo', TIPOS_PROATIVOS as unknown as string[])
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+}
 
 function todayISO() {
   return format(new Date(), 'yyyy-MM-dd');
@@ -135,9 +168,19 @@ function useMetricasPortfolio(consultorId: string | null | undefined) {
 
 export default function MeuPainel() {
   const { data: consultorId, isLoading: loadingConsultor } = useMyConsultorId();
+  const [userId, setUserId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // pega user id (para filtrar notificações do próprio usuário)
+  useMemo(() => {
+    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
+  }, []);
+
   const { data: reunioes, isLoading: loadingReunioes } = useProximasReunioes(consultorId);
   const { data: alertas, isLoading: loadingAlertas } = useAlertasPortfolio(consultorId);
   const { data: metricas, isLoading: loadingMetricas } = useMetricasPortfolio(consultorId);
+  const { data: acoesSugeridas, isLoading: loadingAcoes } = useAcoesSugeridas(userId);
   const { data: checklistItens } = useMinhasTarefasChecklist();
   const { data: todoItens } = useMinhasTarefasTodo();
   const toggleChecklist = useToggleChecklistItem();
@@ -145,6 +188,29 @@ export default function MeuPainel() {
 
   const [novaReuniao, setNovaReuniao] = useState<{ clienteId: string } | null>(null);
   const [novaTarefaOpen, setNovaTarefaOpen] = useState(false);
+
+  async function copiarMensagem(id: string, texto: string) {
+    try {
+      await navigator.clipboard.writeText(texto);
+      setCopiedId(id);
+      toast.success('Mensagem copiada para a área de transferência');
+      setTimeout(() => setCopiedId((v) => (v === id ? null : v)), 2500);
+    } catch {
+      toast.error('Não foi possível copiar');
+    }
+  }
+
+  async function marcarComoLida(id: string) {
+    const { error } = await supabase
+      .from('notificacoes')
+      .update({ lida: true, lida_em: new Date().toISOString() })
+      .eq('id', id);
+    if (error) {
+      toast.error('Erro ao marcar como resolvida');
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: ['meu-painel', 'acoes-sugeridas'] });
+  }
 
   const hoje = todayISO();
   const tarefasUrgentes = useMemo(() => {
@@ -177,6 +243,76 @@ export default function MeuPainel() {
         <h1 className="text-2xl font-bold text-foreground">Meu Painel</h1>
         <p className="text-sm text-muted-foreground">Visão geral do seu dia e do portfólio sob sua responsabilidade.</p>
       </div>
+
+      {/* Ações sugeridas (proativas) */}
+      <Card className="border-primary/30">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            Ações sugeridas
+          </CardTitle>
+          <Badge variant="outline" className="bg-primary/15 text-primary border-primary/30">
+            {acoesSugeridas?.length ?? 0}
+          </Badge>
+        </CardHeader>
+        <CardContent>
+          {loadingAcoes ? (
+            <Skeleton className="h-24 w-full" />
+          ) : (acoesSugeridas?.length ?? 0) === 0 ? (
+            <p className="text-sm text-muted-foreground">Sem ações sugeridas no momento. 🎯</p>
+          ) : (
+            <div className="space-y-3">
+              {acoesSugeridas!.map((n: any) => {
+                const meta = TIPO_META[n.tipo as TipoProativo] ?? TIPO_META.sem_contato;
+                const msg = n.metadata?.mensagem_sugerida as string | undefined;
+                return (
+                  <div key={n.id} className="p-3 rounded-md border border-border/50 bg-card/40 space-y-2">
+                    <div className="flex items-start gap-3">
+                      <Badge variant="outline" className={cn('text-[10px] shrink-0', meta.className)}>
+                        {meta.label}
+                      </Badge>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-foreground">{n.titulo}</p>
+                        {n.descricao && (
+                          <p className="text-[11px] text-muted-foreground mt-0.5">{n.descricao}</p>
+                        )}
+                      </div>
+                    </div>
+                    {msg && (
+                      <div className="rounded-md bg-muted/40 border border-border/40 p-2 text-xs text-foreground whitespace-pre-wrap">
+                        {msg}
+                      </div>
+                    )}
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {msg && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => copiarMensagem(n.id, msg)}
+                        >
+                          {copiedId === n.id ? (
+                            <><Check className="h-3 w-3 mr-1" /> Copiado</>
+                          ) : (
+                            <><Copy className="h-3 w-3 mr-1" /> Copiar mensagem</>
+                          )}
+                        </Button>
+                      )}
+                      {n.link && (
+                        <Button asChild size="sm" variant="outline">
+                          <Link to={n.link}>Abrir</Link>
+                        </Button>
+                      )}
+                      <Button size="sm" variant="ghost" onClick={() => marcarComoLida(n.id)}>
+                        Marcar como resolvida
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Coluna esquerda */}

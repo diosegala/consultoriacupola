@@ -764,6 +764,7 @@ export type Database = {
           lida: boolean
           lida_em: string | null
           link: string | null
+          metadata: Json
           tipo: string
           titulo: string
           user_id: string
@@ -777,6 +778,7 @@ export type Database = {
           lida?: boolean
           lida_em?: string | null
           link?: string | null
+          metadata?: Json
           tipo: string
           titulo: string
           user_id: string
@@ -790,6 +792,7 @@ export type Database = {
           lida?: boolean
           lida_em?: string | null
           link?: string | null
+          metadata?: Json
           tipo?: string
           titulo?: string
           user_id?: string
