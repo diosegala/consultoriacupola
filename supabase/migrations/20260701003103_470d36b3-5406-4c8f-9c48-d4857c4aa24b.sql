@@ -1,0 +1,2 @@
+UPDATE public.oraculo_settings SET chat_provider = 'anthropic', chat_model = 'claude-sonnet-4-5' WHERE id = true;
+UPDATE public.agente_prompts SET provedor = 'anthropic' WHERE provedor IS DISTINCT FROM 'openai';
