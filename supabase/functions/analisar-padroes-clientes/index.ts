@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { callClaude, CLAUDE_MODEL } from "../_shared/anthropic.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -84,24 +85,17 @@ Retorne SOMENTE JSON válido (sem markdown fences), no formato:
 DADOS (${porCliente.size} clientes distintos):
 ${contexto}`;
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
-    const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: "Você é um analista sênior de consultoria empresarial. Responda apenas com JSON válido." },
-          { role: "user", content: prompt },
-        ],
-      }),
+    const claude = await callClaude({
+      system: "Você é um analista sênior de consultoria empresarial. Responda apenas com JSON válido, sem markdown fences.",
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 8000,
     });
-    if (!aiResp.ok) {
-      const t = await aiResp.text();
-      throw new Error(`AI Gateway ${aiResp.status}: ${t.slice(0, 400)}`);
+    if (!claude.ok) {
+      return new Response(JSON.stringify({ error: claude.errorMessage || `Erro Claude (${claude.status})` }), {
+        status: claude.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
-    const aiJson = await aiResp.json();
-    const raw = aiJson?.choices?.[0]?.message?.content ?? "";
+    const raw = claude.text ?? "";
     const cleaned = String(raw).replace(/```json|```/g, "").trim();
     let conteudo: any;
     try { conteudo = JSON.parse(cleaned); } catch { conteudo = { raw: cleaned }; }

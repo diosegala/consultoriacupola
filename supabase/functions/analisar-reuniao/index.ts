@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { callClaude } from "../_shared/anthropic.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -38,10 +39,10 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+    const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
 
-    if (!lovableApiKey) {
-      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY não configurada" }), {
+    if (!anthropicKey) {
+      return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY não configurada" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -140,52 +141,36 @@ Avalie nos seguintes critérios (nota de 0 a 10 cada):
 
 Retorne a análise usando a função fornecida. Seja conciso nos textos.`;
 
-    const consultorAIResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: consultorSystemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        max_tokens: 8192,
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "registrar_analise",
-              description: "Registra a análise completa da reunião",
-              parameters: {
-                type: "object",
-                properties: {
-                  resumo: { type: "string", description: "Resumo conciso da reunião (3-5 frases)" },
-                  empatia: { type: "number", description: "Nota 0-10 para empatia e escuta ativa" },
-                  clareza: { type: "number", description: "Nota 0-10 para clareza na comunicação" },
-                  proatividade: { type: "number", description: "Nota 0-10 para proatividade" },
-                  dominio_tecnico: { type: "number", description: "Nota 0-10 para domínio técnico" },
-                  orientacao_resultados: { type: "number", description: "Nota 0-10 para orientação para resultados" },
-                  pontos_fortes: { type: "array", items: { type: "string" }, description: "Lista de 3-5 pontos fortes (frases curtas)" },
-                  pontos_melhoria: { type: "array", items: { type: "string" }, description: "Lista de 3-5 pontos de melhoria (frases curtas)" },
-                },
-                required: ["resumo", "empatia", "clareza", "proatividade", "dominio_tecnico", "orientacao_resultados", "pontos_fortes", "pontos_melhoria"],
-                additionalProperties: false,
-              },
+    const consultorClaude = await callClaude({
+      system: consultorSystemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+      max_tokens: 4096,
+      tools: [
+        {
+          name: "registrar_analise",
+          description: "Registra a análise completa da reunião",
+          input_schema: {
+            type: "object",
+            properties: {
+              resumo: { type: "string", description: "Resumo conciso da reunião (3-5 frases)" },
+              empatia: { type: "number", description: "Nota 0-10 para empatia e escuta ativa" },
+              clareza: { type: "number", description: "Nota 0-10 para clareza na comunicação" },
+              proatividade: { type: "number", description: "Nota 0-10 para proatividade" },
+              dominio_tecnico: { type: "number", description: "Nota 0-10 para domínio técnico" },
+              orientacao_resultados: { type: "number", description: "Nota 0-10 para orientação para resultados" },
+              pontos_fortes: { type: "array", items: { type: "string" }, description: "Lista de 3-5 pontos fortes (frases curtas)" },
+              pontos_melhoria: { type: "array", items: { type: "string" }, description: "Lista de 3-5 pontos de melhoria (frases curtas)" },
             },
+            required: ["resumo", "empatia", "clareza", "proatividade", "dominio_tecnico", "orientacao_resultados", "pontos_fortes", "pontos_melhoria"],
           },
-        ],
-        tool_choice: { type: "function", function: { name: "registrar_analise" } },
-      }),
+        },
+      ],
+      tool_choice: { type: "tool", name: "registrar_analise" },
     });
 
-    if (!consultorAIResponse.ok) {
-      const statusCode = consultorAIResponse.status;
-      let errorMsg = "Erro na análise IA";
-      if (statusCode === 429) errorMsg = "Limite de requisições excedido, tente novamente mais tarde";
-      if (statusCode === 402) errorMsg = "Créditos de IA esgotados";
+    if (!consultorClaude.ok) {
+      const statusCode = consultorClaude.status;
+      const errorMsg = consultorClaude.errorMessage || "Erro na análise IA";
       await supabase.from("reunioes").update({ status_analise: "erro" }).eq("id", reuniao_id);
       return new Response(JSON.stringify({ error: errorMsg }), {
         status: statusCode,
@@ -193,10 +178,7 @@ Retorne a análise usando a função fornecida. Seja conciso nos textos.`;
       });
     }
 
-    const consultorAIData = await consultorAIResponse.json();
-    const consultorToolCall = consultorAIData.choices?.[0]?.message?.tool_calls?.[0];
-
-    if (!consultorToolCall && !consultorAIData.choices?.[0]?.message?.content) {
+    if (!consultorClaude.toolInput && !consultorClaude.text) {
       await supabase.from("reunioes").update({ status_analise: "erro" }).eq("id", reuniao_id);
       return new Response(JSON.stringify({ error: "IA não retornou análise estruturada" }), {
         status: 500,
@@ -206,8 +188,9 @@ Retorne a análise usando a função fornecida. Seja conciso nos textos.`;
 
     let analise: any;
     try {
-      const rawArgs = consultorToolCall ? consultorToolCall.function.arguments : consultorAIData.choices[0].message.content;
-      analise = parseAIResponse(rawArgs);
+      analise = consultorClaude.toolInput
+        ? consultorClaude.toolInput
+        : parseAIResponse(consultorClaude.text || "");
     } catch (parseErr) {
       console.error("Erro ao parsear resposta da IA (consultor):", parseErr);
       await supabase.from("reunioes").update({ status_analise: "erro" }).eq("id", reuniao_id);
@@ -246,54 +229,36 @@ Avalie nos seguintes critérios (nota de 0 a 10 cada):
 
 Retorne a análise usando a função fornecida. Seja conciso nos textos.`;
 
-      const clienteAIResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${lovableApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [
-            { role: "system", content: clienteSystemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          max_tokens: 8192,
-          tools: [
-            {
-              type: "function",
-              function: {
-                name: "registrar_analise_cliente",
-                description: "Registra a análise de engajamento do cliente",
-                parameters: {
-                  type: "object",
-                  properties: {
-                    resumo: { type: "string", description: "Resumo conciso do engajamento do cliente (2-3 frases)" },
-                    participacao_ativa: { type: "number", description: "Nota 0-10 para participação ativa" },
-                    abertura_sugestoes: { type: "number", description: "Nota 0-10 para abertura a sugestões" },
-                    comprometimento_acoes: { type: "number", description: "Nota 0-10 para comprometimento com ações" },
-                    clareza_demandas: { type: "number", description: "Nota 0-10 para clareza nas demandas" },
-                    engajamento_estrategico: { type: "number", description: "Nota 0-10 para engajamento estratégico" },
-                    pontos_fortes: { type: "array", items: { type: "string" }, description: "Lista de 3-5 pontos fortes do cliente (frases curtas)" },
-                    pontos_melhoria: { type: "array", items: { type: "string" }, description: "Lista de 3-5 pontos de melhoria do cliente (frases curtas)" },
-                  },
-                  required: ["resumo", "participacao_ativa", "abertura_sugestoes", "comprometimento_acoes", "clareza_demandas", "engajamento_estrategico", "pontos_fortes", "pontos_melhoria"],
-                  additionalProperties: false,
-                },
+      const clienteClaude = await callClaude({
+        system: clienteSystemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+        max_tokens: 4096,
+        tools: [
+          {
+            name: "registrar_analise_cliente",
+            description: "Registra a análise de engajamento do cliente",
+            input_schema: {
+              type: "object",
+              properties: {
+                resumo: { type: "string", description: "Resumo conciso do engajamento do cliente (2-3 frases)" },
+                participacao_ativa: { type: "number", description: "Nota 0-10 para participação ativa" },
+                abertura_sugestoes: { type: "number", description: "Nota 0-10 para abertura a sugestões" },
+                comprometimento_acoes: { type: "number", description: "Nota 0-10 para comprometimento com ações" },
+                clareza_demandas: { type: "number", description: "Nota 0-10 para clareza nas demandas" },
+                engajamento_estrategico: { type: "number", description: "Nota 0-10 para engajamento estratégico" },
+                pontos_fortes: { type: "array", items: { type: "string" }, description: "Lista de 3-5 pontos fortes do cliente (frases curtas)" },
+                pontos_melhoria: { type: "array", items: { type: "string" }, description: "Lista de 3-5 pontos de melhoria do cliente (frases curtas)" },
               },
+              required: ["resumo", "participacao_ativa", "abertura_sugestoes", "comprometimento_acoes", "clareza_demandas", "engajamento_estrategico", "pontos_fortes", "pontos_melhoria"],
             },
-          ],
-          tool_choice: { type: "function", function: { name: "registrar_analise_cliente" } },
-        }),
+          },
+        ],
+        tool_choice: { type: "tool", name: "registrar_analise_cliente" },
       });
 
-      if (clienteAIResponse.ok) {
-        const clienteAIData = await clienteAIResponse.json();
-        const clienteToolCall = clienteAIData.choices?.[0]?.message?.tool_calls?.[0];
-        const rawArgs = clienteToolCall ? clienteToolCall.function.arguments : clienteAIData.choices?.[0]?.message?.content;
-        
-        if (rawArgs) {
-          analiseCliente = parseAIResponse(rawArgs);
+      if (clienteClaude.ok) {
+        if (clienteClaude.toolInput || clienteClaude.text) {
+          analiseCliente = clienteClaude.toolInput ?? parseAIResponse(clienteClaude.text || "");
           analiseCliente.participacao_ativa = Number(analiseCliente.participacao_ativa) || 0;
           analiseCliente.abertura_sugestoes = Number(analiseCliente.abertura_sugestoes) || 0;
           analiseCliente.comprometimento_acoes = Number(analiseCliente.comprometimento_acoes) || 0;
@@ -309,7 +274,7 @@ Retorne a análise usando a função fornecida. Seja conciso nos textos.`;
           ) / 10;
         }
       } else {
-        console.error("Erro na análise do cliente:", clienteAIResponse.status);
+        console.error("Erro na análise do cliente:", clienteClaude.status, clienteClaude.errorMessage);
       }
     } catch (clienteErr) {
       console.error("Erro na análise do cliente (não crítico):", clienteErr);

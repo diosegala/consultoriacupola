@@ -111,8 +111,9 @@ Deno.serve(async (req) => {
       .eq("id", true).maybeSingle();
     const embModel = settings?.embedding_model || "openai/text-embedding-3-small";
     const embDims = settings?.embedding_dimensions || 1536;
-    const chatProvider = settings?.chat_provider || "lovable";
-    const chatModel = settings?.chat_model || "google/gemini-2.5-flash";
+    const chatProvider = settings?.chat_provider || "anthropic";
+    const chatModel = settings?.chat_model
+      || (settings?.chat_provider === "lovable" ? "google/gemini-2.5-flash" : "claude-sonnet-4-5");
 
     // Cria/garante conversa
     if (!conversaId) {
