@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callClaude, CLAUDE_MODEL } from "../_shared/anthropic.ts";
+import { logAiUsage } from "../_shared/ai-usage.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -91,10 +92,17 @@ ${contexto}`;
       max_tokens: 8000,
     });
     if (!claude.ok) {
+      await logAiUsage({
+        admin, agente_tipo: "insights_dores_recorrentes", user_id: user.id,
+        status: "error", error_message: claude.errorMessage ?? null,
+      });
       return new Response(JSON.stringify({ error: claude.errorMessage || `Erro Claude (${claude.status})` }), {
         status: claude.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    await logAiUsage({
+      admin, agente_tipo: "insights_dores_recorrentes", user_id: user.id, usage: claude.usage,
+    });
     const raw = claude.text ?? "";
     const cleaned = String(raw).replace(/```json|```/g, "").trim();
     let conteudo: any;
