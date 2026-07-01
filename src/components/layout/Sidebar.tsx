@@ -14,7 +14,8 @@ import {
   Video,
   CalendarDays,
   Sparkles,
-  Bot
+  Bot,
+  Brain
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -33,6 +34,7 @@ const adminMenuItems = [
   { to: '/agenda', icon: CalendarDays, label: 'Agenda' },
   { to: '/oraculo', icon: Sparkles, label: 'Oráculo' },
   { to: '/agentes', icon: Bot, label: 'Agentes IA' },
+  { to: '/inteligencia', icon: Brain, label: 'Inteligência' },
   { to: '/minhas-tarefas', icon: ListChecks, label: 'Minhas tarefas' },
   { to: '/integracoes', icon: Link2, label: 'Minhas Integrações' },
   { to: '/configuracoes', icon: Settings, label: 'Configurações' },
