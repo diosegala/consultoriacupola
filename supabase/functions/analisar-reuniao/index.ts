@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callClaude } from "../_shared/anthropic.ts";
+import { logAiUsage } from "../_shared/ai-usage.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -171,12 +172,30 @@ Retorne a análise usando a função fornecida. Seja conciso nos textos.`;
     if (!consultorClaude.ok) {
       const statusCode = consultorClaude.status;
       const errorMsg = consultorClaude.errorMessage || "Erro na análise IA";
+      await logAiUsage({
+        admin: supabase,
+        agente_tipo: "analise_reuniao_consultor",
+        user_id: user.id,
+        cliente_id: reuniao.cliente_id ?? null,
+        consultor_id: reuniao.consultor_id ?? null,
+        status: "error",
+        error_message: errorMsg,
+      });
       await supabase.from("reunioes").update({ status_analise: "erro" }).eq("id", reuniao_id);
       return new Response(JSON.stringify({ error: errorMsg }), {
         status: statusCode,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    await logAiUsage({
+      admin: supabase,
+      agente_tipo: "analise_reuniao_consultor",
+      user_id: user.id,
+      cliente_id: reuniao.cliente_id ?? null,
+      consultor_id: reuniao.consultor_id ?? null,
+      usage: consultorClaude.usage,
+    });
 
     if (!consultorClaude.toolInput && !consultorClaude.text) {
       await supabase.from("reunioes").update({ status_analise: "erro" }).eq("id", reuniao_id);
@@ -257,6 +276,14 @@ Retorne a análise usando a função fornecida. Seja conciso nos textos.`;
       });
 
       if (clienteClaude.ok) {
+        await logAiUsage({
+          admin: supabase,
+          agente_tipo: "analise_reuniao_cliente",
+          user_id: user.id,
+          cliente_id: reuniao.cliente_id ?? null,
+          consultor_id: reuniao.consultor_id ?? null,
+          usage: clienteClaude.usage,
+        });
         if (clienteClaude.toolInput || clienteClaude.text) {
           analiseCliente = clienteClaude.toolInput ?? parseAIResponse(clienteClaude.text || "");
           analiseCliente.participacao_ativa = Number(analiseCliente.participacao_ativa) || 0;
@@ -275,6 +302,15 @@ Retorne a análise usando a função fornecida. Seja conciso nos textos.`;
         }
       } else {
         console.error("Erro na análise do cliente:", clienteClaude.status, clienteClaude.errorMessage);
+        await logAiUsage({
+          admin: supabase,
+          agente_tipo: "analise_reuniao_cliente",
+          user_id: user.id,
+          cliente_id: reuniao.cliente_id ?? null,
+          consultor_id: reuniao.consultor_id ?? null,
+          status: "error",
+          error_message: clienteClaude.errorMessage ?? null,
+        });
       }
     } catch (clienteErr) {
       console.error("Erro na análise do cliente (não crítico):", clienteErr);
