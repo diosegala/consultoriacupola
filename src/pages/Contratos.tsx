@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { FileText, Search, Eye, X, ExternalLink, Calendar, DollarSign, User, Building, Pencil, ArrowUpDown, ArrowUp, ArrowDown, XCircle, RefreshCw, Pause, Play, CalendarPlus, Trash2, Plane } from 'lucide-react';
+import { FileText, Search, Eye, X, ExternalLink, Calendar, DollarSign, User, Building, Pencil, ArrowUpDown, ArrowUp, ArrowDown, XCircle, RefreshCw, Pause, Play, CalendarPlus, Trash2, Plane, Sheet, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -42,6 +42,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 import { useAllContratos, AllContratosFilters, ContratoComCliente, useDeleteContrato } from '@/hooks/useContratos';
 import { useConsultores } from '@/hooks/useConsultores';
@@ -126,6 +127,25 @@ export default function Contratos() {
   
   // Modal para lista de contratos por status do KPI
   const [cardModalType, setCardModalType] = useState<CardModalType>(null);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExportSheets = async () => {
+    setIsExporting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('exportar-clientes-sheets');
+      if (error) throw error;
+      if ((data as any)?.url) {
+        window.open((data as any).url, '_blank');
+        toast.success(`Planilha criada com ${(data as any).total} clientes`);
+      } else {
+        toast.error((data as any)?.error || 'Falha ao exportar');
+      }
+    } catch (e: any) {
+      toast.error('Erro ao exportar: ' + (e.message || String(e)));
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   // Query para a lista principal (com filtros)
   const { data: contratosRaw, isLoading } = useAllContratos({
@@ -286,12 +306,18 @@ export default function Contratos() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <FileText className="h-8 w-8 text-primary" />
-        <div>
-          <h1 className="text-2xl font-bold">Contratos</h1>
-          <p className="text-muted-foreground">Visão consolidada de todos os contratos</p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <FileText className="h-8 w-8 text-primary" />
+          <div>
+            <h1 className="text-2xl font-bold">Contratos</h1>
+            <p className="text-muted-foreground">Visão consolidada de todos os contratos</p>
+          </div>
         </div>
+        <Button onClick={handleExportSheets} disabled={isExporting} variant="outline">
+          {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sheet className="h-4 w-4 mr-2" />}
+          Exportar clientes ativos (Google Sheets)
+        </Button>
       </div>
 
       {/* KPI Cards */}
