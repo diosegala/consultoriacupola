@@ -1175,6 +1175,8 @@ function PanelAgente({
   existingDoc,
   versoesAnteriores,
   onView,
+  onCriarGdoc,
+  criandoGdocDocId,
   expanded,
   onToggleExpand,
   disabled,
@@ -1186,6 +1188,8 @@ function PanelAgente({
   existingDoc?: ProjetoDocumento;
   versoesAnteriores: ProjetoDocumento[];
   onView: (d: ProjetoDocumento) => void;
+  onCriarGdoc?: (d: ProjetoDocumento) => void;
+  criandoGdocDocId?: string | null;
   expanded?: boolean;
   onToggleExpand: () => void;
   disabled?: boolean;
@@ -1218,6 +1222,20 @@ function PanelAgente({
                     <a href={existingDoc.gdoc_url} target="_blank" rel="noopener noreferrer">
                       <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Abrir no Google Docs
                     </a>
+                  </Button>
+                )}
+                {!existingDoc.gdoc_url && onCriarGdoc && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onCriarGdoc(existingDoc)}
+                    disabled={criandoGdocDocId === existingDoc.id}
+                  >
+                    {criandoGdocDocId === existingDoc.id ? (
+                      <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Criando…</>
+                    ) : (
+                      <><ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Criar no Google Docs</>
+                    )}
                   </Button>
                 )}
               </>
@@ -1255,6 +1273,21 @@ function PanelAgente({
                         <a href={d.gdoc_url} target="_blank" rel="noopener noreferrer">
                           <ExternalLink className="h-3 w-3 mr-1" /> Docs
                         </a>
+                      </Button>
+                    )}
+                    {!d.gdoc_url && onCriarGdoc && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 text-xs"
+                        onClick={() => onCriarGdoc(d)}
+                        disabled={criandoGdocDocId === d.id}
+                      >
+                        {criandoGdocDocId === d.id ? (
+                          <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Criando…</>
+                        ) : (
+                          <><ExternalLink className="h-3 w-3 mr-1" /> Criar Docs</>
+                        )}
                       </Button>
                     )}
                   </div>
