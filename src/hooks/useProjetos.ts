@@ -35,6 +35,7 @@ export interface Projeto {
   _reunioes_count?: number;
   _tags?: Array<{ id: string; nome: string; cor: string }>;
   _proxima_reuniao?: string | null;
+  _compromissos_cliente_pendentes?: number;
 }
 
 export function useProjetosEtapas() {
