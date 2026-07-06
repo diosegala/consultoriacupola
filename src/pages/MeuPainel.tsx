@@ -302,6 +302,14 @@ export default function MeuPainel() {
                           <Link to={n.link}>Abrir</Link>
                         </Button>
                       )}
+                      {n.tipo === 'contrato_sem_renovacao' && n.metadata?.link_balanco && (
+                        <Button asChild size="sm" variant="outline">
+                          <Link to={n.metadata.link_balanco as string}>
+                            <Sparkles className="h-3 w-3 mr-1" />
+                            Gerar balanço do período
+                          </Link>
+                        </Button>
+                      )}
                       <Button size="sm" variant="ghost" onClick={() => marcarComoLida(n.id)}>
                         Marcar como resolvida
                       </Button>
