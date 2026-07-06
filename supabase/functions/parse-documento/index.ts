@@ -44,6 +44,42 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const admin = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+
+  let logUserId: string | null = null;
+  let logConsultorId: string | null = null;
+  let logNomeArquivo: string | null = null;
+  let logTipo: string | null = null;
+  let logOrigem: string | null = null;
+  let logTamanhoBytes: number | null = null;
+
+  const registrarErro = async (mensagem: string) => {
+    try {
+      await admin.from("parse_erros_log").insert({
+        user_id: logUserId,
+        consultor_id: logConsultorId,
+        nome_arquivo: logNomeArquivo,
+        tipo: logTipo,
+        origem: logOrigem,
+        tamanho_bytes: logTamanhoBytes,
+        erro: (mensagem || "erro desconhecido").slice(0, 1000),
+      });
+    } catch (err) {
+      console.warn("parse_erros_log insert falhou:", err);
+    }
+  };
+
+  const respondErro = async (mensagem: string, status: number) => {
+    await registrarErro(mensagem);
+    return new Response(JSON.stringify({ error: mensagem }), {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  };
+
   try {
     // Auth
     const authHeader = req.headers.get("Authorization");
@@ -59,10 +95,6 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: authHeader } } }
     );
-    const admin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    );
 
     const token = authHeader.replace("Bearer ", "");
     const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
@@ -73,55 +105,76 @@ Deno.serve(async (req) => {
       });
     }
     const userId = claimsData.claims.sub as string;
+    logUserId = userId;
+    const { data: cuRow } = await admin
+      .from("consultor_user").select("consultor_id").eq("user_id", userId).maybeSingle();
+    logConsultorId = cuRow?.consultor_id ?? null;
 
     const body = await req.json();
     const { tipo, conteudo_base64, nome_arquivo, gdrive_url } = body;
+    logNomeArquivo = nome_arquivo ?? gdrive_url ?? null;
+    logTipo = tipo ?? null;
+    logOrigem = gdrive_url ? "gdrive" : conteudo_base64 ? "upload" : "desconhecido";
 
     let textoExtraido = "";
 
     // Google Drive link
     if (gdrive_url) {
       const accessToken = await getValidGoogleToken(admin, userId);
-      textoExtraido = await extractFromGDrive(gdrive_url, accessToken);
+      try {
+        textoExtraido = await extractFromGDrive(gdrive_url, accessToken);
+      } catch (err) {
+        const mensagem = err instanceof Error ? err.message : "Erro ao ler arquivo do Google Drive";
+        return await respondErro(mensagem, 422);
+      }
     }
     // File upload (base64)
     else if (conteudo_base64) {
       const tipoDetectado = normalizarTipoArquivo(tipo, nome_arquivo);
       const bytes = Uint8Array.from(atob(conteudo_base64), (c) => c.charCodeAt(0));
+      logTamanhoBytes = bytes.length;
 
       if (tipoDetectado === "pdf") {
-        textoExtraido = await extractFromPDF(bytes);
+        try {
+          textoExtraido = await extractFromPDF(bytes);
+        } catch (err) {
+          const mensagem = err instanceof Error ? err.message : "Falha ao ler PDF";
+          return await respondErro(`Não foi possível ler o PDF: ${mensagem}`, 422);
+        }
       } else if (tipoDetectado === "docx") {
-        textoExtraido = await extractFromDOCX(bytes);
+        try {
+          textoExtraido = await extractFromDOCX(bytes);
+        } catch (err) {
+          const mensagem = err instanceof Error ? err.message : "Falha ao ler DOCX";
+          return await respondErro(`Não foi possível ler o DOCX: ${mensagem}`, 422);
+        }
+        if (!textoExtraido || textoExtraido.trim().length === 0) {
+          return await respondErro(
+            "Não foi possível extrair texto deste .docx. Ele pode estar vazio, conter apenas imagens ou ter formatação incompatível. Exporte para .txt e tente novamente.",
+            422,
+          );
+        }
       } else if (tipoDetectado === "txt") {
-        textoExtraido = new TextDecoder().decode(bytes);
+        textoExtraido = decodeTextoComFallback(bytes);
       } else {
-        return new Response(
-          JSON.stringify({ error: `Tipo não suportado: ${tipo || nome_arquivo || "desconhecido"}. Use Google Docs, PDF, DOCX ou TXT.` }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        return await respondErro(
+          `Tipo não suportado: ${tipo || nome_arquivo || "desconhecido"}. Use PDF, DOCX, TXT, VTT ou SRT.`,
+          400,
         );
       }
     } else {
-      return new Response(
-        JSON.stringify({ error: "Envie conteudo_base64+tipo ou gdrive_url" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return await respondErro("Envie conteudo_base64+tipo ou gdrive_url", 400);
     }
 
     if (pareceHtmlLoginGoogle(textoExtraido)) {
-      return new Response(
-        JSON.stringify({
-          error: "O conteúdo recebido do Google foi uma tela de login, não o documento. Reconecte o Google Drive e confirme que sua conta Cupola tem permissão no arquivo.",
-        }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      return await respondErro(
+        "O conteúdo recebido do Google foi uma tela de login, não o documento. Reconecte o Google Drive e confirme que sua conta Cupola tem permissão no arquivo.",
+        403,
       );
     }
 
     if (!textoExtraido || textoExtraido.trim().length === 0) {
-      return new Response(
-        JSON.stringify({ error: "Não foi possível extrair texto do documento." }),
-        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return await respondErro("Não foi possível extrair texto do documento (arquivo vazio ou sem texto legível).", 422);
     }
 
     return new Response(
@@ -130,12 +183,25 @@ Deno.serve(async (req) => {
     );
   } catch (err) {
     console.error("parse-documento error:", err);
-    return new Response(
-      JSON.stringify({ error: err.message || "Erro interno" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    const mensagem = err instanceof Error ? err.message : "Erro interno";
+    return await respondErro(mensagem, 500);
   }
 });
+
+function decodeTextoComFallback(bytes: Uint8Array): string {
+  // Tenta UTF-8 estrito primeiro (fatal:true dispara erro em bytes inválidos).
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    // Fallback para windows-1252 (superset de latin1, comum em exports brasileiros).
+    try {
+      return new TextDecoder("windows-1252").decode(bytes);
+    } catch {
+      // Última tentativa: UTF-8 não-estrito (silencia bytes inválidos).
+      return new TextDecoder("utf-8").decode(bytes);
+    }
+  }
+}
 
 async function extractFromPDF(bytes: Uint8Array): Promise<string> {
   // Use pdf-parse via esm.sh

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, CheckCircle2, XCircle, RefreshCw, Link2, AlertTriangle, FileText, ExternalLink } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, RefreshCw, Link2, AlertTriangle, FileText, ExternalLink, ChevronDown, ChevronUp, AlertOctagon } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useMyConsultorId } from '@/hooks/useConsultorUser';
@@ -14,12 +14,16 @@ import {
   useReunioesImportadasLog,
   useDetectarPastaMeet,
 } from '@/hooks/useGoogleDrive';
+import { useAuth } from '@/contexts/AuthContext';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 export default function MinhasIntegracoes() {
   const { toast } = useToast();
+  const { isAdmin } = useAuth();
   const { data: consultorId } = useMyConsultorId();
   const { data: conn, isLoading } = useGoogleConnection(consultorId ?? undefined);
   const startOAuth = useStartGoogleOAuth();
@@ -27,10 +31,25 @@ export default function MinhasIntegracoes() {
   const detectarPasta = useDetectarPastaMeet();
   const [syncing, setSyncing] = useState(false);
   const [logFilter, setLogFilter] = useState<string>('all');
+  const [parseErrosOpen, setParseErrosOpen] = useState(false);
   const { data: logs, isLoading: logsLoading, refetch: refetchLogs } = useReunioesImportadasLog(
     consultorId ?? undefined,
     { status: logFilter, limit: 20 },
   );
+
+  const { data: parseErros, isLoading: parseErrosLoading, refetch: refetchParseErros } = useQuery({
+    queryKey: ['parse_erros_log', isAdmin],
+    enabled: parseErrosOpen,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('parse_erros_log' as any)
+        .select('id, created_at, nome_arquivo, tipo, origem, tamanho_bytes, erro, consultor_id')
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      return data as any[];
+    },
+  });
 
   const lastSyncStats = useMemo(() => {
     if (!conn?.ultima_sincronizacao || !logs) return null;
@@ -322,6 +341,67 @@ export default function MinhasIntegracoes() {
               ))}
             </TooltipProvider>
           </CardContent>
+        </Card>
+      )}
+
+      {isAdmin && (
+        <Card className="bg-card border-border">
+          <CardHeader
+            className="cursor-pointer"
+            onClick={() => {
+              setParseErrosOpen((v) => {
+                if (!v) refetchParseErros();
+                return !v;
+              });
+            }}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <CardTitle className="text-foreground flex items-center gap-2">
+                  <AlertOctagon className="h-4 w-4" /> Erros de upload/parse (agentes IA)
+                </CardTitle>
+                <CardDescription>
+                  Últimos 20 arquivos que falharam ao ser lidos pelo agente de diagnóstico.
+                </CardDescription>
+              </div>
+              {parseErrosOpen ? (
+                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              )}
+            </div>
+          </CardHeader>
+          {parseErrosOpen && (
+            <CardContent className="space-y-2">
+              {parseErrosLoading && (
+                <div className="flex items-center justify-center py-6 text-muted-foreground text-sm">
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" /> Carregando...
+                </div>
+              )}
+              {!parseErrosLoading && (!parseErros || parseErros.length === 0) && (
+                <p className="text-sm text-muted-foreground text-center py-6">
+                  Nenhum erro de parse registrado.
+                </p>
+              )}
+              {(parseErros || []).map((e) => (
+                <div key={e.id} className="border border-border rounded-md p-3 space-y-1">
+                  <div className="flex items-start justify-between gap-2 flex-wrap">
+                    <p className="text-sm font-medium text-foreground break-all">
+                      {e.nome_arquivo || '(sem nome)'}
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
+                      {e.origem && <Badge variant="outline" className="text-[10px]">{e.origem}</Badge>}
+                      {typeof e.tamanho_bytes === 'number' && e.tamanho_bytes > 0 && (
+                        <span>{(e.tamanho_bytes / (1024 * 1024)).toFixed(2)} MB</span>
+                      )}
+                      <span>{format(new Date(e.created_at), 'dd/MM HH:mm', { locale: ptBR })}</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-red-400 whitespace-pre-wrap break-words">{e.erro}</p>
+                </div>
+              ))}
+            </CardContent>
+          )}
         </Card>
       )}
     </div>

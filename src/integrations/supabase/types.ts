@@ -1079,6 +1079,50 @@ export type Database = {
         }
         Relationships: []
       }
+      parse_erros_log: {
+        Row: {
+          consultor_id: string | null
+          created_at: string
+          erro: string
+          id: string
+          nome_arquivo: string | null
+          origem: string | null
+          tamanho_bytes: number | null
+          tipo: string | null
+          user_id: string | null
+        }
+        Insert: {
+          consultor_id?: string | null
+          created_at?: string
+          erro: string
+          id?: string
+          nome_arquivo?: string | null
+          origem?: string | null
+          tamanho_bytes?: number | null
+          tipo?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          consultor_id?: string | null
+          created_at?: string
+          erro?: string
+          id?: string
+          nome_arquivo?: string | null
+          origem?: string | null
+          tamanho_bytes?: number | null
+          tipo?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parse_erros_log_consultor_id_fkey"
+            columns: ["consultor_id"]
+            isOneToOne: false
+            referencedRelation: "consultores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pausas_contrato: {
         Row: {
           cliente_id: string

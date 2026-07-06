@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import {
   Sparkles, FileText, Target, ClipboardList, ClipboardCheck, Upload, Link as LinkIcon,
   Trash2, Loader2, ExternalLink, Eye, ChevronDown, ChevronUp, FileType, FileAudio,
-  Wand2, CheckCircle2, AlertCircle,
+  Wand2, CheckCircle2, AlertCircle, RefreshCw,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -55,6 +55,18 @@ const PAPEIS_SUGERIDOS = [
   'Equipe Administrativa',
   'Outro',
 ];
+
+const MAX_UPLOAD_BYTES = 6 * 1024 * 1024; // 6 MB
+const EXTENSOES_PERMITIDAS = ['txt', 'pdf', 'docx', 'vtt', 'srt'];
+
+function extensaoArquivo(nome: string) {
+  const idx = nome.lastIndexOf('.');
+  return idx >= 0 ? nome.slice(idx + 1).toLowerCase() : '';
+}
+
+function formatarTamanhoMB(bytes: number) {
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 interface SecaoAnotacao {
   key: string;
@@ -452,6 +464,32 @@ export function AgentesTab({ clienteId }: Props) {
     if (!files) return;
     for (const file of Array.from(files)) {
       const id = crypto.randomUUID();
+      const ext = extensaoArquivo(file.name);
+
+      if (!EXTENSOES_PERMITIDAS.includes(ext)) {
+        setFontes((prev) => [...prev, {
+          id,
+          label: file.name,
+          origem: 'upload',
+          status: 'error',
+          meta: file.name,
+          errorMsg: `Tipo de arquivo não suportado (.${ext || '?'}). Use .txt, .pdf, .docx, .vtt ou .srt.`,
+        }]);
+        continue;
+      }
+
+      if (file.size > MAX_UPLOAD_BYTES) {
+        setFontes((prev) => [...prev, {
+          id,
+          label: file.name,
+          origem: 'upload',
+          status: 'error',
+          meta: file.name,
+          errorMsg: `Arquivo de ${formatarTamanhoMB(file.size)} excede o limite de 6 MB. Exporte como .txt ou divida o arquivo.`,
+        }]);
+        continue;
+      }
+
       setFontes((prev) => [...prev, {
         id, label: file.name, origem: 'upload', status: 'parsing', meta: file.name,
       }]);
@@ -467,11 +505,38 @@ export function AgentesTab({ clienteId }: Props) {
         );
       } catch (e: any) {
         setFontes((prev) =>
-          prev.map((f) => (f.id === id ? { ...f, status: 'error', errorMsg: e.message } : f)),
+          prev.map((f) => (f.id === id ? { ...f, status: 'error', errorMsg: e?.message ?? 'Falha desconhecida ao processar arquivo.' } : f)),
         );
       }
     }
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const tentarReprocessar = async (id: string) => {
+    const fonte = fontes.find((f) => f.id === id);
+    if (!fonte) return;
+
+    if (fonte.origem === 'gdrive' && fonte.meta) {
+      setFontes((prev) =>
+        prev.map((f) => (f.id === id ? { ...f, status: 'parsing', errorMsg: undefined } : f)),
+      );
+      try {
+        const texto = await parseDocumento({ gdrive_url: fonte.meta });
+        setFontes((prev) =>
+          prev.map((f) => (f.id === id ? { ...f, status: 'done', conteudo: texto } : f)),
+        );
+      } catch (e: any) {
+        setFontes((prev) =>
+          prev.map((f) => (f.id === id ? { ...f, status: 'error', errorMsg: e?.message ?? 'Falha desconhecida.' } : f)),
+        );
+      }
+      return;
+    }
+
+    if (fonte.origem === 'upload') {
+      toast.info('Selecione o arquivo novamente para reenviar.');
+      fileInputRef.current?.click();
+    }
   };
 
   const adicionarGdrive = async () => {
@@ -797,17 +862,29 @@ export function AgentesTab({ clienteId }: Props) {
                           </Badge>
                         )}
                         {f.status === 'error' && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Badge variant="destructive" className="text-[10px]">erro</Badge>
-                            </TooltipTrigger>
-                            <TooltipContent>{f.errorMsg ?? 'Falha ao processar'}</TooltipContent>
-                          </Tooltip>
+                          <Badge variant="destructive" className="text-[10px]">erro</Badge>
                         )}
                         <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removerFonte(f.id)}>
                           <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
+                      {f.status === 'error' && (
+                        <div className="pl-6 space-y-1.5">
+                          <p className="text-[11px] text-destructive leading-snug">
+                            {f.errorMsg ?? 'Falha ao processar arquivo.'}
+                          </p>
+                          {(f.origem === 'gdrive' || f.origem === 'upload') && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-6 text-[11px]"
+                              onClick={() => tentarReprocessar(f.id)}
+                            >
+                              <RefreshCw className="h-3 w-3 mr-1" /> Tentar novamente
+                            </Button>
+                          )}
+                        </div>
+                      )}
                       <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2 items-center pl-6">
                         <Input
                           value={f.papel ?? ''}
