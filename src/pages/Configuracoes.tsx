@@ -121,6 +121,7 @@ export default function Configuracoes() {
   const [editedPrompts, setEditedPrompts] = useState<Record<string, string>>({});
   const [editedModelos, setEditedModelos] = useState<Record<string, string>>({});
   const [editedProvedores, setEditedProvedores] = useState<Record<string, string>>({});
+  const [editedTemplateSheets, setEditedTemplateSheets] = useState<Record<string, string>>({});
   const [parsingTipo, setParsingTipo] = useState<string | null>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -139,6 +140,11 @@ export default function Configuracoes() {
     return agentePrompts?.find(p => p.tipo === tipo)?.provedor || 'gemini';
   };
 
+  const getTemplateSheetsValue = (tipo: string) => {
+    if (editedTemplateSheets[tipo] !== undefined) return editedTemplateSheets[tipo];
+    return (agentePrompts?.find(p => p.tipo === tipo) as any)?.template_sheets_id || '';
+  };
+
   const handleSavePrompt = async (tipo: string) => {
     const prompt = agentePrompts?.find(p => p.tipo === tipo);
     if (!prompt) return;
@@ -148,11 +154,15 @@ export default function Configuracoes() {
         prompt: editedPrompts[tipo] ?? prompt.prompt,
         documento_modelo: editedModelos[tipo] ?? prompt.documento_modelo,
         provedor: editedProvedores[tipo] ?? prompt.provedor,
+        template_sheets_id: editedTemplateSheets[tipo] !== undefined
+          ? (editedTemplateSheets[tipo].trim() || null)
+          : (prompt as any).template_sheets_id,
       });
       toast({ title: 'Sucesso', description: 'Prompt atualizado com sucesso' });
       setEditedPrompts(prev => { const n = { ...prev }; delete n[tipo]; return n; });
       setEditedModelos(prev => { const n = { ...prev }; delete n[tipo]; return n; });
       setEditedProvedores(prev => { const n = { ...prev }; delete n[tipo]; return n; });
+      setEditedTemplateSheets(prev => { const n = { ...prev }; delete n[tipo]; return n; });
     } catch (error: any) {
       toast({ title: 'Erro', description: error.message, variant: 'destructive' });
     }
@@ -661,7 +671,7 @@ export default function Configuracoes() {
               <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin" /></div>
             ) : (
               ['diagnostico', 'okrs', 'briefing_cliente_oculto'].map(tipo => {
-                const hasChanges = editedPrompts[tipo] !== undefined || editedModelos[tipo] !== undefined || editedProvedores[tipo] !== undefined;
+                const hasChanges = editedPrompts[tipo] !== undefined || editedModelos[tipo] !== undefined || editedProvedores[tipo] !== undefined || editedTemplateSheets[tipo] !== undefined;
                 return (
                   <Card key={tipo} className="bg-card border-border">
                     <CardHeader className="flex flex-row items-center justify-between">
@@ -736,6 +746,20 @@ export default function Configuracoes() {
                           placeholder="Cole aqui um exemplo de documento já produzido para servir de referência de estilo, tom e estrutura..."
                         />
                       </div>
+                      {tipo === 'okrs' && (
+                        <div className="space-y-2">
+                          <Label className="text-muted-foreground text-xs uppercase tracking-wider">ID do template de OKRs (Google Sheets)</Label>
+                          <Input
+                            className="bg-input border-border font-mono text-sm"
+                            value={getTemplateSheetsValue(tipo)}
+                            onChange={(e) => setEditedTemplateSheets(prev => ({ ...prev, [tipo]: e.target.value }))}
+                            placeholder="ID da planilha modelo (ex: 1AbC...xyz)"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Copie o ID da URL da planilha: docs.google.com/spreadsheets/d/<strong>[ID]</strong>/edit
+                          </p>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 );
