@@ -15,7 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Loader2, ArrowLeft, FileText, Users, Calendar, Pencil, Trash2, BarChart3, Video, CalendarPlus, LineChart, Sparkles, CheckSquare } from 'lucide-react';
+import { Loader2, ArrowLeft, FileText, Users, Calendar, Pencil, Trash2, BarChart3, Video, CalendarPlus, LineChart, Sparkles, CheckSquare, FolderOpen } from 'lucide-react';
 import { useCliente, useDeleteCliente } from '@/hooks/useClientes';
 import { ContratoTab } from '@/components/cliente/ContratoTab';
 import { OnboardingTab } from '@/components/cliente/OnboardingTab';
@@ -24,6 +24,7 @@ import { DesempenhoClienteTab } from '@/components/cliente/DesempenhoClienteTab'
 import { ReunioesClienteTab } from '@/components/cliente/ReunioesClienteTab';
 import { AgentesTab } from '@/components/cliente/AgentesTab';
 import { CompromissosTab } from '@/components/cliente/CompromissosTab';
+import { DocumentosTab } from '@/components/cliente/DocumentosTab';
 import { MinhaPerformanceTab } from '@/components/consultor/MinhaPerformanceTab';
 import { ClienteFormDialog } from '@/components/cliente/ClienteFormDialog';
 import { useAuth } from '@/contexts/AuthContext';
@@ -159,6 +160,10 @@ export default function ClienteDetalhe() {
             <CheckSquare className="h-4 w-4" />
             Compromissos
           </TabsTrigger>
+          <TabsTrigger value="documentos" className="flex items-center gap-2">
+            <FolderOpen className="h-4 w-4" />
+            Documentos
+          </TabsTrigger>
           <TabsTrigger value="reunioes" className="flex items-center gap-2">
             <Video className="h-4 w-4" />
             Reuniões
@@ -193,6 +198,10 @@ export default function ClienteDetalhe() {
 
         <TabsContent value="compromissos" className="mt-6">
           <CompromissosTab clienteId={cliente.id} />
+        </TabsContent>
+
+        <TabsContent value="documentos" className="mt-6">
+          <DocumentosTab clienteId={cliente.id} />
         </TabsContent>
 
         <TabsContent value="reunioes" className="mt-6">
