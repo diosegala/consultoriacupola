@@ -7,6 +7,7 @@ interface AgentePrompt {
   prompt: string;
   documento_modelo: string | null;
   provedor: string;
+  template_sheets_id: string | null;
   updated_at: string;
 }
 
@@ -27,9 +28,10 @@ export function useAgentePrompts() {
 export function useUpdateAgentePrompt() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, prompt, documento_modelo, provedor }: { id: string; prompt: string; documento_modelo?: string | null; provedor?: string }) => {
+    mutationFn: async ({ id, prompt, documento_modelo, provedor, template_sheets_id }: { id: string; prompt: string; documento_modelo?: string | null; provedor?: string; template_sheets_id?: string | null }) => {
       const updateData: Record<string, any> = { prompt, documento_modelo: documento_modelo ?? null, updated_at: new Date().toISOString() };
       if (provedor !== undefined) updateData.provedor = provedor;
+      if (template_sheets_id !== undefined) updateData.template_sheets_id = template_sheets_id;
       const { error } = await supabase
         .from('agente_prompts')
         .update(updateData)

@@ -20,6 +20,7 @@ export type Database = {
           id: string
           prompt: string
           provedor: string
+          template_sheets_id: string | null
           tipo: string
           updated_at: string
         }
@@ -28,6 +29,7 @@ export type Database = {
           id?: string
           prompt: string
           provedor?: string
+          template_sheets_id?: string | null
           tipo: string
           updated_at?: string
         }
@@ -36,6 +38,7 @@ export type Database = {
           id?: string
           prompt?: string
           provedor?: string
+          template_sheets_id?: string | null
           tipo?: string
           updated_at?: string
         }
@@ -1410,9 +1413,11 @@ export type Database = {
           conteudo: string
           created_at: string
           created_by: string | null
+          dados_estruturados: Json | null
           gdoc_url: string | null
           id: string
           projeto_id: string | null
+          sheet_url: string | null
           tipo: string
         }
         Insert: {
@@ -1420,9 +1425,11 @@ export type Database = {
           conteudo: string
           created_at?: string
           created_by?: string | null
+          dados_estruturados?: Json | null
           gdoc_url?: string | null
           id?: string
           projeto_id?: string | null
+          sheet_url?: string | null
           tipo: string
         }
         Update: {
@@ -1430,9 +1437,11 @@ export type Database = {
           conteudo?: string
           created_at?: string
           created_by?: string | null
+          dados_estruturados?: Json | null
           gdoc_url?: string | null
           id?: string
           projeto_id?: string | null
+          sheet_url?: string | null
           tipo?: string
         }
         Relationships: [

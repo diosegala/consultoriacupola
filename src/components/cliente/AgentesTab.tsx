@@ -490,6 +490,76 @@ export function AgentesTab({ clienteId }: Props) {
   const diagnosticoDoc = lastByTipo.get('diagnostico');
   const okrsDoc = lastByTipo.get('okrs');
 
+  // Criação de planilha de OKRs a partir de dados_estruturados
+  const [criandoSheet, setCriandoSheet] = useState(false);
+  const [sheetProgresso, setSheetProgresso] = useState<string>('');
+  const [escopoInsuficienteOpen, setEscopoInsuficienteOpen] = useState(false);
+
+  const okrsDados: any = okrsDoc?.dados_estruturados ?? null;
+
+  const handleCriarPlanilhaOKR = async () => {
+    if (!okrsDoc) return;
+    setCriandoSheet(true);
+    setSheetProgresso('Copiando template…');
+    try {
+      setSheetProgresso('Preenchendo OKRs…');
+      const { data, error } = await supabase.functions.invoke('criar-okr-sheet', {
+        body: { documento_id: okrsDoc.id },
+      });
+      if (error) {
+        let msg = error.message || 'Erro ao criar planilha';
+        try {
+          const ctx: any = (error as any).context;
+          if (ctx && typeof ctx.json === 'function') {
+            const body = await ctx.json();
+            if (typeof body?.error === 'string') msg = body.error;
+          }
+        } catch { /* keep msg */ }
+        if (msg === 'escopo_insuficiente') {
+          setEscopoInsuficienteOpen(true);
+          return;
+        }
+        throw new Error(msg);
+      }
+      if (data?.error === 'escopo_insuficiente') {
+        setEscopoInsuficienteOpen(true);
+        return;
+      }
+      if (data?.error) throw new Error(data.error);
+      setSheetProgresso('Pronto');
+      toast.success('Planilha de OKRs criada.');
+      await queryClient.invalidateQueries({ queryKey: ['cliente_documentos', clienteId] });
+      if (data?.sheet_url) window.open(data.sheet_url, '_blank', 'noopener');
+    } catch (err: any) {
+      toast.error(err?.message ?? 'Erro ao criar planilha de OKRs');
+    } finally {
+      setCriandoSheet(false);
+      setTimeout(() => setSheetProgresso(''), 2000);
+    }
+  };
+
+  const handleCopiarTSV = () => {
+    if (!okrsDados) {
+      toast.error('OKRs sem dados estruturados para exportar');
+      return;
+    }
+    const linhas: string[] = ['Objetivo\tKey Result\tAção\tObservações'];
+    for (const obj of (okrsDados.objetivos ?? [])) {
+      const objTxt = obj.objetivo ?? '';
+      const krs = obj.key_results ?? [];
+      if (!krs.length) linhas.push(`${objTxt}\t\t\t`);
+      for (const kr of krs) {
+        const krTxt = kr.kr ?? '';
+        const obs = kr.observacoes ?? '';
+        const acoes: string[] = kr.acoes ?? [];
+        if (!acoes.length) linhas.push(`${objTxt}\t${krTxt}\t\t${obs}`);
+        acoes.forEach((a, i) => linhas.push(`${objTxt}\t${krTxt}\t${a}\t${i === 0 ? obs : ''}`));
+      }
+    }
+    navigator.clipboard.writeText(linhas.join('\n'));
+    toast.success('Copiado. Cole em qualquer planilha.');
+  };
+
   const TITULO_TIPO: Record<string, string> = {
     diagnostico: 'Diagnóstico',
     okrs: 'OKRs',
@@ -1350,6 +1420,33 @@ export function AgentesTab({ clienteId }: Props) {
               ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Gerando…</>
               : <><Sparkles className="h-4 w-4 mr-2" /> Gerar OKRs {okrTrimestre}</>}
           </Button>
+          {okrsDoc && okrsDados && (
+            <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
+              {okrsDoc.sheet_url ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(okrsDoc.sheet_url!, '_blank', 'noopener')}
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" /> Abrir planilha de OKRs
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCriarPlanilhaOKR}
+                  disabled={criandoSheet}
+                >
+                  {criandoSheet
+                    ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {sheetProgresso || 'Criando…'}</>
+                    : <><FileText className="h-4 w-4 mr-2" /> Criar planilha de OKRs</>}
+                </Button>
+              )}
+              <Button variant="ghost" size="sm" onClick={handleCopiarTSV}>
+                <ClipboardCheck className="h-4 w-4 mr-2" /> Copiar para planilha (TSV)
+              </Button>
+            </div>
+          )}
         </PanelAgente>
 
         {/* CLIENTE OCULTO */}
@@ -1432,6 +1529,25 @@ export function AgentesTab({ clienteId }: Props) {
                 <ReactMarkdown>{viewingDoc.conteudo}</ReactMarkdown>
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={escopoInsuficienteOpen} onOpenChange={setEscopoInsuficienteOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Reconecte sua conta Google</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 text-sm">
+              <p>
+                Sua conexão Google precisa ser renovada para criar planilhas de OKRs. O escopo de acesso ao Google Sheets ainda não foi concedido.
+              </p>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="ghost" onClick={() => setEscopoInsuficienteOpen(false)}>Fechar</Button>
+                <Button onClick={() => { window.location.href = '/minhas-integracoes'; }}>
+                  Ir para Minhas Integrações
+                </Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

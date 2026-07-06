@@ -517,6 +517,47 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
       });
     }
 
+    // Para OKRs: extrair bloco <OKRS_JSON>...</OKRS_JSON>, validar (max 2 obj × 4 KR × 6 ações),
+    // salvar em dados_estruturados e remover do markdown antes de persistir.
+    let dadosEstruturados: any = null;
+    if (tipo === "okrs") {
+      const match = conteudo.match(/<OKRS_JSON>([\s\S]*?)<\/OKRS_JSON>/i);
+      if (match) {
+        try {
+          const parsed = JSON.parse(match[1].trim());
+          const objetivosRaw: any[] = Array.isArray(parsed?.objetivos) ? parsed.objetivos : [];
+          if (objetivosRaw.length > 2) console.warn(`[agente-projeto/okrs] truncando ${objetivosRaw.length} objetivos para 2`);
+          const objetivos = objetivosRaw.slice(0, 2).map((o: any) => {
+            const krsRaw: any[] = Array.isArray(o?.key_results) ? o.key_results : [];
+            if (krsRaw.length > 4) console.warn(`[agente-projeto/okrs] truncando ${krsRaw.length} KRs para 4`);
+            const krs = krsRaw.slice(0, 4).map((kr: any) => {
+              const acoesRaw: any[] = Array.isArray(kr?.acoes) ? kr.acoes : [];
+              if (acoesRaw.length > 6) console.warn(`[agente-projeto/okrs] truncando ${acoesRaw.length} ações para 6`);
+              return {
+                kr: typeof kr?.kr === "string" ? kr.kr : "",
+                acoes: acoesRaw.slice(0, 6).filter((a: any) => typeof a === "string" && a.trim()),
+                observacoes: typeof kr?.observacoes === "string" ? kr.observacoes : null,
+              };
+            });
+            return {
+              objetivo: typeof o?.objetivo === "string" ? o.objetivo : "",
+              key_results: krs,
+            };
+          });
+          dadosEstruturados = {
+            trimestre: typeof parsed?.trimestre === "string" ? parsed.trimestre : (trimestre ?? null),
+            objetivos,
+          };
+        } catch (err) {
+          console.warn("[agente-projeto/okrs] falha ao parsear OKRS_JSON:", err);
+        }
+        // Remove o bloco do markdown salvo
+        conteudo = conteudo.replace(/<OKRS_JSON>[\s\S]*?<\/OKRS_JSON>/gi, "").trim();
+      } else {
+        console.warn("[agente-projeto/okrs] bloco OKRS_JSON não encontrado na resposta");
+      }
+    }
+
     const insertPayload: Record<string, unknown> = {
       tipo,
       conteudo,
@@ -525,6 +566,7 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
     };
     if (projeto_id) insertPayload.projeto_id = projeto_id;
     else insertPayload.cliente_id = clienteId;
+    if (dadosEstruturados) insertPayload.dados_estruturados = dadosEstruturados;
 
     const { data: docInserted, error: insertError } = await serviceClient
       .from("projeto_documentos")

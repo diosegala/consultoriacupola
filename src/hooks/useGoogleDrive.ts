@@ -8,7 +8,7 @@ export function useGoogleConnection(consultorId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('consultor_google_tokens' as any)
-        .select('email_google, ativo, pasta_meet_id, pasta_meet_nome, pasta_meet_link, pasta_meet_owner_email, ultima_sincronizacao')
+        .select('email_google, ativo, pasta_meet_id, pasta_meet_nome, pasta_meet_link, pasta_meet_owner_email, ultima_sincronizacao, escopo')
         .eq('consultor_id', consultorId!)
         .maybeSingle();
       if (error) throw error;

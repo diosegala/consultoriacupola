@@ -229,6 +229,22 @@ export default function MinhasIntegracoes() {
                   <Link2 className="h-4 w-4 mr-2" /> Reconectar
                 </Button>
               </div>
+              {conn.escopo && !String(conn.escopo).includes('spreadsheets') && (
+                <div className="rounded-md border border-yellow-600/40 bg-yellow-600/10 p-3 text-sm">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-yellow-500 mt-0.5" />
+                    <div className="space-y-2 flex-1">
+                      <p className="text-yellow-500 font-medium">Reconecte sua conta Google para habilitar planilhas de OKRs</p>
+                      <p className="text-xs text-muted-foreground">
+                        Sua conexão atual não inclui permissão para criar/editar planilhas Google Sheets. A geração automática do "Plano de OKRs" precisa desse acesso.
+                      </p>
+                      <Button onClick={handleConnect} size="sm" variant="outline" className="border-yellow-600/40">
+                        <Link2 className="h-4 w-4 mr-2" /> Reconectar com permissão de Sheets
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
               <p className="text-xs text-muted-foreground">
                 A detecção busca pastas chamadas "Meet Recordings" que pertencem à sua conta Google.
                 Se o proprietário for diferente, a pasta foi compartilhada por outro usuário — use "Detectar pasta novamente" após criar/abrir o Meet a partir da sua conta.
