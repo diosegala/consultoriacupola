@@ -998,6 +998,8 @@ export function AgentesTab({ clienteId }: Props) {
           existingDoc={okrsDoc}
           versoesAnteriores={documentos?.filter((d) => d.tipo === 'okrs') ?? []}
           onView={(d) => setViewingDoc(d)}
+          onCriarGdoc={handleCriarGdocRetro}
+          criandoGdocDocId={criandoGdocDocId}
           expanded={expandedHistory['okrs']}
           onToggleExpand={() =>
             setExpandedHistory((p) => ({ ...p, okrs: !p['okrs'] }))
@@ -1042,6 +1044,8 @@ export function AgentesTab({ clienteId }: Props) {
           existingDoc={lastByTipo.get('briefing_cliente_oculto')}
           versoesAnteriores={documentos?.filter((d) => d.tipo === 'briefing_cliente_oculto') ?? []}
           onView={(d) => setViewingDoc(d)}
+          onCriarGdoc={handleCriarGdocRetro}
+          criandoGdocDocId={criandoGdocDocId}
           expanded={expandedHistory['briefing_cliente_oculto']}
           onToggleExpand={() =>
             setExpandedHistory((p) => ({ ...p, briefing_cliente_oculto: !p['briefing_cliente_oculto'] }))
