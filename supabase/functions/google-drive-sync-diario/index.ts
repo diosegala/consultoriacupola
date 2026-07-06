@@ -51,6 +51,26 @@ function matchCliente(nome: string, clientes: any[], aliases: any[]): string | n
   return matches.size === 1 ? Array.from(matches)[0] : null;
 }
 
+// Retorna IDs de consultoras cujo primeiro nome aparece como palavra inteira
+// no nome do arquivo. Ignora o consultor "dono" do arquivo (o próprio diretor).
+function matchConsultores(
+  nome: string,
+  consultores: Array<{ id: string; nome: string }>,
+  ownerId: string,
+): string[] {
+  const lower = nome.toLowerCase();
+  const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const hits = new Set<string>();
+  for (const c of consultores) {
+    if (c.id === ownerId) continue;
+    const primeiro = (c.nome ?? "").trim().split(/\s+/)[0];
+    if (!primeiro || primeiro.length < 3) continue;
+    const re = new RegExp(`(^|[^a-z0-9])${escape(primeiro.toLowerCase())}([^a-z0-9]|$)`, "i");
+    if (re.test(lower)) hits.add(c.id);
+  }
+  return Array.from(hits);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -65,6 +85,19 @@ Deno.serve(async (req) => {
 
     const { data: clientes } = await admin.from("clientes").select("id, nome");
     const { data: aliases } = await admin.from("cliente_aliases").select("cliente_id, alias");
+    const { data: consultoresAtivos } = await admin
+      .from("consultores").select("id, nome").eq("ativo", true);
+    // Diretores/admins (podem gerar reunioes_gestao)
+    const { data: rolesDiretores } = await admin
+      .from("user_roles").select("user_id, role").in("role", ["admin", "director"]);
+    const userIdsDiretor = new Set((rolesDiretores ?? []).map((r: any) => r.user_id));
+    const { data: consultorUserMap } = await admin
+      .from("consultor_user").select("consultor_id, user_id");
+    const diretorConsultorIds = new Set(
+      (consultorUserMap ?? [])
+        .filter((r: any) => userIdsDiretor.has(r.user_id))
+        .map((r: any) => r.consultor_id),
+    );
 
     const resultados: any[] = [];
 
@@ -98,7 +131,7 @@ Deno.serve(async (req) => {
           (jaImp || []).filter((j: any) => j.status !== "importado").map((j: any) => [j.google_file_id, j.id])
         );
 
-        let importados = 0; let pulados = 0; let erros = 0;
+        let importados = 0; let pulados = 0; let erros = 0; let gestao = 0;
 
         for (const d of docs) {
           if (importedSet.has(d.id)) continue;
@@ -109,6 +142,66 @@ Deno.serve(async (req) => {
             await admin.from("reunioes_importadas_log").delete().eq("id", staleId);
           }
           if (!clienteId) {
+            // Antes de descartar como sem_match: se o dono da pasta é diretor/admin
+            // e o arquivo menciona consultoras da equipe → reunião de gestão.
+            if (diretorConsultorIds.has(row.consultor_id)) {
+              const consultorHits = matchConsultores(
+                d.name, consultoresAtivos ?? [], row.consultor_id,
+              );
+              if (consultorHits.length >= 1) {
+                try {
+                  const exp = await fetch(
+                    `https://www.googleapis.com/drive/v3/files/${d.id}/export?mimeType=text/plain`,
+                    { headers: { Authorization: `Bearer ${tk.access_token}` } },
+                  );
+                  if (!exp.ok) throw new Error(await exp.text());
+                  const transcricao = await exp.text();
+                  const dataReuniao = (d.createdTime || new Date().toISOString()).slice(0, 10);
+                  // Nomes dos participantes (primeiro nome de cada consultora)
+                  const participantes = (consultoresAtivos ?? [])
+                    .filter((c: any) => consultorHits.includes(c.id))
+                    .map((c: any) => (c.nome ?? "").split(/\s+/)[0])
+                    .filter(Boolean);
+                  const tipo = consultorHits.length >= 2 ? "equipe" : "individual";
+                  const { data: rg, error: rgErr } = await admin
+                    .from("reunioes_gestao")
+                    .insert({
+                      diretor_id: row.consultor_id,
+                      tipo,
+                      participantes,
+                      data_reuniao: dataReuniao,
+                      transcricao,
+                      status_analise: "pendente",
+                      google_file_id: d.id,
+                      nome_arquivo: d.name,
+                    })
+                    .select().single();
+                  if (rgErr) throw rgErr;
+                  await admin.from("reunioes_importadas_log").insert({
+                    google_file_id: d.id, consultor_id: row.consultor_id,
+                    nome_arquivo: d.name, status: "importado",
+                  });
+                  gestao++;
+                  // Dispara análise assíncrona (não bloqueia sync)
+                  const fnUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/analisar-reuniao-gestao`;
+                  fetch(fnUrl, {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+                    },
+                    body: JSON.stringify({ reuniao_gestao_id: rg.id }),
+                  }).catch((err) => console.error("[gestao] disparo analise", err));
+                  continue;
+                } catch (e: any) {
+                  await admin.from("reunioes_importadas_log").insert({
+                    google_file_id: d.id, consultor_id: row.consultor_id,
+                    nome_arquivo: d.name, status: "erro", erro: `gestao: ${e.message}`,
+                  });
+                  erros++; continue;
+                }
+              }
+            }
             await admin.from("reunioes_importadas_log").insert({
               google_file_id: d.id, consultor_id: row.consultor_id,
               nome_arquivo: d.name, status: "sem_match",
@@ -150,7 +243,7 @@ Deno.serve(async (req) => {
           .update({ ultima_sincronizacao: new Date().toISOString() })
           .eq("consultor_id", row.consultor_id);
 
-        resultados.push({ consultor_id: row.consultor_id, importados, pulados, erros });
+        resultados.push({ consultor_id: row.consultor_id, importados, pulados, erros, gestao });
       } catch (e: any) {
         console.error("Sync consultor failed", row.consultor_id, e.message);
         resultados.push({ consultor_id: row.consultor_id, error: e.message });
