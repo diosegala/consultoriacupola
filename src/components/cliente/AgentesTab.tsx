@@ -494,6 +494,82 @@ export function AgentesTab({ clienteId }: Props) {
   const diagnosticoDoc = lastByTipo.get('diagnostico');
   const okrsDoc = lastByTipo.get('okrs');
 
+  // Estatísticas do período para o agente Balanço do Período
+  const { data: balancoStats } = useQuery({
+    queryKey: ['balanco_periodo_stats', clienteId],
+    enabled: !!clienteId,
+    queryFn: async () => {
+      const { data: contrato } = await supabase
+        .from('contratos')
+        .select('data_inicio, data_fim')
+        .eq('cliente_id', clienteId)
+        .eq('ativo', true)
+        .order('data_inicio', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const inicio = contrato?.data_inicio ?? null;
+      const fim = contrato?.data_fim ?? null;
+
+      let rQ = supabase
+        .from('reunioes')
+        .select('id', { count: 'exact', head: true })
+        .eq('cliente_id', clienteId)
+        .eq('status_analise', 'concluido');
+      if (inicio) rQ = rQ.gte('data_reuniao', inicio);
+      if (fim) rQ = rQ.lte('data_reuniao', fim);
+      const { count: reunioesCount } = await rQ;
+
+      let dQ = supabase
+        .from('projeto_documentos')
+        .select('id', { count: 'exact', head: true })
+        .eq('cliente_id', clienteId)
+        .in('tipo', ['diagnostico', 'okrs', 'briefing_cliente_oculto']);
+      if (inicio) dQ = dQ.gte('created_at', inicio + 'T00:00:00');
+      if (fim) dQ = dQ.lte('created_at', fim + 'T23:59:59');
+      const { count: docsCount } = await dQ;
+
+      let cQ = supabase
+        .from('compromissos')
+        .select('status')
+        .eq('cliente_id', clienteId);
+      if (inicio) cQ = cQ.gte('created_at', inicio);
+      if (fim) cQ = cQ.lte('created_at', fim + 'T23:59:59');
+      const { data: comps } = await cQ;
+      const total = comps?.length ?? 0;
+      const concl = (comps ?? []).filter((c: any) => c.status === 'concluido').length;
+
+      return {
+        contrato_inicio: inicio,
+        contrato_fim: fim,
+        reunioes: reunioesCount ?? 0,
+        documentos: docsCount ?? 0,
+        compromissos_total: total,
+        compromissos_concluidos: concl,
+        compromissos_pct: total ? Math.round((concl / total) * 100) : 0,
+      };
+    },
+  });
+
+  const podeGerarBalanco = (balancoStats?.reunioes ?? 0) >= 3 || (balancoStats?.documentos ?? 0) >= 1;
+  const [gerandoBalanco, setGerandoBalanco] = useState(false);
+  const balancoDoc = lastByTipo.get('balanco_periodo');
+
+  const gerarBalanco = async () => {
+    setGerandoBalanco(true);
+    try {
+      await gerar.mutateAsync({
+        tipo: 'balanco_periodo',
+        cliente_id: clienteId,
+        contexto_usuario: bpContexto.trim() || undefined,
+      });
+      toast.success('Balanço do período gerado.');
+    } catch {
+      /* erro tratado no hook */
+    } finally {
+      setGerandoBalanco(false);
+    }
+  };
+
   // Criação de planilha de OKRs a partir de dados_estruturados
   const [criandoSheet, setCriandoSheet] = useState(false);
   const [sheetProgresso, setSheetProgresso] = useState<string>('');
