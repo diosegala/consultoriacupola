@@ -31,6 +31,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useActiveTimer } from '@/hooks/useActiveTimer';
 import { useRegistrarInteracaoTempo, type TipoAgente } from '@/hooks/useInteracoesTempo';
+import {
+  useTranscricoesSumarios,
+  useSumarizarTranscricao,
+  useRemoverSumario,
+} from '@/hooks/useTranscricoesSumarios';
 
 interface Props {
   clienteId: string;
@@ -41,6 +46,11 @@ interface Fonte {
   label: string;
   origem: 'upload' | 'gdrive' | 'texto';
   status: 'pending' | 'parsing' | 'done' | 'error';
+  sumarioStatus?: 'idle' | 'sumarizando' | 'ok' | 'erro';
+  sumarioId?: string;
+  sumarioErro?: string;
+  numCharsOriginal?: number;
+  numCharsSumario?: number;
   conteudo?: string;
   meta?: string; // nome de arquivo ou url
   errorMsg?: string;
@@ -168,6 +178,9 @@ export function AgentesTab({ clienteId }: Props) {
   const gerar = useGerarDocumento();
   const { mutateAsync: parseDocumento } = useParseDocumento();
   const criarGdocRetro = useCriarGdocRetro();
+  const { data: sumariosSalvos } = useTranscricoesSumarios(clienteId);
+  const sumarizar = useSumarizarTranscricao();
+  const removerSumario = useRemoverSumario();
   const queryClient = useQueryClient();
   const { mutate: registrarTempo } = useRegistrarInteracaoTempo();
   const activeTimer = useActiveTimer(true);
