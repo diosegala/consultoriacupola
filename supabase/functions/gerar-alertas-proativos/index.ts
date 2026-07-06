@@ -282,7 +282,12 @@ Deno.serve(async (req) => {
         link: `/clientes/${cli.id}`,
         entidade_tipo: "contrato",
         entidade_id: (c as any).id,
-        metadata: { dias_para_vencer: dias, data_fim: (c as any).data_fim },
+        metadata: {
+          dias_para_vencer: dias,
+          data_fim: (c as any).data_fim,
+          cliente_id: cli.id,
+          link_balanco: `/agentes?agente=balanco_periodo&cliente=${cli.id}`,
+        },
       });
       summary.contrato_sem_renovacao++;
     }
