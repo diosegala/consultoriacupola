@@ -6,7 +6,7 @@ import { OraculoFloatingChat } from '@/components/oraculo/OraculoFloatingChat';
 import { ErrorBoundary } from './ErrorBoundary';
 import { NotificationBell } from './NotificationBell';
 
-const RESTRICTED_FOR_CONSULTOR = ['/', '/clientes', '/contratos', '/consultores', '/configuracoes'];
+const RESTRICTED_FOR_CONSULTOR = ['/', '/contratos', '/consultores', '/configuracoes'];
 
 export function AppLayout() {
   const { user, loading, roleLoading, userRole, forcePasswordChange } = useAuth();
