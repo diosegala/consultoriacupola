@@ -862,17 +862,29 @@ export function AgentesTab({ clienteId }: Props) {
                           </Badge>
                         )}
                         {f.status === 'error' && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Badge variant="destructive" className="text-[10px]">erro</Badge>
-                            </TooltipTrigger>
-                            <TooltipContent>{f.errorMsg ?? 'Falha ao processar'}</TooltipContent>
-                          </Tooltip>
+                          <Badge variant="destructive" className="text-[10px]">erro</Badge>
                         )}
                         <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removerFonte(f.id)}>
                           <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
+                      {f.status === 'error' && (
+                        <div className="pl-6 space-y-1.5">
+                          <p className="text-[11px] text-destructive leading-snug">
+                            {f.errorMsg ?? 'Falha ao processar arquivo.'}
+                          </p>
+                          {(f.origem === 'gdrive' || f.origem === 'upload') && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-6 text-[11px]"
+                              onClick={() => tentarReprocessar(f.id)}
+                            >
+                              <RefreshCw className="h-3 w-3 mr-1" /> Tentar novamente
+                            </Button>
+                          )}
+                        </div>
+                      )}
                       <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2 items-center pl-6">
                         <Input
                           value={f.papel ?? ''}
