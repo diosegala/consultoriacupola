@@ -30,6 +30,8 @@ import { NovaTarefaPessoalDialog } from '@/components/tarefas/NovaTarefaPessoalD
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
+import { GestaoEquipeSection } from '@/components/painel/GestaoEquipeSection';
 
 const TIPOS_PROATIVOS = ['sem_contato', 'checklist_parado', 'okr_sem_progresso', 'contrato_sem_renovacao'] as const;
 type TipoProativo = (typeof TIPOS_PROATIVOS)[number];
@@ -171,6 +173,8 @@ export default function MeuPainel() {
   const [userId, setUserId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const { isAdmin, isDirector } = useAuth();
+  const isGestor = isAdmin || isDirector;
 
   // pega user id (para filtrar notificações do próprio usuário)
   useMemo(() => {
@@ -227,7 +231,7 @@ export default function MeuPainel() {
     return <Skeleton className="h-64 w-full" />;
   }
 
-  if (!consultorId) {
+  if (!consultorId && !isGestor) {
     return (
       <Card>
         <CardContent className="py-10 text-center text-sm text-muted-foreground">
@@ -241,9 +245,20 @@ export default function MeuPainel() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Meu Painel</h1>
-        <p className="text-sm text-muted-foreground">Visão geral do seu dia e do portfólio sob sua responsabilidade.</p>
+        <p className="text-sm text-muted-foreground">
+          {isGestor
+            ? 'Sua visão pessoal como consultor(a) e o radar de gestão da equipe.'
+            : 'Visão geral do seu dia e do portfólio sob sua responsabilidade.'}
+        </p>
       </div>
-
+      {consultorId && isGestor && (
+        <div>
+          <h2 className="text-xl font-bold text-foreground">Meus Clientes</h2>
+          <p className="text-xs text-muted-foreground">Seu portfólio pessoal como consultor(a).</p>
+        </div>
+      )}
+      {consultorId && (
+      <>
       {/* Ações sugeridas (proativas) */}
       <Card className="border-primary/30">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
