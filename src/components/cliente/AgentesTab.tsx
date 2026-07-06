@@ -36,6 +36,12 @@ import {
   useSumarizarTranscricao,
   useRemoverSumario,
 } from '@/hooks/useTranscricoesSumarios';
+import {
+  useClienteArquivos,
+  downloadClienteArquivoBase64,
+  type ClienteArquivo,
+} from '@/hooks/useClienteArquivos';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Props {
   clienteId: string;
@@ -179,6 +185,7 @@ export function AgentesTab({ clienteId }: Props) {
   const { mutateAsync: parseDocumento } = useParseDocumento();
   const criarGdocRetro = useCriarGdocRetro();
   const { data: sumariosSalvos } = useTranscricoesSumarios(clienteId);
+  const { data: baseArquivos } = useClienteArquivos(clienteId);
   const sumarizar = useSumarizarTranscricao();
   const removerSumario = useRemoverSumario();
   const queryClient = useQueryClient();
@@ -261,6 +268,7 @@ export function AgentesTab({ clienteId }: Props) {
   const [gdriveUrl, setGdriveUrl] = useState('');
   const [textoColado, setTextoColado] = useState('');
   const [textoLabel, setTextoLabel] = useState('');
+  const [baseSelectId, setBaseSelectId] = useState<string>('');
   const [anotacoesSecoes, setAnotacoesSecoes] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
