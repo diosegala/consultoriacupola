@@ -291,6 +291,9 @@ export function AgentesTab({ clienteId }: Props) {
   const [coPersonas, setCoPersonas] = useState<1 | 2>(1);
   const [coObservacoes, setCoObservacoes] = useState('');
 
+  // Balanço do Período
+  const [bpContexto, setBpContexto] = useState('');
+
   // Visualização
   const [viewingDoc, setViewingDoc] = useState<ProjetoDocumento | null>(null);
   const [expandedHistory, setExpandedHistory] = useState<Record<string, boolean>>({});
