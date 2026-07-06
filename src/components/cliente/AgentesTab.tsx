@@ -989,7 +989,22 @@ export function AgentesTab({ clienteId }: Props) {
                             <Loader2 className="h-3 w-3 animate-spin" /> processando
                           </Badge>
                         )}
-                        {f.status === 'done' && (
+                        {f.status === 'done' && f.sumarioStatus === 'sumarizando' && (
+                          <Badge variant="secondary" className="text-[10px] gap-1">
+                            <Loader2 className="h-3 w-3 animate-spin" /> sumarizando
+                          </Badge>
+                        )}
+                        {f.status === 'done' && f.sumarioStatus === 'ok' && (
+                          <Badge variant="outline" className="text-[10px] text-emerald-500 border-emerald-500/40">
+                            {f.numCharsOriginal && f.numCharsSumario
+                              ? `sumário ${Math.max(1, Math.round((f.numCharsSumario / f.numCharsOriginal) * 100))}% do original`
+                              : 'sumário pronto'}
+                          </Badge>
+                        )}
+                        {f.status === 'done' && f.sumarioStatus === 'erro' && (
+                          <Badge variant="destructive" className="text-[10px]">falha sumário</Badge>
+                        )}
+                        {f.status === 'done' && !f.sumarioStatus && (
                           <Badge variant="outline" className="text-[10px] text-emerald-500 border-emerald-500/40">
                             pronto
                           </Badge>
@@ -1001,6 +1016,16 @@ export function AgentesTab({ clienteId }: Props) {
                           <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
+                      {f.sumarioStatus === 'erro' && (
+                        <div className="pl-6 space-y-1.5">
+                          <p className="text-[11px] text-destructive leading-snug">
+                            {f.sumarioErro ?? 'Falha ao sumarizar.'}
+                          </p>
+                          <Button size="sm" variant="outline" className="h-6 text-[11px]" onClick={() => tentarSumarizar(f.id)}>
+                            <RefreshCw className="h-3 w-3 mr-1" /> Tentar novamente
+                          </Button>
+                        </div>
+                      )}
                       {f.status === 'error' && (
                         <div className="pl-6 space-y-1.5">
                           <p className="text-[11px] text-destructive leading-snug">
