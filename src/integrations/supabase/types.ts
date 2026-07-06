@@ -353,6 +353,63 @@ export type Database = {
           },
         ]
       }
+      compromissos: {
+        Row: {
+          cliente_id: string
+          created_at: string
+          created_by: string | null
+          descricao: string
+          id: string
+          origem: string
+          prazo: string | null
+          responsavel: string
+          reuniao_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          cliente_id: string
+          created_at?: string
+          created_by?: string | null
+          descricao: string
+          id?: string
+          origem?: string
+          prazo?: string | null
+          responsavel: string
+          reuniao_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          cliente_id?: string
+          created_at?: string
+          created_by?: string | null
+          descricao?: string
+          id?: string
+          origem?: string
+          prazo?: string | null
+          responsavel?: string
+          reuniao_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compromissos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compromissos_reuniao_id_fkey"
+            columns: ["reuniao_id"]
+            isOneToOne: false
+            referencedRelation: "reunioes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       consultor_google_tokens: {
         Row: {
           access_token: string
