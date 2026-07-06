@@ -432,6 +432,11 @@ export function AgentesTab({ clienteId }: Props) {
     f.status === 'done' && f.conteudo && !conteudoExtraidoInvalido(f.conteudo),
   );
 
+  const sumariosIds = useMemo(
+    () => fontes.map((f) => f.sumarioId).filter((x): x is string => !!x),
+    [fontes],
+  );
+
   const totalPalavrasTranscricoes = useMemo(
     () => transcricoesProntas.reduce((acc, f) => acc + contarPalavras(f.conteudo), 0),
     [transcricoesProntas],
@@ -676,10 +681,15 @@ export function AgentesTab({ clienteId }: Props) {
       tipo: 'diagnostico',
       cliente_id: clienteId,
       questionario_data: (questionario?.respostas as Record<string, unknown>) ?? null,
-      transcricoes_textos: transcricoesProntas.map((f) => ({
-        label: rotuloTranscricao(f),
-        conteudo: f.conteudo!,
-      })),
+      // Fluxo novo: envia sumarios_ids (map-reduce). Só envia transcrições brutas
+      // como fallback para as fontes que ainda não têm sumário.
+      sumarios_ids: sumariosIds,
+      transcricoes_textos: transcricoesProntas
+        .filter((f) => !f.sumarioId)
+        .map((f) => ({
+          label: rotuloTranscricao(f),
+          conteudo: f.conteudo!,
+        })),
       anotacoes_consultor: anotacoesConcatenadas || undefined,
     });
   };
