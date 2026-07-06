@@ -23,6 +23,7 @@ import {
   useParseDocumento,
   useAgenteRascunho,
   useSalvarAgenteRascunho,
+  useCriarGdocRetro,
   type ProjetoDocumento,
 } from '@/hooks/useProjetoDocumentos';
 import { useQueryClient } from '@tanstack/react-query';
