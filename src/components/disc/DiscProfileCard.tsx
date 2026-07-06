@@ -55,7 +55,7 @@ export function DiscProfileCard({
 
   async function abrirPdf() {
     try {
-      const url = await signPdf.mutateAsync();
+      const url = await signPdf.mutateAsync(undefined);
       window.open(url, '_blank');
     } catch (err: any) {
       toast({ title: 'Erro ao abrir PDF', description: err?.message ?? '', variant: 'destructive' });

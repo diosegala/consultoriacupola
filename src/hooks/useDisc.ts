@@ -79,7 +79,7 @@ export function useCruzamentoDisc(diretor_id: string | null | undefined, consult
 
 export function useSignedDiscPdf(pdf_url: string | null | undefined) {
   return useMutation({
-    mutationFn: async (path?: string) => {
+    mutationFn: async (path?: string): Promise<string> => {
       const full = path ?? pdf_url ?? '';
       const key = full.replace(/^perfis-disc\//, '');
       const { data, error } = await supabase.storage
