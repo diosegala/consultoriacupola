@@ -20,6 +20,7 @@ import { ContratoFormDialog, RenovarContratoDialog } from './ClienteDialogs';
 import { toast } from 'sonner';
 import { getTipoConsultoriaLabel } from '@/lib/contrato';
 import { QuestionarioBloco } from './QuestionarioBloco';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface ContratoTabProps {
   clienteId: string;
@@ -38,6 +39,7 @@ export function ContratoTab({ clienteId, clienteStatus, consultorId }: ContratoT
   const { data: contratos, isLoading } = useContratos(clienteId);
   const { data: contratoAtivo } = useContratoAtivo(clienteId);
   const contratoEncerradoComPagamento = contratoAtivo && (contratoAtivo as any).encerrado_em;
+  const { isConsultor } = useAuth();
 
   const [showForm, setShowForm] = useState(false);
   const [editingContrato, setEditingContrato] = useState<ContratoComTipo | null>(null);
@@ -130,21 +132,25 @@ export function ContratoTab({ clienteId, clienteStatus, consultorId }: ContratoT
                   {format(parseISO(contratoAtivo.data_fim), 'dd/MM/yyyy')}
                 </p>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">MRR</p>
-                <p className="text-primary font-bold text-lg">
-                  {formatCurrency(Number(contratoAtivo.remuneracao_mensal))}
-                </p>
-              </div>
+              {!isConsultor && (
+                <div>
+                  <p className="text-sm text-muted-foreground">MRR</p>
+                  <p className="text-primary font-bold text-lg">
+                    {formatCurrency(Number(contratoAtivo.remuneracao_mensal))}
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-border">
-              <div>
-                <p className="text-sm text-muted-foreground">Valor Total</p>
-                <p className="text-foreground font-medium">
-                  {formatCurrency(Number(contratoAtivo.remuneracao_total))}
-                </p>
-              </div>
+              {!isConsultor && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Valor Total</p>
+                  <p className="text-foreground font-medium">
+                    {formatCurrency(Number(contratoAtivo.remuneracao_total))}
+                  </p>
+                </div>
+              )}
               <div>
                 <p className="text-sm text-muted-foreground">Parcelas</p>
                 <p className="text-foreground font-medium">{contratoAtivo.parcelas}x</p>
@@ -200,8 +206,8 @@ export function ContratoTab({ clienteId, clienteStatus, consultorId }: ContratoT
                 <TableRow className="border-border hover:bg-transparent">
                   <TableHead className="text-muted-foreground">Tipo</TableHead>
                   <TableHead className="text-muted-foreground">Período</TableHead>
-                  <TableHead className="text-muted-foreground">Valor Total</TableHead>
-                  <TableHead className="text-muted-foreground">MRR</TableHead>
+                  {!isConsultor && <TableHead className="text-muted-foreground">Valor Total</TableHead>}
+                  {!isConsultor && <TableHead className="text-muted-foreground">MRR</TableHead>}
                   <TableHead className="text-muted-foreground">Status</TableHead>
                   <TableHead className="text-muted-foreground w-[60px]"></TableHead>
                 </TableRow>
@@ -216,12 +222,16 @@ export function ContratoTab({ clienteId, clienteStatus, consultorId }: ContratoT
                       {format(parseISO(contrato.data_inicio), 'dd/MM/yyyy')} -{' '}
                       {format(parseISO(contrato.data_fim), 'dd/MM/yyyy')}
                     </TableCell>
-                    <TableCell className="text-foreground">
-                      {formatCurrency(Number(contrato.remuneracao_total))}
-                    </TableCell>
-                    <TableCell className="text-foreground">
-                      {formatCurrency(Number(contrato.remuneracao_mensal))}
-                    </TableCell>
+                    {!isConsultor && (
+                      <TableCell className="text-foreground">
+                        {formatCurrency(Number(contrato.remuneracao_total))}
+                      </TableCell>
+                    )}
+                    {!isConsultor && (
+                      <TableCell className="text-foreground">
+                        {formatCurrency(Number(contrato.remuneracao_mensal))}
+                      </TableCell>
+                    )}
                     <TableCell>
                       <Badge variant="secondary">Encerrado</Badge>
                     </TableCell>

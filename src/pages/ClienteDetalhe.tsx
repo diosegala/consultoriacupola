@@ -15,7 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Loader2, ArrowLeft, FileText, Users, Calendar, Pencil, Trash2, BarChart3, Video, CalendarPlus, LineChart, Sparkles, CheckSquare } from 'lucide-react';
+import { Loader2, ArrowLeft, FileText, Users, Calendar, Pencil, Trash2, BarChart3, Video, CalendarPlus, LineChart, Sparkles, CheckSquare, FolderOpen } from 'lucide-react';
 import { useCliente, useDeleteCliente } from '@/hooks/useClientes';
 import { ContratoTab } from '@/components/cliente/ContratoTab';
 import { OnboardingTab } from '@/components/cliente/OnboardingTab';
@@ -24,6 +24,7 @@ import { DesempenhoClienteTab } from '@/components/cliente/DesempenhoClienteTab'
 import { ReunioesClienteTab } from '@/components/cliente/ReunioesClienteTab';
 import { AgentesTab } from '@/components/cliente/AgentesTab';
 import { CompromissosTab } from '@/components/cliente/CompromissosTab';
+import { DocumentosTab } from '@/components/cliente/DocumentosTab';
 import { MinhaPerformanceTab } from '@/components/consultor/MinhaPerformanceTab';
 import { ClienteFormDialog } from '@/components/cliente/ClienteFormDialog';
 import { useAuth } from '@/contexts/AuthContext';
@@ -34,7 +35,7 @@ export default function ClienteDetalhe() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: cliente, isLoading, error, refetch } = useCliente(id);
-  const { isAdmin } = useAuth();
+  const { isAdmin, isConsultor } = useAuth();
   const { data: myConsultorId } = useMyConsultorId();
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -71,6 +72,13 @@ export default function ClienteDetalhe() {
     );
   }
 
+  // Consultor só pode ver clientes atribuídos a ele
+  if (isConsultor && myConsultorId && cliente.consultor_id !== myConsultorId) {
+    toast.error('Acesso não autorizado');
+    navigate('/projetos', { replace: true });
+    return null;
+  }
+
   const showPerformance =
     !!cliente.consultor_id && (isAdmin || myConsultorId === cliente.consultor_id);
 
@@ -93,15 +101,17 @@ export default function ClienteDetalhe() {
             >
               <Pencil className="h-4 w-4" />
             </Button>
-            <Button 
-              variant="ghost" 
-              size="icon"
-              className="text-destructive hover:text-destructive"
-              onClick={() => setShowDeleteConfirm(true)}
-              title="Excluir cliente"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            {!isConsultor && (
+              <Button 
+                variant="ghost" 
+                size="icon"
+                className="text-destructive hover:text-destructive"
+                onClick={() => setShowDeleteConfirm(true)}
+                title="Excluir cliente"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -150,6 +160,10 @@ export default function ClienteDetalhe() {
             <CheckSquare className="h-4 w-4" />
             Compromissos
           </TabsTrigger>
+          <TabsTrigger value="documentos" className="flex items-center gap-2">
+            <FolderOpen className="h-4 w-4" />
+            Documentos
+          </TabsTrigger>
           <TabsTrigger value="reunioes" className="flex items-center gap-2">
             <Video className="h-4 w-4" />
             Reuniões
@@ -184,6 +198,10 @@ export default function ClienteDetalhe() {
 
         <TabsContent value="compromissos" className="mt-6">
           <CompromissosTab clienteId={cliente.id} />
+        </TabsContent>
+
+        <TabsContent value="documentos" className="mt-6">
+          <DocumentosTab clienteId={cliente.id} />
         </TabsContent>
 
         <TabsContent value="reunioes" className="mt-6">

@@ -36,6 +36,12 @@ import {
   useSumarizarTranscricao,
   useRemoverSumario,
 } from '@/hooks/useTranscricoesSumarios';
+import {
+  useClienteArquivos,
+  downloadClienteArquivoBase64,
+  type ClienteArquivo,
+} from '@/hooks/useClienteArquivos';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Props {
   clienteId: string;
@@ -179,6 +185,7 @@ export function AgentesTab({ clienteId }: Props) {
   const { mutateAsync: parseDocumento } = useParseDocumento();
   const criarGdocRetro = useCriarGdocRetro();
   const { data: sumariosSalvos } = useTranscricoesSumarios(clienteId);
+  const { data: baseArquivos } = useClienteArquivos(clienteId);
   const sumarizar = useSumarizarTranscricao();
   const removerSumario = useRemoverSumario();
   const queryClient = useQueryClient();
@@ -261,6 +268,7 @@ export function AgentesTab({ clienteId }: Props) {
   const [gdriveUrl, setGdriveUrl] = useState('');
   const [textoColado, setTextoColado] = useState('');
   const [textoLabel, setTextoLabel] = useState('');
+  const [baseSelectId, setBaseSelectId] = useState<string>('');
   const [anotacoesSecoes, setAnotacoesSecoes] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -669,6 +677,50 @@ export function AgentesTab({ clienteId }: Props) {
     setTextoLabel('');
   };
 
+  const isGDriveLink = (url: string) =>
+    /drive\.google\.com|docs\.google\.com/i.test(url);
+
+  const baseElegiveis = useMemo(
+    () => (baseArquivos ?? []).filter(a => a.tipo === 'arquivo' || isGDriveLink(a.url)),
+    [baseArquivos],
+  );
+
+  const adicionarDaBase = async (arquivoId: string) => {
+    const arq = baseElegiveis.find(a => a.id === arquivoId);
+    if (!arq) return;
+    const id = crypto.randomUUID();
+    // já existe? evita duplicar
+    if (fontes.some((f) => f.meta === (arq.tipo === 'link' ? arq.url : `base:${arq.id}`))) {
+      toast.info('Este item já está na lista de fontes.');
+      setBaseSelectId('');
+      return;
+    }
+
+    if (arq.tipo === 'link') {
+      setFontes((prev) => [...prev, {
+        id, label: arq.titulo, origem: 'gdrive', status: 'parsing', meta: arq.url,
+      }]);
+      try {
+        const texto = await parseDocumento({ gdrive_url: arq.url });
+        setFontes((prev) => prev.map((f) => f.id === id ? { ...f, status: 'done', conteudo: texto } : f));
+      } catch (e: any) {
+        setFontes((prev) => prev.map((f) => f.id === id ? { ...f, status: 'error', errorMsg: e?.message ?? 'Falha' } : f));
+      }
+    } else {
+      setFontes((prev) => [...prev, {
+        id, label: arq.titulo, origem: 'upload', status: 'parsing', meta: `base:${arq.id}`,
+      }]);
+      try {
+        const { base64, name } = await downloadClienteArquivoBase64(arq.url);
+        const texto = await parseDocumento({ conteudo_base64: base64, nome_arquivo: name });
+        setFontes((prev) => prev.map((f) => f.id === id ? { ...f, status: 'done', conteudo: texto } : f));
+      } catch (e: any) {
+        setFontes((prev) => prev.map((f) => f.id === id ? { ...f, status: 'error', errorMsg: e?.message ?? 'Falha ao processar arquivo da base.' } : f));
+      }
+    }
+    setBaseSelectId('');
+  };
+
   const removerFonte = (id: string) => {
     const fonte = fontes.find((f) => f.id === id);
     if (fonte?.sumarioId) {
@@ -964,6 +1016,34 @@ export function AgentesTab({ clienteId }: Props) {
                 Adicionar texto colado
               </Button>
             </div>
+
+            {/* Da base do cliente */}
+            {baseElegiveis.length > 0 && (
+              <div className="space-y-2">
+                <Separator />
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <h6 className="text-xs font-medium">Da base do cliente</h6>
+                    <p className="text-[11px] text-muted-foreground">
+                      Reaproveite arquivos e links do Drive já cadastrados na aba Documentos.
+                    </p>
+                  </div>
+                </div>
+                <Select value={baseSelectId} onValueChange={(v) => { setBaseSelectId(v); adicionarDaBase(v); }}>
+                  <SelectTrigger className="text-xs">
+                    <SelectValue placeholder="Selecionar item da base..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {baseElegiveis.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.titulo} · {a.tipo === 'link' ? 'link Drive' : 'arquivo'}
+                        {a.categoria ? ` · ${a.categoria}` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Lista de fontes */}
             {fontes.length > 0 && (

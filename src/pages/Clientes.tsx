@@ -23,6 +23,8 @@ import { useConsultores } from '@/hooks/useConsultores';
 import { useTiposConsultoria } from '@/hooks/useDadosAuxiliares';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
+import { useAuth } from '@/contexts/AuthContext';
+import { useMyConsultorId } from '@/hooks/useConsultorUser';
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('pt-BR', {
@@ -39,6 +41,8 @@ type SortDirection = 'asc' | 'desc';
 export default function Clientes() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { isConsultor } = useAuth();
+  const { data: myConsultorId } = useMyConsultorId();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
   const [consultorFilter, setConsultorFilter] = useState('todos');
@@ -49,10 +53,14 @@ export default function Clientes() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clienteToDelete, setClienteToDelete] = useState<ClienteComDetalhes | null>(null);
 
+  const effectiveConsultorId = isConsultor
+    ? (myConsultorId || undefined)
+    : (consultorFilter !== 'todos' ? consultorFilter : undefined);
+
   const { data: clientes, isLoading } = useClientes({
     search: search || undefined,
     status: statusFilter !== 'todos' ? statusFilter : undefined,
-    consultor_id: consultorFilter !== 'todos' ? consultorFilter : undefined
+    consultor_id: effectiveConsultorId,
   });
 
   const { data: consultores } = useConsultores();
@@ -186,6 +194,7 @@ export default function Clientes() {
               </SelectContent>
             </Select>
 
+            {!isConsultor && (
             <Select value={consultorFilter} onValueChange={setConsultorFilter}>
               <SelectTrigger className="bg-input border-border">
                 <SelectValue placeholder="Consultor" />
@@ -197,6 +206,7 @@ export default function Clientes() {
                 ))}
               </SelectContent>
             </Select>
+            )}
 
             <Select value={tipoFilter} onValueChange={setTipoFilter}>
               <SelectTrigger className="bg-input border-border">
@@ -352,14 +362,16 @@ export default function Clientes() {
                           >
                             Ver
                           </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                            onClick={(e) => openDeleteDialog(cliente, e)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {!isConsultor && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={(e) => openDeleteDialog(cliente, e)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

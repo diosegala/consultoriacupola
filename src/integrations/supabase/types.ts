@@ -309,6 +309,57 @@ export type Database = {
         }
         Relationships: []
       }
+      cliente_arquivos: {
+        Row: {
+          adicionado_por: string | null
+          categoria: string | null
+          cliente_id: string
+          created_at: string
+          descricao: string | null
+          id: string
+          tipo: string
+          titulo: string
+          url: string
+        }
+        Insert: {
+          adicionado_por?: string | null
+          categoria?: string | null
+          cliente_id: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          tipo: string
+          titulo: string
+          url: string
+        }
+        Update: {
+          adicionado_por?: string | null
+          categoria?: string | null
+          cliente_id?: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          tipo?: string
+          titulo?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cliente_arquivos_adicionado_por_fkey"
+            columns: ["adicionado_por"]
+            isOneToOne: false
+            referencedRelation: "consultores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cliente_arquivos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clientes: {
         Row: {
           cidade: string
