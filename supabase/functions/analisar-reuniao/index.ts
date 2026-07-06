@@ -140,6 +140,8 @@ Avalie nos seguintes critérios (nota de 0 a 10 cada):
 4. Domínio técnico - Demonstra conhecimento da área?
 5. Orientação para resultados - Foca em ações concretas e próximos passos?
 
+Além da análise, extraia os COMPROMISSOS assumidos na reunião — ações concretas que alguém ficou de executar. Para cada um: descricao (ação específica, não genérica), responsavel ("cliente" se quem executa é alguém da empresa cliente, "consultor" se é o consultor), prazo (data no formato YYYY-MM-DD se mencionada explicitamente; use null caso contrário — nunca invente datas). Ignore intenções vagas ("vamos pensar nisso") — só compromissos acionáveis.
+
 Retorne a análise usando a função fornecida. Seja conciso nos textos.`;
 
     const consultorClaude = await callClaude({
@@ -161,6 +163,19 @@ Retorne a análise usando a função fornecida. Seja conciso nos textos.`;
               orientacao_resultados: { type: "number", description: "Nota 0-10 para orientação para resultados" },
               pontos_fortes: { type: "array", items: { type: "string" }, description: "Lista de 3-5 pontos fortes (frases curtas)" },
               pontos_melhoria: { type: "array", items: { type: "string" }, description: "Lista de 3-5 pontos de melhoria (frases curtas)" },
+              compromissos: {
+                type: "array",
+                description: "Compromissos acionáveis assumidos na reunião. Deixe vazio se não houver.",
+                items: {
+                  type: "object",
+                  properties: {
+                    descricao: { type: "string", description: "Ação concreta, específica, sem generalidades." },
+                    responsavel: { type: "string", enum: ["cliente", "consultor"], description: "Quem ficou de executar." },
+                    prazo: { type: ["string", "null"], description: "Data no formato YYYY-MM-DD se mencionada; null caso contrário." },
+                  },
+                  required: ["descricao", "responsavel"],
+                },
+              },
             },
             required: ["resumo", "empatia", "clareza", "proatividade", "dominio_tecnico", "orientacao_resultados", "pontos_fortes", "pontos_melhoria"],
           },
@@ -226,6 +241,7 @@ Retorne a análise usando a função fornecida. Seja conciso nos textos.`;
     analise.orientacao_resultados = Number(analise.orientacao_resultados) || 0;
     analise.pontos_fortes = Array.isArray(analise.pontos_fortes) ? analise.pontos_fortes : [];
     analise.pontos_melhoria = Array.isArray(analise.pontos_melhoria) ? analise.pontos_melhoria : [];
+    analise.compromissos = Array.isArray(analise.compromissos) ? analise.compromissos : [];
 
     const scoreConsultor =
       (analise.empatia + analise.clareza + analise.proatividade +
@@ -359,8 +375,48 @@ Retorne a análise usando a função fornecida. Seja conciso nos textos.`;
       });
     }
 
+    // ===== 3. EXTRAIR E PERSISTIR COMPROMISSOS =====
+    let compromissosInseridos = 0;
+    try {
+      const brutos = (analise.compromissos ?? []) as Array<any>;
+      const validos = brutos
+        .map((c) => ({
+          descricao: typeof c?.descricao === "string" ? c.descricao.trim() : "",
+          responsavel: c?.responsavel === "consultor" ? "consultor" : "cliente",
+          prazo: typeof c?.prazo === "string" && /^\d{4}-\d{2}-\d{2}$/.test(c.prazo) ? c.prazo : null,
+        }))
+        .filter((c) => c.descricao.length >= 6);
+
+      for (const comp of validos) {
+        const prefixo = comp.descricao.slice(0, 50).replace(/[%_]/g, (m) => `\\${m}`);
+        const { data: jaExiste } = await supabase
+          .from("compromissos")
+          .select("id")
+          .eq("cliente_id", reuniao.cliente_id)
+          .eq("status", "pendente")
+          .ilike("descricao", `${prefixo}%`)
+          .limit(1)
+          .maybeSingle();
+        if (jaExiste) continue;
+
+        const { error: cErr } = await supabase.from("compromissos").insert({
+          cliente_id: reuniao.cliente_id,
+          reuniao_id,
+          descricao: comp.descricao,
+          responsavel: comp.responsavel,
+          prazo: comp.prazo,
+          origem: "ia",
+          status: "pendente",
+          created_by: user.id,
+        });
+        if (!cErr) compromissosInseridos++;
+      }
+    } catch (compErr) {
+      console.error("[analisar-reuniao] erro ao persistir compromissos (não crítico):", compErr);
+    }
+
     return new Response(
-      JSON.stringify({ success: true, score: Math.round(scoreConsultor * 10) / 10, score_cliente: scoreCliente }),
+      JSON.stringify({ success: true, score: Math.round(scoreConsultor * 10) / 10, score_cliente: scoreCliente, compromissos: compromissosInseridos }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
