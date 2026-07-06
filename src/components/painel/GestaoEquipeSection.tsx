@@ -35,13 +35,24 @@ type RadarConsultor = {
   alertas: { sem_contato: number; checklist_parado: number; compromisso_vencido: number };
 };
 
-function useRadarEquipe() {
+function useRadarEquipe(userId: string | null) {
   return useQuery({
-    queryKey: ['painel-diretor', 'radar-equipe'],
+    queryKey: ['painel-diretor', 'radar-equipe', userId],
     queryFn: async (): Promise<RadarConsultor[]> => {
       const hoje = format(new Date(), 'yyyy-MM-dd');
       const ha14 = format(subDays(new Date(), 14), 'yyyy-MM-dd');
       const ha28 = format(subDays(new Date(), 28), 'yyyy-MM-dd');
+
+      // Descobre o consultor vinculado ao próprio diretor logado para excluí-lo do radar
+      let selfConsultorId: string | null = null;
+      if (userId) {
+        const { data: cu } = await supabase
+          .from('consultor_user')
+          .select('consultor_id')
+          .eq('user_id', userId)
+          .maybeSingle();
+        selfConsultorId = (cu as any)?.consultor_id ?? null;
+      }
 
       const [consRes, cliRes, reunRes, atendRes, checkRes, compRes] = await Promise.all([
         supabase.from('consultores').select('id, nome, ativo').eq('ativo', true).order('nome'),
@@ -66,7 +77,8 @@ function useRadarEquipe() {
           .eq('status', 'pendente') as any,
       ]);
 
-      const consultores = (consRes.data ?? []) as Array<{ id: string; nome: string; ativo: boolean }>;
+      const consultores = ((consRes.data ?? []) as Array<{ id: string; nome: string; ativo: boolean }>)
+        .filter((c) => c.id !== selfConsultorId);
       const clientes = (cliRes.data ?? []) as Array<{ id: string; consultor_id: string | null }>;
       const reunioes = (reunRes.data ?? []) as Array<{ consultor_id: string; data_reuniao: string; score_ia: number | null; status_analise: string }>;
       const atendimentos = (atendRes.data ?? []) as any[];
@@ -206,7 +218,7 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
 }
 
 export function GestaoEquipeSection({ userId }: { userId: string | null }) {
-  const { data: radar, isLoading: loadingRadar } = useRadarEquipe();
+  const { data: radar, isLoading: loadingRadar } = useRadarEquipe(userId);
   const { data: alertas, isLoading: loadingAlertas } = useAlertasSentimento(userId);
   const { data: reunioesGestao, isLoading: loadingRG } = useReunioesGestao(undefined);
   const { data: lembretes, isLoading: loadingLembretes } = useLembretesGestao(userId);
