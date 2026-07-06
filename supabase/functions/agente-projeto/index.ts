@@ -432,7 +432,7 @@ ${checklistPeriodo.filter((c) => c.concluido).map((c: any) => `- [x] ${c.titulo}
       }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const promptCompleto = `${promptBase}${historicoSection}\n\n---\n\nINFORMAÇÕES DO CLIENTE:\n\n${contexto}${questionarioSection}${sumariosSection}${transcricoesSectionLimitada}${anotacoesSection}${trimestreSection}${canaisSection}${contextoUsuarioSection}${documentoModeloSection}`;
+    const promptCompleto = `${promptBase}${historicoSection}\n\n---\n\nINFORMAÇÕES DO CLIENTE:\n\n${contexto}${questionarioSection}${sumariosSection}${transcricoesSectionLimitada}${anotacoesSection}${trimestreSection}${canaisSection}${balancoSection ? "\n\n" + balancoSection : ""}${contextoUsuarioSection}${documentoModeloSection}`;
 
     let conteudo = "";
     let lastStatus = 500;
@@ -454,7 +454,7 @@ ${checklistPeriodo.filter((c) => c.concluido).map((c: any) => `- [x] ${c.titulo}
           model: "gpt-4o",
           messages: [
             { role: "system", content: `${promptBase}${historicoSection}` },
-            { role: "user", content: `${contexto}${questionarioSection}${sumariosSection}${transcricoesSectionLimitada}${anotacoesSection}${trimestreSection}${canaisSection}${contextoUsuarioSection}${documentoModeloSection}` },
+            { role: "user", content: `${contexto}${questionarioSection}${sumariosSection}${transcricoesSectionLimitada}${anotacoesSection}${trimestreSection}${canaisSection}${balancoSection ? "\n\n" + balancoSection : ""}${contextoUsuarioSection}${documentoModeloSection}` },
           ],
           temperature: 0.4,
           max_tokens: 8000,
@@ -479,7 +479,7 @@ ${checklistPeriodo.filter((c) => c.concluido).map((c: any) => `- [x] ${c.titulo}
       }
       const anthropicModel = "claude-sonnet-4-5";
       const systemPrompt = `${promptBase}${historicoSection}`;
-      const userPrompt = `${contexto}${questionarioSection}${sumariosSection}${transcricoesSectionLimitada}${anotacoesSection}${trimestreSection}${canaisSection}${contextoUsuarioSection}${documentoModeloSection}`;
+      const userPrompt = `${contexto}${questionarioSection}${sumariosSection}${transcricoesSectionLimitada}${anotacoesSection}${trimestreSection}${canaisSection}${balancoSection ? "\n\n" + balancoSection : ""}${contextoUsuarioSection}${documentoModeloSection}`;
 
       const messages: Array<{ role: string; content: string }> = [
         { role: "user", content: userPrompt },
@@ -594,6 +594,7 @@ ${checklistPeriodo.filter((c) => c.concluido).map((c: any) => `- [x] ${c.titulo}
           diagnostico: "Diagnóstico",
           okrs: "OKRs",
           briefing_cliente_oculto: "Briefing Cliente Oculto",
+          balanco_periodo: "Balanço do Período",
         };
         const tituloBase = titulo_doc
           || `${tituloLabel[tipo] ?? tipo} — ${projeto.clientes?.nome ?? ""} — ${new Date().toLocaleDateString("pt-BR")}`;
