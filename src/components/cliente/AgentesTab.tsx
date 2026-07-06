@@ -11,8 +11,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import {
   Sparkles, FileText, Target, ClipboardList, ClipboardCheck, Upload, Link as LinkIcon,
   Trash2, Loader2, ExternalLink, Eye, ChevronDown, ChevronUp, FileType, FileAudio,
-  Wand2, CheckCircle2, AlertCircle, RefreshCw,
+  Wand2, CheckCircle2, AlertCircle, RefreshCw, BarChart3,
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
