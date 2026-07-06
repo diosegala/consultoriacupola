@@ -343,6 +343,67 @@ export default function MinhasIntegracoes() {
           </CardContent>
         </Card>
       )}
+
+      {isAdmin && (
+        <Card className="bg-card border-border">
+          <CardHeader
+            className="cursor-pointer"
+            onClick={() => {
+              setParseErrosOpen((v) => {
+                if (!v) refetchParseErros();
+                return !v;
+              });
+            }}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <CardTitle className="text-foreground flex items-center gap-2">
+                  <AlertOctagon className="h-4 w-4" /> Erros de upload/parse (agentes IA)
+                </CardTitle>
+                <CardDescription>
+                  Últimos 20 arquivos que falharam ao ser lidos pelo agente de diagnóstico.
+                </CardDescription>
+              </div>
+              {parseErrosOpen ? (
+                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              )}
+            </div>
+          </CardHeader>
+          {parseErrosOpen && (
+            <CardContent className="space-y-2">
+              {parseErrosLoading && (
+                <div className="flex items-center justify-center py-6 text-muted-foreground text-sm">
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" /> Carregando...
+                </div>
+              )}
+              {!parseErrosLoading && (!parseErros || parseErros.length === 0) && (
+                <p className="text-sm text-muted-foreground text-center py-6">
+                  Nenhum erro de parse registrado.
+                </p>
+              )}
+              {(parseErros || []).map((e) => (
+                <div key={e.id} className="border border-border rounded-md p-3 space-y-1">
+                  <div className="flex items-start justify-between gap-2 flex-wrap">
+                    <p className="text-sm font-medium text-foreground break-all">
+                      {e.nome_arquivo || '(sem nome)'}
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
+                      {e.origem && <Badge variant="outline" className="text-[10px]">{e.origem}</Badge>}
+                      {typeof e.tamanho_bytes === 'number' && e.tamanho_bytes > 0 && (
+                        <span>{(e.tamanho_bytes / (1024 * 1024)).toFixed(2)} MB</span>
+                      )}
+                      <span>{format(new Date(e.created_at), 'dd/MM HH:mm', { locale: ptBR })}</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-red-400 whitespace-pre-wrap break-words">{e.erro}</p>
+                </div>
+              ))}
+            </CardContent>
+          )}
+        </Card>
+      )}
     </div>
   );
 }
