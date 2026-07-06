@@ -677,6 +677,50 @@ export function AgentesTab({ clienteId }: Props) {
     setTextoLabel('');
   };
 
+  const isGDriveLink = (url: string) =>
+    /drive\.google\.com|docs\.google\.com/i.test(url);
+
+  const baseElegiveis = useMemo(
+    () => (baseArquivos ?? []).filter(a => a.tipo === 'arquivo' || isGDriveLink(a.url)),
+    [baseArquivos],
+  );
+
+  const adicionarDaBase = async (arquivoId: string) => {
+    const arq = baseElegiveis.find(a => a.id === arquivoId);
+    if (!arq) return;
+    const id = crypto.randomUUID();
+    // já existe? evita duplicar
+    if (fontes.some((f) => f.meta === (arq.tipo === 'link' ? arq.url : `base:${arq.id}`))) {
+      toast.info('Este item já está na lista de fontes.');
+      setBaseSelectId('');
+      return;
+    }
+
+    if (arq.tipo === 'link') {
+      setFontes((prev) => [...prev, {
+        id, label: arq.titulo, origem: 'gdrive', status: 'parsing', meta: arq.url,
+      }]);
+      try {
+        const texto = await parseDocumento({ gdrive_url: arq.url });
+        setFontes((prev) => prev.map((f) => f.id === id ? { ...f, status: 'done', conteudo: texto } : f));
+      } catch (e: any) {
+        setFontes((prev) => prev.map((f) => f.id === id ? { ...f, status: 'error', errorMsg: e?.message ?? 'Falha' } : f));
+      }
+    } else {
+      setFontes((prev) => [...prev, {
+        id, label: arq.titulo, origem: 'upload', status: 'parsing', meta: `base:${arq.id}`,
+      }]);
+      try {
+        const { base64, name } = await downloadClienteArquivoBase64(arq.url);
+        const texto = await parseDocumento({ conteudo_base64: base64, nome_arquivo: name });
+        setFontes((prev) => prev.map((f) => f.id === id ? { ...f, status: 'done', conteudo: texto } : f));
+      } catch (e: any) {
+        setFontes((prev) => prev.map((f) => f.id === id ? { ...f, status: 'error', errorMsg: e?.message ?? 'Falha ao processar arquivo da base.' } : f));
+      }
+    }
+    setBaseSelectId('');
+  };
+
   const removerFonte = (id: string) => {
     const fonte = fontes.find((f) => f.id === id);
     if (fonte?.sumarioId) {
