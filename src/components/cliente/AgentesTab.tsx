@@ -392,6 +392,85 @@ export function AgentesTab({ clienteId }: Props) {
     });
   }, [fontes, parseDocumento]);
 
+  // Auto-sumarização: dispara em background para cada fonte que já foi parseada
+  // com sucesso mas ainda não tem sumário. Evita reentrância com um Set.
+  const sumarizandoIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!draftHydratedRef.current) return;
+    const alvos = fontes.filter(
+      (f) =>
+        f.status === 'done' &&
+        !!f.conteudo &&
+        !conteudoExtraidoInvalido(f.conteudo) &&
+        !f.sumarioId &&
+        f.sumarioStatus !== 'sumarizando' &&
+        f.sumarioStatus !== 'ok' &&
+        !sumarizandoIdsRef.current.has(f.id) &&
+        (f.conteudo?.length ?? 0) >= 200,
+    );
+    if (alvos.length === 0) return;
+    alvos.forEach((f) => {
+      sumarizandoIdsRef.current.add(f.id);
+      setFontes((prev) => prev.map((x) => (x.id === f.id ? { ...x, sumarioStatus: 'sumarizando', sumarioErro: undefined } : x)));
+      sumarizar.mutateAsync({
+        cliente_id: clienteId,
+        label: rotuloTranscricao(f),
+        papel: f.papel,
+        data_entrevista: f.dataEntrevista || null,
+        conteudo: f.conteudo!,
+      })
+        .then((res) => {
+          setFontes((prev) => prev.map((x) => x.id === f.id ? {
+            ...x,
+            sumarioStatus: 'ok',
+            sumarioId: res.sumario_id,
+            numCharsOriginal: f.conteudo?.length ?? 0,
+            numCharsSumario: res.sumario?.length ?? 0,
+          } : x));
+        })
+        .catch((e: Error) => {
+          setFontes((prev) => prev.map((x) => x.id === f.id ? {
+            ...x,
+            sumarioStatus: 'erro',
+            sumarioErro: e.message,
+          } : x));
+        })
+        .finally(() => {
+          sumarizandoIdsRef.current.delete(f.id);
+        });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fontes, clienteId]);
+
+  // Hidratação: se o consultor voltar ao cliente e não houver fontes carregadas
+  // do rascunho, monta os sumários persistidos no banco como fontes "prontas"
+  // (somente leitura — sem conteúdo original, apenas o sumário serve para gerar).
+  const sumariosHidratadosRef = useRef(false);
+  useEffect(() => {
+    if (!draftHydratedRef.current || sumariosHidratadosRef.current) return;
+    if (!sumariosSalvos || sumariosSalvos.length === 0) return;
+    sumariosHidratadosRef.current = true;
+    setFontes((prev) => {
+      const jaTem = new Set(prev.map((p) => p.sumarioId).filter(Boolean));
+      const novos: Fonte[] = sumariosSalvos
+        .filter((s) => !jaTem.has(s.id))
+        .map((s) => ({
+          id: `sum-${s.id}`,
+          label: s.label,
+          origem: 'texto',
+          status: 'done',
+          sumarioStatus: 'ok',
+          sumarioId: s.id,
+          papel: s.papel ?? undefined,
+          dataEntrevista: s.data_entrevista ?? undefined,
+          numCharsOriginal: s.num_chars_original ?? undefined,
+          numCharsSumario: s.sumario?.length ?? undefined,
+          meta: 'Sumário persistido',
+        }));
+      return novos.length ? [...prev, ...novos] : prev;
+    });
+  }, [sumariosSalvos]);
+
   const lastByTipo = useMemo(() => {
     const map = new Map<string, ProjetoDocumento>();
     for (const d of documentos ?? []) {
