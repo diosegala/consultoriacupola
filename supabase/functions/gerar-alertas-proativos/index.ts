@@ -41,6 +41,8 @@ Deno.serve(async (req) => {
     contrato_sem_renovacao: 0,
     briefing_pre_reuniao: 0,
     compromisso_vencido: 0,
+    lembrete_gestao: 0,
+    briefing_1x1: 0,
     resumo_diario: 0,
     ai_calls: 0,
   };
@@ -431,6 +433,202 @@ Deno.serve(async (req) => {
       summary.compromisso_vencido++;
     }
 
+    // --------- 4d. Cadência de gestão (1:1 / equipe) + briefings 1:1 ---------
+    try {
+      // Descobre diretores/admins ativos
+      const { data: rolesDir } = await admin
+        .from("user_roles").select("user_id, role").in("role", ["admin","director"]);
+      const diretorUserIds = Array.from(new Set((rolesDir ?? []).map((r: any) => r.user_id)));
+      const { data: cuAll } = await admin.from("consultor_user").select("consultor_id, user_id");
+      const consultorByUser = new Map<string, string>(
+        (cuAll ?? []).map((r: any) => [r.user_id, r.consultor_id]),
+      );
+      const diretorConsultorIds = new Set(
+        diretorUserIds.map((uid) => consultorByUser.get(uid)).filter(Boolean) as string[],
+      );
+      const { data: consAtivos } = await admin
+        .from("consultores").select("id, nome").eq("ativo", true);
+      const consultorNome = new Map<string, string>(
+        (consAtivos ?? []).map((c: any) => [c.id, c.nome as string]),
+      );
+
+      const D14 = 14, D21 = 21;
+      for (const diretorUserId of diretorUserIds) {
+        const diretorConsultorId = consultorByUser.get(diretorUserId);
+        if (!diretorConsultorId) continue;
+
+        // Consultoras da equipe = ativos, exceto o próprio diretor
+        const equipe = (consAtivos ?? []).filter((c: any) => c.id !== diretorConsultorId);
+
+        // --- 1:1 sem acontecer há mais de 14 dias por consultora ---
+        for (const c of equipe) {
+          const { data: ult } = await admin
+            .from("reunioes_gestao")
+            .select("data_reuniao, participantes")
+            .eq("diretor_id", diretorConsultorId)
+            .eq("tipo", "individual")
+            .contains("participantes", [(c.nome ?? "").split(/\s+/)[0]])
+            .order("data_reuniao", { ascending: false })
+            .limit(1).maybeSingle();
+          const ultDate = ult?.data_reuniao ?? null;
+          const dias = ultDate ? daysBetween(hoje, new Date(ultDate + "T00:00:00")) : 999;
+          if (dias < D14) continue;
+
+          const { data: exists } = await admin
+            .from("notificacoes").select("id")
+            .eq("user_id", diretorUserId)
+            .eq("tipo", "lembrete_gestao")
+            .eq("entidade_id", c.id)
+            .eq("lida", false).maybeSingle();
+          if (exists) continue;
+
+          await admin.from("notificacoes").insert({
+            user_id: diretorUserId,
+            tipo: "lembrete_gestao",
+            titulo: `1:1 com ${c.nome} está atrasado`,
+            descricao: ultDate
+              ? `Última reunião individual há ${dias} dias (${ultDate}). Considere agendar um 1:1.`
+              : "Nenhuma reunião 1:1 registrada. Considere agendar um encontro.",
+            link: `/meu-painel`,
+            entidade_tipo: "consultor",
+            entidade_id: c.id,
+            metadata: { escopo: "individual", consultor_id: c.id, consultor_nome: c.nome, dias },
+          });
+          summary.lembrete_gestao++;
+        }
+
+        // --- Reunião de equipe > 21 dias ---
+        const { data: ultEq } = await admin
+          .from("reunioes_gestao")
+          .select("data_reuniao")
+          .eq("diretor_id", diretorConsultorId)
+          .eq("tipo", "equipe")
+          .order("data_reuniao", { ascending: false })
+          .limit(1).maybeSingle();
+        const ultEqDate = ultEq?.data_reuniao ?? null;
+        const diasEq = ultEqDate ? daysBetween(hoje, new Date(ultEqDate + "T00:00:00")) : 999;
+        if (diasEq >= D21) {
+          const { data: exists } = await admin
+            .from("notificacoes").select("id")
+            .eq("user_id", diretorUserId)
+            .eq("tipo", "lembrete_gestao")
+            .eq("entidade_id", diretorConsultorId)
+            .eq("lida", false).maybeSingle();
+          if (!exists) {
+            await admin.from("notificacoes").insert({
+              user_id: diretorUserId,
+              tipo: "lembrete_gestao",
+              titulo: `Reunião de equipe atrasada`,
+              descricao: ultEqDate
+                ? `Última reunião de equipe há ${diasEq} dias (${ultEqDate}).`
+                : "Nenhuma reunião de equipe registrada.",
+              link: `/meu-painel`,
+              entidade_tipo: "consultor",
+              entidade_id: diretorConsultorId,
+              metadata: { escopo: "equipe", dias: diasEq },
+            });
+            summary.lembrete_gestao++;
+          }
+        }
+
+        // --- Briefings 1:1 nos próximos 2 dias (via compromissos.google_calendar?) ---
+        // Aproximação leve: se houver reuniao_gestao futura em <=2 dias (data), gerar briefing.
+        const amanhaISO = (() => { const d = new Date(hoje); d.setDate(d.getDate()+1); return d.toISOString().slice(0,10); })();
+        const em2ISO = (() => { const d = new Date(hoje); d.setDate(d.getDate()+2); return d.toISOString().slice(0,10); })();
+
+        const { data: proximos } = await admin
+          .from("reunioes_gestao")
+          .select("id, tipo, participantes, data_reuniao")
+          .eq("diretor_id", diretorConsultorId)
+          .eq("tipo", "individual")
+          .gte("data_reuniao", amanhaISO)
+          .lte("data_reuniao", em2ISO);
+
+        for (const pr of proximos ?? []) {
+          const { data: exists } = await admin
+            .from("notificacoes").select("id")
+            .eq("user_id", diretorUserId)
+            .eq("tipo", "briefing_1x1")
+            .eq("entidade_id", (pr as any).id)
+            .eq("lida", false).maybeSingle();
+          if (exists) continue;
+
+          const primeiro = ((pr as any).participantes ?? [])[0] ?? "consultora";
+          // Tenta identificar a consultora pelo primeiro nome
+          const cMatch = (consAtivos ?? []).find((c: any) =>
+            (c.nome ?? "").toLowerCase().startsWith(String(primeiro).toLowerCase())
+          );
+          const cId: string | null = cMatch?.id ?? null;
+
+          // Portfólio ativo
+          let portfolio = 0;
+          if (cId) {
+            const { count } = await admin
+              .from("clientes").select("id", { count: "exact", head: true })
+              .eq("consultor_id", cId).eq("status", "ativo");
+            portfolio = count ?? 0;
+          }
+          // Últimos 5 scores
+          let scoreMedio: number | null = null;
+          if (cId) {
+            const { data: reunis } = await admin
+              .from("reunioes").select("score_ia")
+              .eq("consultor_id", cId).eq("status_analise", "concluido")
+              .not("score_ia", "is", null)
+              .order("data_reuniao", { ascending: false }).limit(5);
+            const arr = (reunis ?? []).map((r: any) => Number(r.score_ia)).filter((n) => !isNaN(n));
+            if (arr.length) scoreMedio = Math.round((arr.reduce((s,x)=>s+x,0)/arr.length)*10)/10;
+          }
+          // Alertas pendentes que envolvem clientes dessa consultora
+          let alertasPend = 0;
+          if (cId) {
+            const { data: cliIds } = await admin
+              .from("clientes").select("id").eq("consultor_id", cId).eq("status", "ativo");
+            const ids = (cliIds ?? []).map((c: any) => c.id);
+            if (ids.length) {
+              const { count } = await admin
+                .from("notificacoes").select("id", { count: "exact", head: true })
+                .eq("user_id", diretorUserId)
+                .eq("lida", false)
+                .in("entidade_id", ids);
+              alertasPend = count ?? 0;
+            }
+          }
+
+          const linhas = [
+            `Briefing para 1:1 com ${primeiro} em ${(pr as any).data_reuniao}.`,
+            "",
+            `• Portfólio ativo: ${portfolio} cliente(s)`,
+            `• Score médio (últimas 5 reuniões): ${scoreMedio ?? "—"}`,
+            `• Alertas pendentes envolvendo clientes dela: ${alertasPend}`,
+            "",
+            "Sugestão de pauta:",
+            "1. Como estão os clientes com alertas abertos?",
+            "2. Prioridades da semana e apoio necessário.",
+            "3. Um ponto de desenvolvimento pessoal.",
+          ];
+
+          await admin.from("notificacoes").insert({
+            user_id: diretorUserId,
+            tipo: "briefing_1x1",
+            titulo: `Prepare-se para o 1:1 com ${primeiro}`,
+            descricao: linhas.join("\n"),
+            link: `/meu-painel`,
+            entidade_tipo: "reuniao_gestao",
+            entidade_id: (pr as any).id,
+            metadata: {
+              consultora_nome: primeiro, consultor_id: cId,
+              portfolio, score_medio: scoreMedio, alertas_pendentes: alertasPend,
+              data_reuniao: (pr as any).data_reuniao,
+            },
+          });
+          summary.briefing_1x1++;
+        }
+      }
+    } catch (gestErr) {
+      console.error("[gerar-alertas-proativos] erro bloco gestão:", gestErr);
+    }
+
     // --------- 5. Resumo diário ---------
     const { data: consultores } = await admin.from("consultor_user").select("user_id");
     const inicioDia = new Date(hoje);
@@ -442,7 +640,7 @@ Deno.serve(async (req) => {
         .select("id", { count: "exact", head: true })
         .eq("user_id", userId)
         .eq("lida", false)
-        .in("tipo", ["sem_contato", "checklist_parado", "okr_sem_progresso", "contrato_sem_renovacao", "briefing_pre_reuniao", "compromisso_vencido"]);
+        .in("tipo", ["sem_contato", "checklist_parado", "okr_sem_progresso", "contrato_sem_renovacao", "briefing_pre_reuniao", "compromisso_vencido", "lembrete_gestao", "briefing_1x1", "sentimento_negativo_cliente"]);
       const total = count ?? 0;
       if (total === 0) continue;
 
