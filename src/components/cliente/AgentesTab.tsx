@@ -17,6 +17,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { useQuestionarioCliente } from '@/hooks/useQuestionario';
+import { useCliente } from '@/hooks/useClientes';
 import {
   useClienteDocumentos,
   useGerarDocumento,
@@ -149,10 +150,12 @@ function formatarMinutosFala(palavras: number) {
 export function AgentesTab({ clienteId }: Props) {
   const { data: questionario } = useQuestionarioCliente(clienteId);
   const { data: documentos } = useClienteDocumentos(clienteId);
+  const { data: cliente } = useCliente(clienteId);
   const { data: rascunho, isLoading: loadingRascunho } = useAgenteRascunho<AgentesDraftState>(clienteId);
   const { mutate: salvarRascunho } = useSalvarAgenteRascunho();
   const gerar = useGerarDocumento();
   const { mutateAsync: parseDocumento } = useParseDocumento();
+  const criarGdocRetro = useCriarGdocRetro();
   const queryClient = useQueryClient();
   const { mutate: registrarTempo } = useRegistrarInteracaoTempo();
   const activeTimer = useActiveTimer(true);
