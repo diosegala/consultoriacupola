@@ -34,7 +34,7 @@ export default function ClienteDetalhe() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: cliente, isLoading, error, refetch } = useCliente(id);
-  const { isAdmin } = useAuth();
+  const { isAdmin, isConsultor } = useAuth();
   const { data: myConsultorId } = useMyConsultorId();
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -69,6 +69,13 @@ export default function ClienteDetalhe() {
         </Card>
       </div>
     );
+  }
+
+  // Consultor só pode ver clientes atribuídos a ele
+  if (isConsultor && myConsultorId && cliente.consultor_id !== myConsultorId) {
+    toast.error('Acesso não autorizado');
+    navigate('/projetos', { replace: true });
+    return null;
   }
 
   const showPerformance =
