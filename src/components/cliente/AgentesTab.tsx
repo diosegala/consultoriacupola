@@ -1531,6 +1531,25 @@ export function AgentesTab({ clienteId }: Props) {
             )}
           </DialogContent>
         </Dialog>
+
+        <Dialog open={escopoInsuficienteOpen} onOpenChange={setEscopoInsuficienteOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Reconecte sua conta Google</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 text-sm">
+              <p>
+                Sua conexão Google precisa ser renovada para criar planilhas de OKRs. O escopo de acesso ao Google Sheets ainda não foi concedido.
+              </p>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="ghost" onClick={() => setEscopoInsuficienteOpen(false)}>Fechar</Button>
+                <Button onClick={() => { window.location.href = '/minhas-integracoes'; }}>
+                  Ir para Minhas Integrações
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </TooltipProvider>
   );
