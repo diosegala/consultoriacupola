@@ -9,6 +9,8 @@ export interface ProjetoDocumento {
   tipo: string;
   conteudo: string;
   gdoc_url: string | null;
+  sheet_url: string | null;
+  dados_estruturados: any | null;
   created_by: string | null;
   created_at: string;
 }
