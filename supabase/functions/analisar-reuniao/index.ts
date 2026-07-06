@@ -436,6 +436,20 @@ Retorne a análise usando a função fornecida. Seja conciso nos textos.`;
     try {
       const alertas = (analiseCliente?.alertas_sentimento ?? []) as Array<any>;
       if (alertas.length > 0) {
+          // Contexto DISC da consultora (pode informar a leitura do sinal)
+          let discDica = "";
+          try {
+            if (reuniao.consultor_id) {
+              const { data: perfC } = await supabase
+                .from("perfis_comportamentais").select("perfil_resumo")
+                .eq("consultor_id", reuniao.consultor_id).maybeSingle();
+              if (perfC?.perfil_resumo) {
+                const p = perfC.perfil_resumo as any;
+                discDica = `Possível tensão de estilo — considere discutir abordagem com ${reuniao.consultores?.nome ?? "a consultora"} dado o perfil ${p.perfil_primario}/${p.perfil_secundario} dela.`;
+              }
+            }
+          } catch (dErr) { console.error("[disc dica]", dErr); }
+
         // Descobre user_ids de diretores/admins
         const { data: roles } = await supabase
           .from("user_roles").select("user_id, role").in("role", ["admin","director"]);
@@ -443,10 +457,11 @@ Retorne a análise usando a função fornecida. Seja conciso nos textos.`;
         const clienteNome = reuniao.clientes?.nome ?? "Cliente";
         const consultoraNome = reuniao.consultores?.nome ?? "Consultora";
         const severidade = alertas.some((a) => a.severidade === "alta") ? "alta" : "media";
-        const descricao = alertas
+          let descricao = alertas
           .slice(0, 3)
           .map((a) => `• ${a.motivo}${a.trecho ? ` — "${a.trecho}"` : ""}`)
           .join("\n");
+          if (discDica) descricao += `\n\n${discDica}`;
 
         for (const uid of diretoresUserIds) {
           // dedup: já há notificação não lida para a mesma reunião?

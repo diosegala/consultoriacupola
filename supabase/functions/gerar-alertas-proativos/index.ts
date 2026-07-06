@@ -595,6 +595,31 @@ Deno.serve(async (req) => {
             }
           }
 
+          // Lembrete DISC do cruzamento
+          let discLembrete = "";
+          if (cId) {
+            const { data: perfC } = await admin
+              .from("perfis_comportamentais").select("perfil_resumo")
+              .eq("consultor_id", cId).maybeSingle();
+            const { data: cruz } = await admin
+              .from("cruzamentos_disc").select("analise")
+              .eq("diretor_id", diretorConsultorId).eq("consultor_id", cId).maybeSingle();
+            if (perfC?.perfil_resumo) {
+              const p = perfC.perfil_resumo as any;
+              const partes = [
+                `Lembrete de perfil: ${primeiro} é ${p.perfil_primario}/${p.perfil_secundario}.`,
+              ];
+              if (cruz?.analise) {
+                const a = cruz.analise as any;
+                if (a.recomendacoes_comunicacao?.length)
+                  partes.push(`Comunicação: ${a.recomendacoes_comunicacao.slice(0,2).join("; ")}.`);
+                if (a.sinais_de_alerta?.length)
+                  partes.push(`Atenção a: ${a.sinais_de_alerta.slice(0,2).join("; ")}.`);
+              }
+              discLembrete = partes.join(" ");
+            }
+          }
+
           const linhas = [
             `Briefing para 1:1 com ${primeiro} em ${(pr as any).data_reuniao}.`,
             "",
@@ -607,6 +632,9 @@ Deno.serve(async (req) => {
             "2. Prioridades da semana e apoio necessário.",
             "3. Um ponto de desenvolvimento pessoal.",
           ];
+          if (discLembrete) {
+            linhas.push("", discLembrete);
+          }
 
           await admin.from("notificacoes").insert({
             user_id: diretorUserId,
@@ -620,6 +648,7 @@ Deno.serve(async (req) => {
               consultora_nome: primeiro, consultor_id: cId,
               portfolio, score_medio: scoreMedio, alertas_pendentes: alertasPend,
               data_reuniao: (pr as any).data_reuniao,
+              disc_lembrete: discLembrete || null,
             },
           });
           summary.briefing_1x1++;
