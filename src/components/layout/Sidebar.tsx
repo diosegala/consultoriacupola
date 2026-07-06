@@ -42,6 +42,7 @@ const adminMenuItems = [
 
 const consultorMenuItems = [
   { to: '/meu-painel', icon: LayoutDashboard, label: 'Meu Painel' },
+  { to: '/clientes', icon: Users, label: 'Meus Clientes' },
   { to: '/projetos', icon: Kanban, label: 'Projetos' },
   { to: '/agenda', icon: CalendarDays, label: 'Agenda' },
   { to: '/reunioes', icon: Video, label: 'Reuniões' },
