@@ -464,6 +464,32 @@ export function AgentesTab({ clienteId }: Props) {
     if (!files) return;
     for (const file of Array.from(files)) {
       const id = crypto.randomUUID();
+      const ext = extensaoArquivo(file.name);
+
+      if (!EXTENSOES_PERMITIDAS.includes(ext)) {
+        setFontes((prev) => [...prev, {
+          id,
+          label: file.name,
+          origem: 'upload',
+          status: 'error',
+          meta: file.name,
+          errorMsg: `Tipo de arquivo não suportado (.${ext || '?'}). Use .txt, .pdf, .docx, .vtt ou .srt.`,
+        }]);
+        continue;
+      }
+
+      if (file.size > MAX_UPLOAD_BYTES) {
+        setFontes((prev) => [...prev, {
+          id,
+          label: file.name,
+          origem: 'upload',
+          status: 'error',
+          meta: file.name,
+          errorMsg: `Arquivo de ${formatarTamanhoMB(file.size)} excede o limite de 6 MB. Exporte como .txt ou divida o arquivo.`,
+        }]);
+        continue;
+      }
+
       setFontes((prev) => [...prev, {
         id, label: file.name, origem: 'upload', status: 'parsing', meta: file.name,
       }]);
@@ -479,11 +505,38 @@ export function AgentesTab({ clienteId }: Props) {
         );
       } catch (e: any) {
         setFontes((prev) =>
-          prev.map((f) => (f.id === id ? { ...f, status: 'error', errorMsg: e.message } : f)),
+          prev.map((f) => (f.id === id ? { ...f, status: 'error', errorMsg: e?.message ?? 'Falha desconhecida ao processar arquivo.' } : f)),
         );
       }
     }
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const tentarReprocessar = async (id: string) => {
+    const fonte = fontes.find((f) => f.id === id);
+    if (!fonte) return;
+
+    if (fonte.origem === 'gdrive' && fonte.meta) {
+      setFontes((prev) =>
+        prev.map((f) => (f.id === id ? { ...f, status: 'parsing', errorMsg: undefined } : f)),
+      );
+      try {
+        const texto = await parseDocumento({ gdrive_url: fonte.meta });
+        setFontes((prev) =>
+          prev.map((f) => (f.id === id ? { ...f, status: 'done', conteudo: texto } : f)),
+        );
+      } catch (e: any) {
+        setFontes((prev) =>
+          prev.map((f) => (f.id === id ? { ...f, status: 'error', errorMsg: e?.message ?? 'Falha desconhecida.' } : f)),
+        );
+      }
+      return;
+    }
+
+    if (fonte.origem === 'upload') {
+      toast.info('Selecione o arquivo novamente para reenviar.');
+      fileInputRef.current?.click();
+    }
   };
 
   const adicionarGdrive = async () => {
