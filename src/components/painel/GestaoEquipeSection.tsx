@@ -218,7 +218,7 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
 }
 
 export function GestaoEquipeSection({ userId }: { userId: string | null }) {
-  const { data: radar, isLoading: loadingRadar } = useRadarEquipe();
+  const { data: radar, isLoading: loadingRadar } = useRadarEquipe(userId);
   const { data: alertas, isLoading: loadingAlertas } = useAlertasSentimento(userId);
   const { data: reunioesGestao, isLoading: loadingRG } = useReunioesGestao(undefined);
   const { data: lembretes, isLoading: loadingLembretes } = useLembretesGestao(userId);
