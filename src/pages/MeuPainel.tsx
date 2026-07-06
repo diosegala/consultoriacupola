@@ -525,11 +525,15 @@ export default function MeuPainel() {
           </Card>
         </div>
       </div>
+      </>
+      )}
+
+      {isGestor && <GestaoEquipeSection userId={userId} />}
 
       <NovaReuniaoDialog
         open={!!novaReuniao}
         onOpenChange={(o) => !o && setNovaReuniao(null)}
-        consultorId={consultorId}
+        consultorId={consultorId ?? ''}
         clienteId={novaReuniao?.clienteId}
       />
       <NovaTarefaPessoalDialog open={novaTarefaOpen} onOpenChange={setNovaTarefaOpen} />
