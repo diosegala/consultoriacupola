@@ -27,7 +27,7 @@ export default function Auth() {
 
   useEffect(() => {
     if (user && !roleLoading) {
-      navigate(userRole === 'consultor' ? '/projetos' : '/', { replace: true });
+      navigate(userRole === 'consultor' ? '/projetos' : '/meu-painel', { replace: true });
     }
   }, [user, userRole, roleLoading, navigate]);
 

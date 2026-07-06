@@ -25,6 +25,7 @@ import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 
 const adminMenuItems = [
+  { to: '/meu-painel', icon: LayoutDashboard, label: 'Meu Painel' },
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/clientes', icon: Users, label: 'Clientes' },
   { to: '/contratos', icon: FileText, label: 'Contratos' },

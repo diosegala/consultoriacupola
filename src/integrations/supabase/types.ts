@@ -1781,6 +1781,62 @@ export type Database = {
           },
         ]
       }
+      reunioes_gestao: {
+        Row: {
+          analise_ia: Json | null
+          created_at: string
+          data_reuniao: string
+          diretor_id: string
+          google_file_id: string | null
+          id: string
+          nome_arquivo: string | null
+          participantes: string[]
+          resumo_ia: string | null
+          status_analise: string
+          tipo: string
+          transcricao: string | null
+          updated_at: string
+        }
+        Insert: {
+          analise_ia?: Json | null
+          created_at?: string
+          data_reuniao: string
+          diretor_id: string
+          google_file_id?: string | null
+          id?: string
+          nome_arquivo?: string | null
+          participantes?: string[]
+          resumo_ia?: string | null
+          status_analise?: string
+          tipo: string
+          transcricao?: string | null
+          updated_at?: string
+        }
+        Update: {
+          analise_ia?: Json | null
+          created_at?: string
+          data_reuniao?: string
+          diretor_id?: string
+          google_file_id?: string | null
+          id?: string
+          nome_arquivo?: string | null
+          participantes?: string[]
+          resumo_ia?: string | null
+          status_analise?: string
+          tipo?: string
+          transcricao?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reunioes_gestao_diretor_id_fkey"
+            columns: ["diretor_id"]
+            isOneToOne: false
+            referencedRelation: "consultores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reunioes_importadas_log: {
         Row: {
           cliente_id: string | null
