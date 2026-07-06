@@ -262,6 +262,8 @@ Avalie nos seguintes critérios (nota de 0 a 10 cada):
 4. Clareza nas demandas - Comunica necessidades, problemas e expectativas de forma clara?
 5. Engajamento estratégico - Demonstra visão de longo prazo e interesse em resultados sustentáveis?
 
+Além das notas, identifique ALERTAS DE SENTIMENTO NEGATIVO: sinais explícitos ou fortes de insatisfação, frustração, questionamento de valor da consultoria, cancelamento iminente, comparação negativa com concorrentes, ou reclamações recorrentes. Ignore ruído leve. Para cada alerta: trecho (frase curta parafraseada da transcrição), severidade ("alta"|"media"), motivo (breve explicação). Se não houver sinais claros, retorne array vazio.
+
 Retorne a análise usando a função fornecida. Seja conciso nos textos.`;
 
       const clienteClaude = await callClaude({
@@ -283,6 +285,19 @@ Retorne a análise usando a função fornecida. Seja conciso nos textos.`;
                 engajamento_estrategico: { type: "number", description: "Nota 0-10 para engajamento estratégico" },
                 pontos_fortes: { type: "array", items: { type: "string" }, description: "Lista de 3-5 pontos fortes do cliente (frases curtas)" },
                 pontos_melhoria: { type: "array", items: { type: "string" }, description: "Lista de 3-5 pontos de melhoria do cliente (frases curtas)" },
+                alertas_sentimento: {
+                  type: "array",
+                  description: "Sinais fortes de insatisfação/risco. Vazio se não houver.",
+                  items: {
+                    type: "object",
+                    properties: {
+                      trecho: { type: "string" },
+                      severidade: { type: "string", enum: ["alta","media"] },
+                      motivo: { type: "string" },
+                    },
+                    required: ["trecho","severidade","motivo"],
+                  },
+                },
               },
               required: ["resumo", "participacao_ativa", "abertura_sugestoes", "comprometimento_acoes", "clareza_demandas", "engajamento_estrategico", "pontos_fortes", "pontos_melhoria"],
             },
@@ -309,6 +324,7 @@ Retorne a análise usando a função fornecida. Seja conciso nos textos.`;
           analiseCliente.engajamento_estrategico = Number(analiseCliente.engajamento_estrategico) || 0;
           analiseCliente.pontos_fortes = Array.isArray(analiseCliente.pontos_fortes) ? analiseCliente.pontos_fortes : [];
           analiseCliente.pontos_melhoria = Array.isArray(analiseCliente.pontos_melhoria) ? analiseCliente.pontos_melhoria : [];
+          analiseCliente.alertas_sentimento = Array.isArray(analiseCliente.alertas_sentimento) ? analiseCliente.alertas_sentimento : [];
 
           scoreCliente = Math.round(
             ((analiseCliente.participacao_ativa + analiseCliente.abertura_sugestoes +
@@ -359,6 +375,7 @@ Retorne a análise usando a função fornecida. Seja conciso nos textos.`;
         engajamento_estrategico: analiseCliente.engajamento_estrategico,
         pontos_fortes: analiseCliente.pontos_fortes,
         pontos_melhoria: analiseCliente.pontos_melhoria,
+        alertas_sentimento: analiseCliente.alertas_sentimento ?? [],
       };
     }
 
@@ -413,6 +430,58 @@ Retorne a análise usando a função fornecida. Seja conciso nos textos.`;
       }
     } catch (compErr) {
       console.error("[analisar-reuniao] erro ao persistir compromissos (não crítico):", compErr);
+    }
+
+    // ===== 4. NOTIFICAR DIRETORES SOBRE SENTIMENTO NEGATIVO =====
+    try {
+      const alertas = (analiseCliente?.alertas_sentimento ?? []) as Array<any>;
+      if (alertas.length > 0) {
+        // Descobre user_ids de diretores/admins
+        const { data: roles } = await supabase
+          .from("user_roles").select("user_id, role").in("role", ["admin","director"]);
+        const diretoresUserIds = Array.from(new Set((roles ?? []).map((r: any) => r.user_id)));
+        const clienteNome = reuniao.clientes?.nome ?? "Cliente";
+        const consultoraNome = reuniao.consultores?.nome ?? "Consultora";
+        const severidade = alertas.some((a) => a.severidade === "alta") ? "alta" : "media";
+        const descricao = alertas
+          .slice(0, 3)
+          .map((a) => `• ${a.motivo}${a.trecho ? ` — "${a.trecho}"` : ""}`)
+          .join("\n");
+
+        for (const uid of diretoresUserIds) {
+          // dedup: já há notificação não lida para a mesma reunião?
+          const { data: exists } = await supabase
+            .from("notificacoes")
+            .select("id")
+            .eq("user_id", uid)
+            .eq("tipo", "sentimento_negativo_cliente")
+            .eq("entidade_id", reuniao_id)
+            .eq("lida", false)
+            .maybeSingle();
+          if (exists) continue;
+
+          await supabase.from("notificacoes").insert({
+            user_id: uid,
+            tipo: "sentimento_negativo_cliente",
+            titulo: `Sinal de alerta em reunião de ${clienteNome}`,
+            descricao,
+            link: `/reunioes?id=${reuniao_id}`,
+            entidade_tipo: "reuniao",
+            entidade_id: reuniao_id,
+            metadata: {
+              cliente_id: reuniao.cliente_id,
+              cliente_nome: clienteNome,
+              consultora_nome: consultoraNome,
+              consultor_id: reuniao.consultor_id,
+              reuniao_id,
+              severidade,
+              alertas,
+            },
+          });
+        }
+      }
+    } catch (sentErr) {
+      console.error("[analisar-reuniao] erro ao notificar sentimento (não crítico):", sentErr);
     }
 
     return new Response(
