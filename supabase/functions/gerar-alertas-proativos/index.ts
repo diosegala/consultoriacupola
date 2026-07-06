@@ -39,6 +39,8 @@ Deno.serve(async (req) => {
     checklist_parado: 0,
     okr_sem_progresso: 0,
     contrato_sem_renovacao: 0,
+    briefing_pre_reuniao: 0,
+    compromisso_vencido: 0,
     resumo_diario: 0,
     ai_calls: 0,
   };
@@ -285,6 +287,145 @@ Deno.serve(async (req) => {
       summary.contrato_sem_renovacao++;
     }
 
+    // --------- 4b. Briefing pré-reunião (1 a 2 dias antes) ---------
+    const amanha = new Date(hoje);
+    amanha.setDate(amanha.getDate() + 1);
+    const depoisAmanha = new Date(hoje);
+    depoisAmanha.setDate(depoisAmanha.getDate() + 2);
+    const amanhaISO = amanha.toISOString().slice(0, 10);
+    const depoisAmanhaISO = depoisAmanha.toISOString().slice(0, 10);
+
+    const { data: proximas } = await admin
+      .from("atendimentos")
+      .select("cliente_id, proxima_reuniao, clientes!inner(id, nome, consultor_id, status)")
+      .not("proxima_reuniao", "is", null)
+      .gte("proxima_reuniao", amanhaISO)
+      .lte("proxima_reuniao", depoisAmanhaISO)
+      .eq("clientes.status", "ativo");
+
+    for (const at of proximas ?? []) {
+      const cli: any = (at as any).clientes;
+      if (!cli?.consultor_id) continue;
+      const userId = userByConsultor.get(cli.consultor_id);
+      if (!userId) continue;
+
+      // dedup por cliente/tipo/reuniao (usa data como entidade auxiliar em metadata)
+      const { data: exists } = await admin
+        .from("notificacoes")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("tipo", "briefing_pre_reuniao")
+        .eq("entidade_id", cli.id)
+        .eq("lida", false)
+        .maybeSingle();
+      if (exists) continue;
+
+      // Compromissos em aberto do cliente
+      const { data: comps } = await admin
+        .from("compromissos")
+        .select("descricao, responsavel, prazo, status")
+        .eq("cliente_id", cli.id)
+        .in("status", ["pendente", "adiado"])
+        .order("prazo", { ascending: true, nullsFirst: false });
+
+      const doCliente = (comps ?? []).filter((c: any) => c.responsavel === "cliente");
+      const doConsultor = (comps ?? []).filter((c: any) => c.responsavel === "consultor");
+
+      const fmt = (list: any[]) =>
+        list.length
+          ? list
+              .map((c: any) => {
+                const vencido = c.prazo && c.prazo < hojeISO ? " [VENCIDO]" : "";
+                const prazo = c.prazo ? ` (prazo: ${c.prazo})` : "";
+                return `• ${c.descricao}${prazo}${vencido}`;
+              })
+              .join("\n")
+          : "(nenhum)";
+
+      // Se havia compromissos anteriores e todos os do cliente estão concluídos
+      const { count: totalHistorico } = await admin
+        .from("compromissos")
+        .select("id", { count: "exact", head: true })
+        .eq("cliente_id", cli.id)
+        .eq("responsavel", "cliente");
+      const clienteZerado = (totalHistorico ?? 0) > 0 && doCliente.length === 0;
+
+      const linhas: string[] = [
+        `Reunião com ${cli.nome} em ${(at as any).proxima_reuniao}.`,
+        "",
+        "Compromissos em aberto desde a última reunião:",
+        "",
+        "DO CLIENTE:",
+        fmt(doCliente),
+        "",
+        "DO CONSULTOR:",
+        fmt(doConsultor),
+      ];
+      if (clienteZerado) {
+        linhas.push("", "✓ O cliente concluiu todos os compromissos anteriores — vale reconhecer isso na abertura.");
+      }
+      linhas.push("", "Sugestão: abra a reunião revisando o status destes itens antes da pauta nova.");
+
+      await admin.from("notificacoes").insert({
+        user_id: userId,
+        tipo: "briefing_pre_reuniao",
+        titulo: `Briefing pré-reunião — ${cli.nome}`,
+        descricao: linhas.join("\n"),
+        link: `/clientes/${cli.id}?tab=compromissos`,
+        entidade_tipo: "cliente",
+        entidade_id: cli.id,
+        metadata: {
+          data_reuniao: (at as any).proxima_reuniao,
+          compromissos_cliente: doCliente.length,
+          compromissos_consultor: doConsultor.length,
+          cliente_zerado: clienteZerado,
+        },
+      });
+      summary.briefing_pre_reuniao++;
+    }
+
+    // --------- 4c. Compromisso do cliente vencido há +3 dias ---------
+    const limiteVenc = new Date(hoje);
+    limiteVenc.setDate(limiteVenc.getDate() - 3);
+    const limiteVencISO = limiteVenc.toISOString().slice(0, 10);
+
+    const { data: vencidos } = await admin
+      .from("compromissos")
+      .select("id, cliente_id, descricao, prazo, clientes!inner(id, nome, consultor_id, status)")
+      .eq("status", "pendente")
+      .eq("responsavel", "cliente")
+      .lt("prazo", limiteVencISO)
+      .eq("clientes.status", "ativo");
+
+    for (const comp of vencidos ?? []) {
+      const cli: any = (comp as any).clientes;
+      if (!cli?.consultor_id) continue;
+      const userId = userByConsultor.get(cli.consultor_id);
+      if (!userId) continue;
+
+      const { data: exists } = await admin
+        .from("notificacoes")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("tipo", "compromisso_vencido")
+        .eq("entidade_id", (comp as any).id)
+        .eq("lida", false)
+        .maybeSingle();
+      if (exists) continue;
+
+      await admin.from("notificacoes").insert({
+        user_id: userId,
+        tipo: "compromisso_vencido",
+        titulo: `Compromisso vencido — ${cli.nome}`,
+        descricao: `O cliente ${cli.nome} tem compromisso vencido: ${(comp as any).descricao}. Considere um contato leve de acompanhamento antes da próxima reunião.`,
+        link: `/clientes/${cli.id}?tab=compromissos`,
+        entidade_tipo: "compromisso",
+        entidade_id: (comp as any).id,
+        metadata: { prazo: (comp as any).prazo, descricao: (comp as any).descricao },
+      });
+      summary.compromisso_vencido++;
+    }
+
     // --------- 5. Resumo diário ---------
     const { data: consultores } = await admin.from("consultor_user").select("user_id");
     const inicioDia = new Date(hoje);
@@ -296,7 +437,7 @@ Deno.serve(async (req) => {
         .select("id", { count: "exact", head: true })
         .eq("user_id", userId)
         .eq("lida", false)
-        .in("tipo", ["sem_contato", "checklist_parado", "okr_sem_progresso", "contrato_sem_renovacao"]);
+        .in("tipo", ["sem_contato", "checklist_parado", "okr_sem_progresso", "contrato_sem_renovacao", "briefing_pre_reuniao", "compromisso_vencido"]);
       const total = count ?? 0;
       if (total === 0) continue;
 

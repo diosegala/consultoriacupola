@@ -1,7 +1,7 @@
 import { Draggable } from '@hello-pangea/dnd';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MapPin, MessageSquarePlus, CalendarIcon, CheckSquare, MessageSquare, AlertTriangle, Clock, RefreshCw, CalendarClock } from 'lucide-react';
+import { MapPin, MessageSquarePlus, CalendarIcon, CheckSquare, MessageSquare, AlertTriangle, Clock, RefreshCw, CalendarClock, ListChecks } from 'lucide-react';
 import { format, isPast, addDays, isBefore, differenceInCalendarDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
@@ -22,6 +22,7 @@ interface KanbanCardProps {
     _reunioes_count?: number;
     _tags?: ProjetoCardTag[];
     _proxima_reuniao?: string | null;
+    _compromissos_cliente_pendentes?: number;
   };
   index: number;
   onRegistrarReuniao: (projeto: Projeto) => void;
@@ -178,6 +179,15 @@ export function KanbanCard({ projeto, index, onRegistrarReuniao, onClick }: Kanb
                 <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
                   <MessageSquare className="h-3 w-3" />
                   {projeto._comentarios_count}
+                </span>
+              )}
+              {(projeto._compromissos_cliente_pendentes ?? 0) > 0 && (
+                <span
+                  className="text-[10px] text-muted-foreground flex items-center gap-0.5"
+                  title={`${projeto._compromissos_cliente_pendentes} compromisso(s) do cliente pendente(s)`}
+                >
+                  <ListChecks className="h-3 w-3" />
+                  {projeto._compromissos_cliente_pendentes}
                 </span>
               )}
               {responsaveis.length > 0 && (

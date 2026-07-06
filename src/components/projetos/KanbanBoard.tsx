@@ -13,6 +13,7 @@ import { Plus, Users } from 'lucide-react';
 import { useConsultores } from '@/hooks/useConsultores';
 import { useMyConsultorId } from '@/hooks/useConsultorUser';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCompromissosPendentesCliente } from '@/hooks/useCompromissos';
 
 export function KanbanBoard() {
   const { isAdmin, userRole } = useAuth();
@@ -51,6 +52,18 @@ export function KanbanBoard() {
     return list;
   }, [projetos, searchText, filtroTag, apenasRenovacoes]);
 
+  const clienteIds = useMemo(() => Array.from(new Set((projetos ?? []).map((p) => p.cliente_id))), [projetos]);
+  const { data: compromissosMap } = useCompromissosPendentesCliente(clienteIds);
+
+  const projetosComContagem = useMemo(
+    () =>
+      filteredProjetos.map((p) => ({
+        ...p,
+        _compromissos_cliente_pendentes: compromissosMap?.get(p.cliente_id) ?? 0,
+      })),
+    [filteredProjetos, compromissosMap],
+  );
+
   const handleDragEnd = useCallback((result: DropResult) => {
     if (!result.destination) return;
     const { draggableId, destination } = result;
@@ -84,7 +97,7 @@ export function KanbanBoard() {
   }
 
   const projetosByEtapa = (etapaId: string) =>
-    filteredProjetos
+    projetosComContagem
       .filter((p) => p.etapa_id === etapaId)
       .sort((a, b) => a.ordem_na_etapa - b.ordem_na_etapa);
 
