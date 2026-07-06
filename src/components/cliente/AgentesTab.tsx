@@ -1596,6 +1596,63 @@ export function AgentesTab({ clienteId }: Props) {
           </Button>
         </PanelAgente>
 
+        {/* BALANÇO DO PERÍODO */}
+        <PanelAgente
+          icon={BarChart3}
+          titulo="Balanço do Período"
+          existingDoc={balancoDoc}
+          versoesAnteriores={documentos?.filter((d) => d.tipo === 'balanco_periodo') ?? []}
+          onView={(d) => setViewingDoc(d)}
+          onCriarGdoc={handleCriarGdocRetro}
+          criandoGdocDocId={criandoGdocDocId}
+          expanded={expandedHistory['balanco_periodo']}
+          onToggleExpand={() =>
+            setExpandedHistory((p) => ({ ...p, balanco_periodo: !p['balanco_periodo'] }))
+          }
+          disabled={!podeGerarBalanco}
+          disabledTooltip="Necessário ao menos 3 reuniões analisadas ou 1 documento gerado no período."
+        >
+          <div className="rounded-lg border border-border bg-muted/10 p-3 space-y-1.5 text-xs">
+            <p className="font-medium">Será consolidado:</p>
+            <ul className="space-y-0.5 text-muted-foreground">
+              <li>• {balancoStats?.reunioes ?? 0} reunião(ões) analisada(s)</li>
+              <li>• {balancoStats?.documentos ?? 0} documento(s) do período (diagnóstico, OKRs, cliente oculto)</li>
+              <li>
+                • {balancoStats?.compromissos_total ?? 0} compromisso(s)
+                {(balancoStats?.compromissos_total ?? 0) > 0
+                  ? ` (${balancoStats?.compromissos_pct ?? 0}% concluídos)`
+                  : ''}
+              </li>
+              <li>
+                • Contrato:{' '}
+                {balancoStats?.contrato_inicio
+                  ? format(new Date(balancoStats.contrato_inicio + 'T00:00:00'), 'dd/MM/yyyy')
+                  : '—'}
+                {' a '}
+                {balancoStats?.contrato_fim
+                  ? format(new Date(balancoStats.contrato_fim + 'T00:00:00'), 'dd/MM/yyyy')
+                  : '—'}
+              </li>
+            </ul>
+          </div>
+          <Textarea
+            value={bpContexto}
+            onChange={(e) => setBpContexto(e.target.value)}
+            rows={3}
+            placeholder="Algo específico a destacar ou contextualizar neste balanço? (opcional — ex: mudanças societárias no cliente, fatores externos que afetaram resultados)"
+            disabled={!podeGerarBalanco}
+          />
+          <Button
+            onClick={gerarBalanco}
+            disabled={!podeGerarBalanco || gerandoBalanco || isBusy('balanco_periodo')}
+            className="w-full sm:w-auto"
+          >
+            {gerandoBalanco || isBusy('balanco_periodo')
+              ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Gerando…</>
+              : <><Sparkles className="h-4 w-4 mr-2" /> Gerar Balanço</>}
+          </Button>
+        </PanelAgente>
+
         {/* Modal de visualização */}
         <Dialog open={!!viewingDoc} onOpenChange={(o) => !o && setViewingDoc(null)}>
           <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
