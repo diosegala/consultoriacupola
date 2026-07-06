@@ -669,8 +669,39 @@ export function AgentesTab({ clienteId }: Props) {
     setTextoLabel('');
   };
 
-  const removerFonte = (id: string) =>
+  const removerFonte = (id: string) => {
+    const fonte = fontes.find((f) => f.id === id);
+    if (fonte?.sumarioId) {
+      removerSumario.mutate({ id: fonte.sumarioId, cliente_id: clienteId });
+    }
     setFontes((prev) => prev.filter((f) => f.id !== id));
+  };
+
+  const tentarSumarizar = async (id: string) => {
+    const f = fontes.find((x) => x.id === id);
+    if (!f?.conteudo) {
+      toast.info('Sem conteúdo original salvo nesta sessão. Reenvie o arquivo/link para sumarizar novamente.');
+      return;
+    }
+    setFontes((prev) => prev.map((x) => x.id === id ? { ...x, sumarioStatus: 'sumarizando', sumarioErro: undefined } : x));
+    try {
+      const res = await sumarizar.mutateAsync({
+        cliente_id: clienteId,
+        label: rotuloTranscricao(f),
+        papel: f.papel,
+        data_entrevista: f.dataEntrevista || null,
+        conteudo: f.conteudo,
+      });
+      setFontes((prev) => prev.map((x) => x.id === id ? {
+        ...x,
+        sumarioStatus: 'ok',
+        sumarioId: res.sumario_id,
+        numCharsSumario: res.sumario?.length ?? 0,
+      } : x));
+    } catch (e: any) {
+      setFontes((prev) => prev.map((x) => x.id === id ? { ...x, sumarioStatus: 'erro', sumarioErro: e?.message ?? 'Falha ao sumarizar' } : x));
+    }
+  };
 
   const renomearFonte = (id: string, label: string) =>
     setFontes((prev) => prev.map((f) => (f.id === id ? { ...f, label } : f)));
