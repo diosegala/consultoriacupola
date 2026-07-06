@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { Sparkles, FileText, Target, ClipboardList, ArrowLeft, Check } from 'lucide-react';
+import { Sparkles, FileText, Target, ClipboardList, ArrowLeft, Check, BarChart3 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyConsultorId } from '@/hooks/useConsultorUser';
@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/select';
 import { AgentesTab } from '@/components/cliente/AgentesTab';
 
-type AgenteKey = 'diagnostico' | 'okrs' | 'cliente_oculto';
+type AgenteKey = 'diagnostico' | 'okrs' | 'cliente_oculto' | 'balanco_periodo';
 
 const AGENTES: Array<{
   key: AgenteKey;
@@ -38,6 +38,12 @@ const AGENTES: Array<{
     descricao: 'Cria briefing de avaliação de canais e personas para cliente oculto.',
     icon: ClipboardList,
   },
+  {
+    key: 'balanco_periodo',
+    titulo: 'Balanço do Período',
+    descricao: 'Consolida entregas, engajamento e OKRs do período para a conversa de renovação.',
+    icon: BarChart3,
+  },
 ];
 
 export default function Agentes() {
@@ -47,7 +53,7 @@ export default function Agentes() {
   const { data: clientes, isLoading: loadingClientes } = useClientes(consultorFilter);
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const VALID_AGENTES: AgenteKey[] = ['diagnostico', 'okrs', 'cliente_oculto'];
+  const VALID_AGENTES: AgenteKey[] = ['diagnostico', 'okrs', 'cliente_oculto', 'balanco_periodo'];
   const urlAgente = searchParams.get('agente') as AgenteKey | null;
   const urlCliente = searchParams.get('cliente') || undefined;
   const agente: AgenteKey | null =

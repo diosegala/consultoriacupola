@@ -11,8 +11,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import {
   Sparkles, FileText, Target, ClipboardList, ClipboardCheck, Upload, Link as LinkIcon,
   Trash2, Loader2, ExternalLink, Eye, ChevronDown, ChevronUp, FileType, FileAudio,
-  Wand2, CheckCircle2, AlertCircle, RefreshCw,
+  Wand2, CheckCircle2, AlertCircle, RefreshCw, BarChart3,
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -290,6 +291,9 @@ export function AgentesTab({ clienteId }: Props) {
   const [coPersonas, setCoPersonas] = useState<1 | 2>(1);
   const [coObservacoes, setCoObservacoes] = useState('');
 
+  // Balanço do Período
+  const [bpContexto, setBpContexto] = useState('');
+
   // Visualização
   const [viewingDoc, setViewingDoc] = useState<ProjetoDocumento | null>(null);
   const [expandedHistory, setExpandedHistory] = useState<Record<string, boolean>>({});
@@ -490,6 +494,82 @@ export function AgentesTab({ clienteId }: Props) {
   const diagnosticoDoc = lastByTipo.get('diagnostico');
   const okrsDoc = lastByTipo.get('okrs');
 
+  // Estatísticas do período para o agente Balanço do Período
+  const { data: balancoStats } = useQuery({
+    queryKey: ['balanco_periodo_stats', clienteId],
+    enabled: !!clienteId,
+    queryFn: async () => {
+      const { data: contrato } = await supabase
+        .from('contratos')
+        .select('data_inicio, data_fim')
+        .eq('cliente_id', clienteId)
+        .eq('ativo', true)
+        .order('data_inicio', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const inicio = contrato?.data_inicio ?? null;
+      const fim = contrato?.data_fim ?? null;
+
+      let rQ = supabase
+        .from('reunioes')
+        .select('id', { count: 'exact', head: true })
+        .eq('cliente_id', clienteId)
+        .eq('status_analise', 'concluido');
+      if (inicio) rQ = rQ.gte('data_reuniao', inicio);
+      if (fim) rQ = rQ.lte('data_reuniao', fim);
+      const { count: reunioesCount } = await rQ;
+
+      let dQ = supabase
+        .from('projeto_documentos')
+        .select('id', { count: 'exact', head: true })
+        .eq('cliente_id', clienteId)
+        .in('tipo', ['diagnostico', 'okrs', 'briefing_cliente_oculto']);
+      if (inicio) dQ = dQ.gte('created_at', inicio + 'T00:00:00');
+      if (fim) dQ = dQ.lte('created_at', fim + 'T23:59:59');
+      const { count: docsCount } = await dQ;
+
+      let cQ = supabase
+        .from('compromissos')
+        .select('status')
+        .eq('cliente_id', clienteId);
+      if (inicio) cQ = cQ.gte('created_at', inicio);
+      if (fim) cQ = cQ.lte('created_at', fim + 'T23:59:59');
+      const { data: comps } = await cQ;
+      const total = comps?.length ?? 0;
+      const concl = (comps ?? []).filter((c: any) => c.status === 'concluido').length;
+
+      return {
+        contrato_inicio: inicio,
+        contrato_fim: fim,
+        reunioes: reunioesCount ?? 0,
+        documentos: docsCount ?? 0,
+        compromissos_total: total,
+        compromissos_concluidos: concl,
+        compromissos_pct: total ? Math.round((concl / total) * 100) : 0,
+      };
+    },
+  });
+
+  const podeGerarBalanco = (balancoStats?.reunioes ?? 0) >= 3 || (balancoStats?.documentos ?? 0) >= 1;
+  const [gerandoBalanco, setGerandoBalanco] = useState(false);
+  const balancoDoc = lastByTipo.get('balanco_periodo');
+
+  const gerarBalanco = async () => {
+    setGerandoBalanco(true);
+    try {
+      await gerar.mutateAsync({
+        tipo: 'balanco_periodo',
+        cliente_id: clienteId,
+        contexto_usuario: bpContexto.trim() || undefined,
+      });
+      toast.success('Balanço do período gerado.');
+    } catch {
+      /* erro tratado no hook */
+    } finally {
+      setGerandoBalanco(false);
+    }
+  };
+
   // Criação de planilha de OKRs a partir de dados_estruturados
   const [criandoSheet, setCriandoSheet] = useState(false);
   const [sheetProgresso, setSheetProgresso] = useState<string>('');
@@ -564,6 +644,7 @@ export function AgentesTab({ clienteId }: Props) {
     diagnostico: 'Diagnóstico',
     okrs: 'OKRs',
     briefing_cliente_oculto: 'Briefing Cliente Oculto',
+    balanco_periodo: 'Balanço do Período',
   };
 
   const handleCriarGdocRetro = (doc: ProjetoDocumento) => {
@@ -1512,6 +1593,63 @@ export function AgentesTab({ clienteId }: Props) {
             {isBusy('briefing_cliente_oculto')
               ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Gerando…</>
               : <><Sparkles className="h-4 w-4 mr-2" /> Gerar Briefing</>}
+          </Button>
+        </PanelAgente>
+
+        {/* BALANÇO DO PERÍODO */}
+        <PanelAgente
+          icon={BarChart3}
+          titulo="Balanço do Período"
+          existingDoc={balancoDoc}
+          versoesAnteriores={documentos?.filter((d) => d.tipo === 'balanco_periodo') ?? []}
+          onView={(d) => setViewingDoc(d)}
+          onCriarGdoc={handleCriarGdocRetro}
+          criandoGdocDocId={criandoGdocDocId}
+          expanded={expandedHistory['balanco_periodo']}
+          onToggleExpand={() =>
+            setExpandedHistory((p) => ({ ...p, balanco_periodo: !p['balanco_periodo'] }))
+          }
+          disabled={!podeGerarBalanco}
+          disabledTooltip="Necessário ao menos 3 reuniões analisadas ou 1 documento gerado no período."
+        >
+          <div className="rounded-lg border border-border bg-muted/10 p-3 space-y-1.5 text-xs">
+            <p className="font-medium">Será consolidado:</p>
+            <ul className="space-y-0.5 text-muted-foreground">
+              <li>• {balancoStats?.reunioes ?? 0} reunião(ões) analisada(s)</li>
+              <li>• {balancoStats?.documentos ?? 0} documento(s) do período (diagnóstico, OKRs, cliente oculto)</li>
+              <li>
+                • {balancoStats?.compromissos_total ?? 0} compromisso(s)
+                {(balancoStats?.compromissos_total ?? 0) > 0
+                  ? ` (${balancoStats?.compromissos_pct ?? 0}% concluídos)`
+                  : ''}
+              </li>
+              <li>
+                • Contrato:{' '}
+                {balancoStats?.contrato_inicio
+                  ? format(new Date(balancoStats.contrato_inicio + 'T00:00:00'), 'dd/MM/yyyy')
+                  : '—'}
+                {' a '}
+                {balancoStats?.contrato_fim
+                  ? format(new Date(balancoStats.contrato_fim + 'T00:00:00'), 'dd/MM/yyyy')
+                  : '—'}
+              </li>
+            </ul>
+          </div>
+          <Textarea
+            value={bpContexto}
+            onChange={(e) => setBpContexto(e.target.value)}
+            rows={3}
+            placeholder="Algo específico a destacar ou contextualizar neste balanço? (opcional — ex: mudanças societárias no cliente, fatores externos que afetaram resultados)"
+            disabled={!podeGerarBalanco}
+          />
+          <Button
+            onClick={gerarBalanco}
+            disabled={!podeGerarBalanco || gerandoBalanco || isBusy('balanco_periodo')}
+            className="w-full sm:w-auto"
+          >
+            {gerandoBalanco || isBusy('balanco_periodo')
+              ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Gerando…</>
+              : <><Sparkles className="h-4 w-4 mr-2" /> Gerar Balanço</>}
           </Button>
         </PanelAgente>
 
