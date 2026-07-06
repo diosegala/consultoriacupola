@@ -1420,6 +1420,33 @@ export function AgentesTab({ clienteId }: Props) {
               ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Gerando…</>
               : <><Sparkles className="h-4 w-4 mr-2" /> Gerar OKRs {okrTrimestre}</>}
           </Button>
+          {okrsDoc && okrsDados && (
+            <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
+              {okrsDoc.sheet_url ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(okrsDoc.sheet_url!, '_blank', 'noopener')}
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" /> Abrir planilha de OKRs
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCriarPlanilhaOKR}
+                  disabled={criandoSheet}
+                >
+                  {criandoSheet
+                    ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {sheetProgresso || 'Criando…'}</>
+                    : <><FileText className="h-4 w-4 mr-2" /> Criar planilha de OKRs</>}
+                </Button>
+              )}
+              <Button variant="ghost" size="sm" onClick={handleCopiarTSV}>
+                <ClipboardCheck className="h-4 w-4 mr-2" /> Copiar para planilha (TSV)
+              </Button>
+            </div>
+          )}
         </PanelAgente>
 
         {/* CLIENTE OCULTO */}
