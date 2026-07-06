@@ -1017,6 +1017,34 @@ export function AgentesTab({ clienteId }: Props) {
               </Button>
             </div>
 
+            {/* Da base do cliente */}
+            {baseElegiveis.length > 0 && (
+              <div className="space-y-2">
+                <Separator />
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <h6 className="text-xs font-medium">Da base do cliente</h6>
+                    <p className="text-[11px] text-muted-foreground">
+                      Reaproveite arquivos e links do Drive já cadastrados na aba Documentos.
+                    </p>
+                  </div>
+                </div>
+                <Select value={baseSelectId} onValueChange={(v) => { setBaseSelectId(v); adicionarDaBase(v); }}>
+                  <SelectTrigger className="text-xs">
+                    <SelectValue placeholder="Selecionar item da base..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {baseElegiveis.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.titulo} · {a.tipo === 'link' ? 'link Drive' : 'arquivo'}
+                        {a.categoria ? ` · ${a.categoria}` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             {/* Lista de fontes */}
             {fontes.length > 0 && (
               <div className="space-y-2">
