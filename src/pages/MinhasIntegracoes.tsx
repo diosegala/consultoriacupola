@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, CheckCircle2, XCircle, RefreshCw, Link2, AlertTriangle, FileText, ExternalLink } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, RefreshCw, Link2, AlertTriangle, FileText, ExternalLink, ChevronDown, ChevronUp, AlertOctagon } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useMyConsultorId } from '@/hooks/useConsultorUser';
@@ -14,12 +14,16 @@ import {
   useReunioesImportadasLog,
   useDetectarPastaMeet,
 } from '@/hooks/useGoogleDrive';
+import { useAuth } from '@/contexts/AuthContext';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 export default function MinhasIntegracoes() {
   const { toast } = useToast();
+  const { isAdmin } = useAuth();
   const { data: consultorId } = useMyConsultorId();
   const { data: conn, isLoading } = useGoogleConnection(consultorId ?? undefined);
   const startOAuth = useStartGoogleOAuth();
@@ -27,10 +31,25 @@ export default function MinhasIntegracoes() {
   const detectarPasta = useDetectarPastaMeet();
   const [syncing, setSyncing] = useState(false);
   const [logFilter, setLogFilter] = useState<string>('all');
+  const [parseErrosOpen, setParseErrosOpen] = useState(false);
   const { data: logs, isLoading: logsLoading, refetch: refetchLogs } = useReunioesImportadasLog(
     consultorId ?? undefined,
     { status: logFilter, limit: 20 },
   );
+
+  const { data: parseErros, isLoading: parseErrosLoading, refetch: refetchParseErros } = useQuery({
+    queryKey: ['parse_erros_log', isAdmin],
+    enabled: parseErrosOpen,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('parse_erros_log' as any)
+        .select('id, created_at, nome_arquivo, tipo, origem, tamanho_bytes, erro, consultor_id')
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      return data as any[];
+    },
+  });
 
   const lastSyncStats = useMemo(() => {
     if (!conn?.ultima_sincronizacao || !logs) return null;
