@@ -200,3 +200,46 @@ export function useLimparAgenteRascunho() {
     },
   });
 }
+
+export function useCriarGdocRetro() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { documento_id: string; titulo: string; conteudo: string }) => {
+      const { data, error } = await supabase.functions.invoke('criar-gdoc', {
+        body: { titulo: params.titulo, conteudo_markdown: params.conteudo },
+      });
+      if (error) {
+        let message = error.message || 'Erro ao criar Google Doc';
+        const response = (error as any)?.context;
+        if (response && typeof response.json === 'function') {
+          try {
+            const body = await response.json();
+            if (typeof body?.message === 'string') message = body.message;
+            else if (typeof body?.error === 'string') message = body.error;
+          } catch {
+            // mantém mensagem original
+          }
+        }
+        throw new Error(message);
+      }
+      const url = (data as any)?.url as string | undefined;
+      if (!url) throw new Error('Google Doc criado sem URL retornada');
+
+      const { error: upErr } = await supabase
+        .from('projeto_documentos' as any)
+        .update({ gdoc_url: url })
+        .eq('id', params.documento_id);
+      if (upErr) throw new Error(upErr.message);
+
+      return url;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cliente_documentos'] });
+      queryClient.invalidateQueries({ queryKey: ['projeto_documentos'] });
+      toast.success('Google Doc criado.');
+    },
+    onError: (err: Error) => {
+      toast.error(`Erro ao criar Google Doc: ${err.message}`);
+    },
+  });
+}

@@ -17,12 +17,14 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { useQuestionarioCliente } from '@/hooks/useQuestionario';
+import { useCliente } from '@/hooks/useClientes';
 import {
   useClienteDocumentos,
   useGerarDocumento,
   useParseDocumento,
   useAgenteRascunho,
   useSalvarAgenteRascunho,
+  useCriarGdocRetro,
   type ProjetoDocumento,
 } from '@/hooks/useProjetoDocumentos';
 import { useQueryClient } from '@tanstack/react-query';
@@ -148,10 +150,12 @@ function formatarMinutosFala(palavras: number) {
 export function AgentesTab({ clienteId }: Props) {
   const { data: questionario } = useQuestionarioCliente(clienteId);
   const { data: documentos } = useClienteDocumentos(clienteId);
+  const { data: cliente } = useCliente(clienteId);
   const { data: rascunho, isLoading: loadingRascunho } = useAgenteRascunho<AgentesDraftState>(clienteId);
   const { mutate: salvarRascunho } = useSalvarAgenteRascunho();
   const gerar = useGerarDocumento();
   const { mutateAsync: parseDocumento } = useParseDocumento();
+  const criarGdocRetro = useCriarGdocRetro();
   const queryClient = useQueryClient();
   const { mutate: registrarTempo } = useRegistrarInteracaoTempo();
   const activeTimer = useActiveTimer(true);
@@ -373,6 +377,22 @@ export function AgentesTab({ clienteId }: Props) {
 
   const diagnosticoDoc = lastByTipo.get('diagnostico');
   const okrsDoc = lastByTipo.get('okrs');
+
+  const TITULO_TIPO: Record<string, string> = {
+    diagnostico: 'Diagnóstico',
+    okrs: 'OKRs',
+    briefing_cliente_oculto: 'Briefing Cliente Oculto',
+  };
+
+  const handleCriarGdocRetro = (doc: ProjetoDocumento) => {
+    const nomeCliente = cliente?.nome ?? '';
+    const dataFmt = format(new Date(doc.created_at), 'dd/MM/yyyy');
+    const titulo = `${TITULO_TIPO[doc.tipo] ?? doc.tipo}${nomeCliente ? ` — ${nomeCliente}` : ''} — ${dataFmt}`;
+    criarGdocRetro.mutate({ documento_id: doc.id, titulo, conteudo: doc.conteudo });
+  };
+  const criandoGdocDocId = criarGdocRetro.isPending
+    ? (criarGdocRetro.variables?.documento_id ?? null)
+    : null;
 
   const respostasDisponiveis = useMemo(() => {
     if (!questionario?.respostas) return 0;
@@ -640,6 +660,8 @@ export function AgentesTab({ clienteId }: Props) {
           existingDoc={diagnosticoDoc}
           versoesAnteriores={documentos?.filter((d) => d.tipo === 'diagnostico') ?? []}
           onView={(d) => setViewingDoc(d)}
+          onCriarGdoc={handleCriarGdocRetro}
+          criandoGdocDocId={criandoGdocDocId}
           expanded={expandedHistory['diagnostico']}
           onToggleExpand={() =>
             setExpandedHistory((p) => ({ ...p, diagnostico: !p['diagnostico'] }))
@@ -976,6 +998,8 @@ export function AgentesTab({ clienteId }: Props) {
           existingDoc={okrsDoc}
           versoesAnteriores={documentos?.filter((d) => d.tipo === 'okrs') ?? []}
           onView={(d) => setViewingDoc(d)}
+          onCriarGdoc={handleCriarGdocRetro}
+          criandoGdocDocId={criandoGdocDocId}
           expanded={expandedHistory['okrs']}
           onToggleExpand={() =>
             setExpandedHistory((p) => ({ ...p, okrs: !p['okrs'] }))
@@ -1020,6 +1044,8 @@ export function AgentesTab({ clienteId }: Props) {
           existingDoc={lastByTipo.get('briefing_cliente_oculto')}
           versoesAnteriores={documentos?.filter((d) => d.tipo === 'briefing_cliente_oculto') ?? []}
           onView={(d) => setViewingDoc(d)}
+          onCriarGdoc={handleCriarGdocRetro}
+          criandoGdocDocId={criandoGdocDocId}
           expanded={expandedHistory['briefing_cliente_oculto']}
           onToggleExpand={() =>
             setExpandedHistory((p) => ({ ...p, briefing_cliente_oculto: !p['briefing_cliente_oculto'] }))
@@ -1149,6 +1175,8 @@ function PanelAgente({
   existingDoc,
   versoesAnteriores,
   onView,
+  onCriarGdoc,
+  criandoGdocDocId,
   expanded,
   onToggleExpand,
   disabled,
@@ -1160,6 +1188,8 @@ function PanelAgente({
   existingDoc?: ProjetoDocumento;
   versoesAnteriores: ProjetoDocumento[];
   onView: (d: ProjetoDocumento) => void;
+  onCriarGdoc?: (d: ProjetoDocumento) => void;
+  criandoGdocDocId?: string | null;
   expanded?: boolean;
   onToggleExpand: () => void;
   disabled?: boolean;
@@ -1192,6 +1222,20 @@ function PanelAgente({
                     <a href={existingDoc.gdoc_url} target="_blank" rel="noopener noreferrer">
                       <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Abrir no Google Docs
                     </a>
+                  </Button>
+                )}
+                {!existingDoc.gdoc_url && onCriarGdoc && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onCriarGdoc(existingDoc)}
+                    disabled={criandoGdocDocId === existingDoc.id}
+                  >
+                    {criandoGdocDocId === existingDoc.id ? (
+                      <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Criando…</>
+                    ) : (
+                      <><ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Criar no Google Docs</>
+                    )}
                   </Button>
                 )}
               </>
@@ -1229,6 +1273,21 @@ function PanelAgente({
                         <a href={d.gdoc_url} target="_blank" rel="noopener noreferrer">
                           <ExternalLink className="h-3 w-3 mr-1" /> Docs
                         </a>
+                      </Button>
+                    )}
+                    {!d.gdoc_url && onCriarGdoc && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 text-xs"
+                        onClick={() => onCriarGdoc(d)}
+                        disabled={criandoGdocDocId === d.id}
+                      >
+                        {criandoGdocDocId === d.id ? (
+                          <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Criando…</>
+                        ) : (
+                          <><ExternalLink className="h-3 w-3 mr-1" /> Criar Docs</>
+                        )}
                       </Button>
                     )}
                   </div>
