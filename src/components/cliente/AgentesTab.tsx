@@ -660,6 +660,8 @@ export function AgentesTab({ clienteId }: Props) {
           existingDoc={diagnosticoDoc}
           versoesAnteriores={documentos?.filter((d) => d.tipo === 'diagnostico') ?? []}
           onView={(d) => setViewingDoc(d)}
+          onCriarGdoc={handleCriarGdocRetro}
+          criandoGdocDocId={criandoGdocDocId}
           expanded={expandedHistory['diagnostico']}
           onToggleExpand={() =>
             setExpandedHistory((p) => ({ ...p, diagnostico: !p['diagnostico'] }))
