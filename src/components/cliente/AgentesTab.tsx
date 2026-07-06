@@ -31,6 +31,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useActiveTimer } from '@/hooks/useActiveTimer';
 import { useRegistrarInteracaoTempo, type TipoAgente } from '@/hooks/useInteracoesTempo';
+import {
+  useTranscricoesSumarios,
+  useSumarizarTranscricao,
+  useRemoverSumario,
+} from '@/hooks/useTranscricoesSumarios';
 
 interface Props {
   clienteId: string;
@@ -41,6 +46,11 @@ interface Fonte {
   label: string;
   origem: 'upload' | 'gdrive' | 'texto';
   status: 'pending' | 'parsing' | 'done' | 'error';
+  sumarioStatus?: 'idle' | 'sumarizando' | 'ok' | 'erro';
+  sumarioId?: string;
+  sumarioErro?: string;
+  numCharsOriginal?: number;
+  numCharsSumario?: number;
   conteudo?: string;
   meta?: string; // nome de arquivo ou url
   errorMsg?: string;
@@ -168,6 +178,9 @@ export function AgentesTab({ clienteId }: Props) {
   const gerar = useGerarDocumento();
   const { mutateAsync: parseDocumento } = useParseDocumento();
   const criarGdocRetro = useCriarGdocRetro();
+  const { data: sumariosSalvos } = useTranscricoesSumarios(clienteId);
+  const sumarizar = useSumarizarTranscricao();
+  const removerSumario = useRemoverSumario();
   const queryClient = useQueryClient();
   const { mutate: registrarTempo } = useRegistrarInteracaoTempo();
   const activeTimer = useActiveTimer(true);
@@ -379,6 +392,85 @@ export function AgentesTab({ clienteId }: Props) {
     });
   }, [fontes, parseDocumento]);
 
+  // Auto-sumarização: dispara em background para cada fonte que já foi parseada
+  // com sucesso mas ainda não tem sumário. Evita reentrância com um Set.
+  const sumarizandoIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!draftHydratedRef.current) return;
+    const alvos = fontes.filter(
+      (f) =>
+        f.status === 'done' &&
+        !!f.conteudo &&
+        !conteudoExtraidoInvalido(f.conteudo) &&
+        !f.sumarioId &&
+        f.sumarioStatus !== 'sumarizando' &&
+        f.sumarioStatus !== 'ok' &&
+        !sumarizandoIdsRef.current.has(f.id) &&
+        (f.conteudo?.length ?? 0) >= 200,
+    );
+    if (alvos.length === 0) return;
+    alvos.forEach((f) => {
+      sumarizandoIdsRef.current.add(f.id);
+      setFontes((prev) => prev.map((x) => (x.id === f.id ? { ...x, sumarioStatus: 'sumarizando', sumarioErro: undefined } : x)));
+      sumarizar.mutateAsync({
+        cliente_id: clienteId,
+        label: rotuloTranscricao(f),
+        papel: f.papel,
+        data_entrevista: f.dataEntrevista || null,
+        conteudo: f.conteudo!,
+      })
+        .then((res) => {
+          setFontes((prev) => prev.map((x) => x.id === f.id ? {
+            ...x,
+            sumarioStatus: 'ok',
+            sumarioId: res.sumario_id,
+            numCharsOriginal: f.conteudo?.length ?? 0,
+            numCharsSumario: res.sumario?.length ?? 0,
+          } : x));
+        })
+        .catch((e: Error) => {
+          setFontes((prev) => prev.map((x) => x.id === f.id ? {
+            ...x,
+            sumarioStatus: 'erro',
+            sumarioErro: e.message,
+          } : x));
+        })
+        .finally(() => {
+          sumarizandoIdsRef.current.delete(f.id);
+        });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fontes, clienteId]);
+
+  // Hidratação: se o consultor voltar ao cliente e não houver fontes carregadas
+  // do rascunho, monta os sumários persistidos no banco como fontes "prontas"
+  // (somente leitura — sem conteúdo original, apenas o sumário serve para gerar).
+  const sumariosHidratadosRef = useRef(false);
+  useEffect(() => {
+    if (!draftHydratedRef.current || sumariosHidratadosRef.current) return;
+    if (!sumariosSalvos || sumariosSalvos.length === 0) return;
+    sumariosHidratadosRef.current = true;
+    setFontes((prev) => {
+      const jaTem = new Set(prev.map((p) => p.sumarioId).filter(Boolean));
+      const novos: Fonte[] = sumariosSalvos
+        .filter((s) => !jaTem.has(s.id))
+        .map((s) => ({
+          id: `sum-${s.id}`,
+          label: s.label,
+          origem: 'texto',
+          status: 'done',
+          sumarioStatus: 'ok',
+          sumarioId: s.id,
+          papel: s.papel ?? undefined,
+          dataEntrevista: s.data_entrevista ?? undefined,
+          numCharsOriginal: s.num_chars_original ?? undefined,
+          numCharsSumario: s.sumario?.length ?? undefined,
+          meta: 'Sumário persistido',
+        }));
+      return novos.length ? [...prev, ...novos] : prev;
+    });
+  }, [sumariosSalvos]);
+
   const lastByTipo = useMemo(() => {
     const map = new Map<string, ProjetoDocumento>();
     for (const d of documentos ?? []) {
@@ -417,6 +509,11 @@ export function AgentesTab({ clienteId }: Props) {
 
   const transcricoesProntas = fontes.filter((f) =>
     f.status === 'done' && f.conteudo && !conteudoExtraidoInvalido(f.conteudo),
+  );
+
+  const sumariosIds = useMemo(
+    () => fontes.map((f) => f.sumarioId).filter((x): x is string => !!x),
+    [fontes],
   );
 
   const totalPalavrasTranscricoes = useMemo(
@@ -572,8 +669,39 @@ export function AgentesTab({ clienteId }: Props) {
     setTextoLabel('');
   };
 
-  const removerFonte = (id: string) =>
+  const removerFonte = (id: string) => {
+    const fonte = fontes.find((f) => f.id === id);
+    if (fonte?.sumarioId) {
+      removerSumario.mutate({ id: fonte.sumarioId, cliente_id: clienteId });
+    }
     setFontes((prev) => prev.filter((f) => f.id !== id));
+  };
+
+  const tentarSumarizar = async (id: string) => {
+    const f = fontes.find((x) => x.id === id);
+    if (!f?.conteudo) {
+      toast.info('Sem conteúdo original salvo nesta sessão. Reenvie o arquivo/link para sumarizar novamente.');
+      return;
+    }
+    setFontes((prev) => prev.map((x) => x.id === id ? { ...x, sumarioStatus: 'sumarizando', sumarioErro: undefined } : x));
+    try {
+      const res = await sumarizar.mutateAsync({
+        cliente_id: clienteId,
+        label: rotuloTranscricao(f),
+        papel: f.papel,
+        data_entrevista: f.dataEntrevista || null,
+        conteudo: f.conteudo,
+      });
+      setFontes((prev) => prev.map((x) => x.id === id ? {
+        ...x,
+        sumarioStatus: 'ok',
+        sumarioId: res.sumario_id,
+        numCharsSumario: res.sumario?.length ?? 0,
+      } : x));
+    } catch (e: any) {
+      setFontes((prev) => prev.map((x) => x.id === id ? { ...x, sumarioStatus: 'erro', sumarioErro: e?.message ?? 'Falha ao sumarizar' } : x));
+    }
+  };
 
   const renomearFonte = (id: string, label: string) =>
     setFontes((prev) => prev.map((f) => (f.id === id ? { ...f, label } : f)));
@@ -663,10 +791,15 @@ export function AgentesTab({ clienteId }: Props) {
       tipo: 'diagnostico',
       cliente_id: clienteId,
       questionario_data: (questionario?.respostas as Record<string, unknown>) ?? null,
-      transcricoes_textos: transcricoesProntas.map((f) => ({
-        label: rotuloTranscricao(f),
-        conteudo: f.conteudo!,
-      })),
+      // Fluxo novo: envia sumarios_ids (map-reduce). Só envia transcrições brutas
+      // como fallback para as fontes que ainda não têm sumário.
+      sumarios_ids: sumariosIds,
+      transcricoes_textos: transcricoesProntas
+        .filter((f) => !f.sumarioId)
+        .map((f) => ({
+          label: rotuloTranscricao(f),
+          conteudo: f.conteudo!,
+        })),
       anotacoes_consultor: anotacoesConcatenadas || undefined,
     });
   };
@@ -856,7 +989,22 @@ export function AgentesTab({ clienteId }: Props) {
                             <Loader2 className="h-3 w-3 animate-spin" /> processando
                           </Badge>
                         )}
-                        {f.status === 'done' && (
+                        {f.status === 'done' && f.sumarioStatus === 'sumarizando' && (
+                          <Badge variant="secondary" className="text-[10px] gap-1">
+                            <Loader2 className="h-3 w-3 animate-spin" /> sumarizando
+                          </Badge>
+                        )}
+                        {f.status === 'done' && f.sumarioStatus === 'ok' && (
+                          <Badge variant="outline" className="text-[10px] text-emerald-500 border-emerald-500/40">
+                            {f.numCharsOriginal && f.numCharsSumario
+                              ? `sumário ${Math.max(1, Math.round((f.numCharsSumario / f.numCharsOriginal) * 100))}% do original`
+                              : 'sumário pronto'}
+                          </Badge>
+                        )}
+                        {f.status === 'done' && f.sumarioStatus === 'erro' && (
+                          <Badge variant="destructive" className="text-[10px]">falha sumário</Badge>
+                        )}
+                        {f.status === 'done' && !f.sumarioStatus && (
                           <Badge variant="outline" className="text-[10px] text-emerald-500 border-emerald-500/40">
                             pronto
                           </Badge>
@@ -868,6 +1016,16 @@ export function AgentesTab({ clienteId }: Props) {
                           <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
+                      {f.sumarioStatus === 'erro' && (
+                        <div className="pl-6 space-y-1.5">
+                          <p className="text-[11px] text-destructive leading-snug">
+                            {f.sumarioErro ?? 'Falha ao sumarizar.'}
+                          </p>
+                          <Button size="sm" variant="outline" className="h-6 text-[11px]" onClick={() => tentarSumarizar(f.id)}>
+                            <RefreshCw className="h-3 w-3 mr-1" /> Tentar novamente
+                          </Button>
+                        </div>
+                      )}
                       {f.status === 'error' && (
                         <div className="pl-6 space-y-1.5">
                           <p className="text-[11px] text-destructive leading-snug">

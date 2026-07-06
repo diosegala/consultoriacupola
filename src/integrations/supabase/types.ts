@@ -1778,6 +1778,53 @@ export type Database = {
           },
         ]
       }
+      transcricoes_sumarios: {
+        Row: {
+          cliente_id: string
+          created_at: string
+          created_by: string | null
+          data_entrevista: string | null
+          hash_conteudo: string | null
+          id: string
+          label: string
+          num_chars_original: number | null
+          papel: string | null
+          sumario: string
+        }
+        Insert: {
+          cliente_id: string
+          created_at?: string
+          created_by?: string | null
+          data_entrevista?: string | null
+          hash_conteudo?: string | null
+          id?: string
+          label: string
+          num_chars_original?: number | null
+          papel?: string | null
+          sumario: string
+        }
+        Update: {
+          cliente_id?: string
+          created_at?: string
+          created_by?: string | null
+          data_entrevista?: string | null
+          hash_conteudo?: string | null
+          id?: string
+          label?: string
+          num_chars_original?: number | null
+          papel?: string | null
+          sumario?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transcricoes_sumarios_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
