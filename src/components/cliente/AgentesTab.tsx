@@ -378,6 +378,22 @@ export function AgentesTab({ clienteId }: Props) {
   const diagnosticoDoc = lastByTipo.get('diagnostico');
   const okrsDoc = lastByTipo.get('okrs');
 
+  const TITULO_TIPO: Record<string, string> = {
+    diagnostico: 'Diagnóstico',
+    okrs: 'OKRs',
+    briefing_cliente_oculto: 'Briefing Cliente Oculto',
+  };
+
+  const handleCriarGdocRetro = (doc: ProjetoDocumento) => {
+    const nomeCliente = cliente?.nome ?? '';
+    const dataFmt = format(new Date(doc.created_at), 'dd/MM/yyyy');
+    const titulo = `${TITULO_TIPO[doc.tipo] ?? doc.tipo}${nomeCliente ? ` — ${nomeCliente}` : ''} — ${dataFmt}`;
+    criarGdocRetro.mutate({ documento_id: doc.id, titulo, conteudo: doc.conteudo });
+  };
+  const criandoGdocDocId = criarGdocRetro.isPending
+    ? (criarGdocRetro.variables?.documento_id ?? null)
+    : null;
+
   const respostasDisponiveis = useMemo(() => {
     if (!questionario?.respostas) return 0;
     return Object.values(questionario.respostas).filter((v) => {
