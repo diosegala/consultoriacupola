@@ -86,6 +86,7 @@ export function useGerarDocumento() {
       cliente_id?: string;
       contexto_usuario?: string;
       transcricoes_textos?: Array<{ label?: string; conteudo: string }>;
+      sumarios_ids?: string[];
       questionario_data?: Record<string, unknown> | null;
       anotacoes_consultor?: string;
       trimestre?: string;
