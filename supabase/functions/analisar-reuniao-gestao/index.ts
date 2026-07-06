@@ -80,6 +80,52 @@ serve(async (req) => {
     const tipoLabel = reuniao.tipo === "individual" ? "1:1" : "reunião de equipe";
     const participantes = (reuniao.participantes ?? []).join(", ");
 
+    // --- Contexto DISC (diretor + participantes) ---
+    let contextoDisc = "";
+    try {
+      const diretorId = reuniao.diretor_id as string;
+      const { data: perfilDir } = await admin
+        .from("perfis_comportamentais")
+        .select("perfil_resumo").eq("consultor_id", diretorId).maybeSingle();
+
+      // Mapeia participantes (primeiro nome) → consultor
+      const { data: consAtivos } = await admin
+        .from("consultores").select("id, nome").eq("ativo", true);
+      const consMatched = (reuniao.participantes ?? [])
+        .map((p: string) => {
+          const first = (p ?? "").trim().split(/\s+/)[0].toLowerCase();
+          return (consAtivos ?? []).find((c: any) =>
+            (c.nome ?? "").toLowerCase().startsWith(first));
+        })
+        .filter(Boolean) as Array<{ id: string; nome: string }>;
+
+      const partes: string[] = [];
+      if (perfilDir?.perfil_resumo) {
+        const p = perfilDir.perfil_resumo as any;
+        partes.push(`Perfil DISC do diretor: ${p.perfil_primario}/${p.perfil_secundario} — ${p.estilo_comunicacao ?? ""}. Pontos de atenção: ${(p.pontos_de_atencao ?? []).join("; ")}.`);
+      }
+      for (const c of consMatched) {
+        const { data: perfC } = await admin
+          .from("perfis_comportamentais").select("perfil_resumo").eq("consultor_id", c.id).maybeSingle();
+        if (perfC?.perfil_resumo) {
+          const p = perfC.perfil_resumo as any;
+          partes.push(`Perfil DISC de ${c.nome.split(/\s+/)[0]}: ${p.perfil_primario}/${p.perfil_secundario} — ${p.estilo_comunicacao ?? ""}. Necessidades: ${(p.necessidades_do_ambiente ?? []).join("; ")}.`);
+        }
+        const { data: cruz } = await admin
+          .from("cruzamentos_disc").select("analise")
+          .eq("diretor_id", diretorId).eq("consultor_id", c.id).maybeSingle();
+        if (cruz?.analise) {
+          const a = cruz.analise as any;
+          partes.push(`Dinâmica ${c.nome.split(/\s+/)[0]} × diretor — pontos de tensão: ${(a.pontos_de_tensao ?? []).join("; ")}. Recomendações: ${(a.recomendacoes_comunicacao ?? []).join("; ")}.`);
+        }
+      }
+      if (partes.length) {
+        contextoDisc = `\n\nCONTEXTO DISC (use para contextualizar a análise — por exemplo, se o diretor é D alto e a consultora é S alto, avalie se ele deu espaço para ela se posicionar e se ela conseguiu expressar discordância):\n${partes.join("\n")}\n`;
+      }
+    } catch (discErr) {
+      console.error("[analisar-reuniao-gestao] DISC contexto falhou:", discErr);
+    }
+
     const systemPrompt = `Você é um analista de qualidade de gestão de equipes de consultoria.
 Analise a transcrição de uma ${tipoLabel} conduzida pelo diretor de consultoria com sua equipe. Foque no COMPORTAMENTO DE LIDERANÇA do diretor.
 
@@ -91,7 +137,7 @@ Avalie estas 5 dimensões (nota 0-10 cada):
 5. Desenvolvimento — investe em crescimento (perguntas de reflexão, sugestões de repertório, coaching)?
 
 Extraia também: pontos fortes (3-5), 1 sugestão principal de melhoria, e ações combinadas (com responsável e prazo se explícitos).
-Retorne via a função fornecida. Seja específico, sem generalidades.`;
+Retorne via a função fornecida. Seja específico, sem generalidades. Se houver contexto DISC abaixo, personalize a sugestão de melhoria ao par específico.${contextoDisc}`;
 
     const userPrompt = `Diretor: ${reuniao.consultores?.nome ?? "—"}
 Tipo: ${tipoLabel}

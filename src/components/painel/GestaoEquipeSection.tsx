@@ -22,6 +22,8 @@ import { format, subDays, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { EventoFormDialog } from '@/components/agenda/EventoFormDialog';
+import { usePerfisDiscBatch } from '@/hooks/useDisc';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 type RadarConsultor = {
   id: string;
@@ -222,6 +224,8 @@ export function GestaoEquipeSection({ userId }: { userId: string | null }) {
   const { data: alertas, isLoading: loadingAlertas } = useAlertasSentimento(userId);
   const { data: reunioesGestao, isLoading: loadingRG } = useReunioesGestao(undefined);
   const { data: lembretes, isLoading: loadingLembretes } = useLembretesGestao(userId);
+  const consultorIds = useMemo(() => (radar ?? []).map((c) => c.id), [radar]);
+  const { data: discMap } = usePerfisDiscBatch(consultorIds);
 
   const [agendarPara, setAgendarPara] = useState<{ consultora: string; cliente: string } | null>(null);
 
@@ -257,6 +261,7 @@ export function GestaoEquipeSection({ userId }: { userId: string | null }) {
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
               {radar!.map((c) => {
                 const totalAlertas = c.alertas.sem_contato + c.alertas.checklist_parado + c.alertas.compromisso_vencido;
+                const disc = discMap?.get(c.id) ?? null;
                 return (
                   <Link
                     key={c.id}
@@ -268,11 +273,50 @@ export function GestaoEquipeSection({ userId }: { userId: string | null }) {
                         <p className="text-sm font-semibold text-foreground truncate">{c.nome}</p>
                         <p className="text-[10px] text-muted-foreground">Portfólio ativo</p>
                       </div>
-                      {totalAlertas > 0 && (
-                        <Badge variant="outline" className="bg-destructive/15 text-destructive border-destructive/30 text-[10px]">
-                          {totalAlertas} alerta{totalAlertas > 1 ? 's' : ''}
-                        </Badge>
-                      )}
+                      <div className="flex items-center gap-1 shrink-0">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              {disc ? (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] cursor-help bg-primary/10 text-primary border-primary/30"
+                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                >
+                                  {disc.perfil_primario}/{disc.perfil_secundario}
+                                </Badge>
+                              ) : (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] cursor-help bg-muted text-muted-foreground"
+                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                >
+                                  DISC pendente
+                                </Badge>
+                              )}
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-xs">
+                              {disc ? (
+                                <div className="space-y-1">
+                                  <p className="text-[11px] font-semibold">{disc.perfil_primario}/{disc.perfil_secundario} — pontos de atenção</p>
+                                  <ul className="text-[11px] list-disc list-inside">
+                                    {(disc.pontos_de_atencao ?? []).slice(0, 3).map((s, i) => <li key={i}>{s}</li>)}
+                                  </ul>
+                                </div>
+                              ) : (
+                                <Link to={`/consultores/${c.id}`} className="text-[11px] underline">
+                                  Cadastrar DISC na página do consultor
+                                </Link>
+                              )}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        {totalAlertas > 0 && (
+                          <Badge variant="outline" className="bg-destructive/15 text-destructive border-destructive/30 text-[10px]">
+                            {totalAlertas}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                     <div className="grid grid-cols-3 gap-2 text-[11px]">
                       <div>

@@ -33,10 +33,13 @@ import { useParseDocumento } from '@/hooks/useProjetoDocumentos';
 import { useProjetosEtapas, useUpdateEtapaStatusCliente } from '@/hooks/useProjetos';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { DiscProfileCard } from '@/components/disc/DiscProfileCard';
+import { useMyConsultorId } from '@/hooks/useDisc';
 
 export default function Configuracoes() {
   const { toast } = useToast();
-  const { isAdmin, user } = useAuth();
+  const { isAdmin, isDirector, user } = useAuth();
+  const { data: myConsultorId } = useMyConsultorId();
   const navigate = useNavigate();
   
   // Tipos de Consultoria
@@ -416,6 +419,7 @@ export default function Configuracoes() {
 
         {/* Minha Conta */}
         <TabsContent value="conta" className="mt-6">
+          <div className="space-y-6">
           <Card className="bg-card border-border max-w-md">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-foreground">
@@ -438,6 +442,11 @@ export default function Configuracoes() {
               </Button>
             </CardContent>
           </Card>
+
+          {myConsultorId && (
+            <DiscProfileCard consultor_id={myConsultorId} canEdit={isAdmin || isDirector} />
+          )}
+          </div>
         </TabsContent>
 
         {/* Usuários (admin only) */}

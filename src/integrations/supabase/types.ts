@@ -676,6 +676,51 @@ export type Database = {
         }
         Relationships: []
       }
+      cruzamentos_disc: {
+        Row: {
+          analise: Json
+          consultor_id: string
+          created_at: string
+          diretor_id: string
+          gerado_em: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          analise: Json
+          consultor_id: string
+          created_at?: string
+          diretor_id: string
+          gerado_em?: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          analise?: Json
+          consultor_id?: string
+          created_at?: string
+          diretor_id?: string
+          gerado_em?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cruzamentos_disc_consultor_id_fkey"
+            columns: ["consultor_id"]
+            isOneToOne: false
+            referencedRelation: "consultores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cruzamentos_disc_diretor_id_fkey"
+            columns: ["diretor_id"]
+            isOneToOne: false
+            referencedRelation: "consultores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       encerramentos: {
         Row: {
           classificacao: Database["public"]["Enums"]["classificacao_encerramento"]
@@ -1284,6 +1329,50 @@ export type Database = {
             columns: ["contrato_id"]
             isOneToOne: false
             referencedRelation: "contratos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      perfis_comportamentais: {
+        Row: {
+          consultor_id: string
+          created_at: string
+          data_avaliacao: string | null
+          id: string
+          pdf_url: string | null
+          perfil_resumo: Json
+          raw_text: string | null
+          tipo_avaliacao: string
+          updated_at: string
+        }
+        Insert: {
+          consultor_id: string
+          created_at?: string
+          data_avaliacao?: string | null
+          id?: string
+          pdf_url?: string | null
+          perfil_resumo: Json
+          raw_text?: string | null
+          tipo_avaliacao?: string
+          updated_at?: string
+        }
+        Update: {
+          consultor_id?: string
+          created_at?: string
+          data_avaliacao?: string | null
+          id?: string
+          pdf_url?: string | null
+          perfil_resumo?: Json
+          raw_text?: string | null
+          tipo_avaliacao?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "perfis_comportamentais_consultor_id_fkey"
+            columns: ["consultor_id"]
+            isOneToOne: true
+            referencedRelation: "consultores"
             referencedColumns: ["id"]
           },
         ]

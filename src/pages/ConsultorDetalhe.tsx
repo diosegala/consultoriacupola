@@ -7,6 +7,10 @@ import { Loader2, ArrowLeft, Users, DollarSign, Star, Video, FileDown } from 'lu
 import { useConsultoresComStats } from '@/hooks/useConsultores';
 import { useReunioesByConsultor, useScoreConsultor } from '@/hooks/useReunioes';
 import { ReunioesList } from '@/components/consultor/ReunioesList';
+import { DiscProfileCard } from '@/components/disc/DiscProfileCard';
+import { DiscCruzamentoCard } from '@/components/disc/DiscCruzamentoCard';
+import { useAuth } from '@/contexts/AuthContext';
+import { useMyConsultorId } from '@/hooks/useDisc';
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('pt-BR', {
@@ -23,6 +27,8 @@ export default function ConsultorDetalhe() {
   const { data: consultores, isLoading: loadingConsultor } = useConsultoresComStats();
   const { data: reunioes, isLoading: loadingReunioes } = useReunioesByConsultor(id);
   const { data: scoreData } = useScoreConsultor(id);
+  const { isAdmin, isDirector } = useAuth();
+  const { data: myConsultorId } = useMyConsultorId();
 
   const consultor = consultores?.find(c => c.id === id);
 
@@ -144,6 +150,19 @@ export default function ConsultorDetalhe() {
           <ReunioesList reunioes={reunioes} isLoading={loadingReunioes} linkCliente />
         </CardContent>
       </Card>
+
+      {(isAdmin || isDirector) && id && (
+        <>
+          <DiscProfileCard consultor_id={id} canEdit />
+          {myConsultorId && myConsultorId !== id && (
+            <DiscCruzamentoCard
+              diretor_id={myConsultorId}
+              consultor_id={id}
+              consultor_nome={consultor.nome}
+            />
+          )}
+        </>
+      )}
     </div>
   );
 }
