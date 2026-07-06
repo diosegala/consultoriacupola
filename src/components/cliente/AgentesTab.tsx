@@ -644,6 +644,7 @@ export function AgentesTab({ clienteId }: Props) {
     diagnostico: 'Diagnóstico',
     okrs: 'OKRs',
     briefing_cliente_oculto: 'Briefing Cliente Oculto',
+    balanco_periodo: 'Balanço do Período',
   };
 
   const handleCriarGdocRetro = (doc: ProjetoDocumento) => {
