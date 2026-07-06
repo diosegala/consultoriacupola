@@ -38,7 +38,7 @@ import { useMyConsultorId } from '@/hooks/useDisc';
 
 export default function Configuracoes() {
   const { toast } = useToast();
-  const { isAdmin, user } = useAuth();
+  const { isAdmin, isDirector, user } = useAuth();
   const { data: myConsultorId } = useMyConsultorId();
   const navigate = useNavigate();
   
@@ -444,7 +444,7 @@ export default function Configuracoes() {
           </Card>
 
           {myConsultorId && (
-            <DiscProfileCard consultor_id={myConsultorId} canEdit={isAdmin} />
+            <DiscProfileCard consultor_id={myConsultorId} canEdit={isAdmin || isDirector} />
           )}
           </div>
         </TabsContent>
