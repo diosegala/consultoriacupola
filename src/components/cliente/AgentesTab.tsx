@@ -56,6 +56,18 @@ const PAPEIS_SUGERIDOS = [
   'Outro',
 ];
 
+const MAX_UPLOAD_BYTES = 6 * 1024 * 1024; // 6 MB
+const EXTENSOES_PERMITIDAS = ['txt', 'pdf', 'docx', 'vtt', 'srt'];
+
+function extensaoArquivo(nome: string) {
+  const idx = nome.lastIndexOf('.');
+  return idx >= 0 ? nome.slice(idx + 1).toLowerCase() : '';
+}
+
+function formatarTamanhoMB(bytes: number) {
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 interface SecaoAnotacao {
   key: string;
   titulo: string;
