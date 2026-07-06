@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase as sb } from '@/integrations/supabase/client';
+// Table types are regenerated post-migration; cast to any until then.
+const supabase = sb as any;
 
 export interface ClienteArquivo {
   id: string;
