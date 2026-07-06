@@ -20,10 +20,12 @@ Seja direto, use tópicos curtos em markdown e não invente informações que n�
 
 const MAX_PROMPT_BASE_CHARS = 4_000;
 const MAX_DOCUMENTO_MODELO_CHARS = 3_000;
-const MAX_HISTORICO_DOC_CHARS = 1_500;
+const MAX_HISTORICO_DOC_CHARS = 6_000;
 const MAX_HISTORICO_DOCS = 2;
-const MAX_TRANSCRICAO_CHARS = 5_000;
-const MAX_TRANSCRICOES = 2;
+// Transcrições legadas (sem sumário) continuam sendo truncadas para conter o custo,
+// mas o fluxo novo passa por sumarios_ids que não sofrem truncamento aqui.
+const MAX_TRANSCRICAO_CHARS_LEGADO = 5_000;
+const MAX_TRANSCRICOES_LEGADO = 2;
 const MAX_QUESTIONARIO_CHARS = 4_000;
 const MAX_CONTEXTO_USUARIO_CHARS = 2_500;
 const MAX_ANOTACOES_CHARS = 3_000;
@@ -111,6 +113,7 @@ serve(async (req) => {
       cliente_id: cliente_id_in,
       contexto_usuario,
       transcricoes_textos,
+      sumarios_ids,
       questionario_data,
       anotacoes_consultor,
       trimestre,
@@ -122,6 +125,7 @@ serve(async (req) => {
       cliente_id?: string | null;
       contexto_usuario?: string;
       transcricoes_textos?: Array<{ label?: string; conteudo: string }>;
+      sumarios_ids?: string[];
       questionario_data?: Record<string, unknown> | null;
       anotacoes_consultor?: string;
       trimestre?: string;
@@ -291,18 +295,44 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
 
     const transcricoesSectionLimitada = transcricoesValidas.length
       ? `\n\n## Transcrições das Entrevistas da Imersão\n${transcricoesValidas
-          .slice(0, MAX_TRANSCRICOES)
-          .map((t, i) => `\n### ${t.label || `Transcrição ${i + 1}`}\n${limitarTexto(t.conteudo, MAX_TRANSCRICAO_CHARS)}`)
+          .slice(0, MAX_TRANSCRICOES_LEGADO)
+          .map((t, i) => `\n### ${t.label || `Transcrição ${i + 1}`}\n${limitarTexto(t.conteudo, MAX_TRANSCRICAO_CHARS_LEGADO)}`)
           .join("\n")}`
       : '';
 
-    if ((transcricoes_textos?.length ?? 0) > 0 && transcricoesValidas.length === 0 && !questionarioSection && !anotacoesSection && !contextoUsuarioSection) {
+    // Buscar sumários por ID (fluxo novo, sem truncamento)
+    let sumariosSection = "";
+    if (sumarios_ids && sumarios_ids.length > 0) {
+      const { data: sumariosData, error: sumErr } = await serviceClient
+        .from("transcricoes_sumarios")
+        .select("id, label, papel, data_entrevista, sumario, num_chars_original")
+        .in("id", sumarios_ids)
+        .eq("cliente_id", clienteId!);
+      if (sumErr) console.warn("sumarios_ids fetch falhou:", sumErr);
+      if (sumariosData?.length) {
+        sumariosSection = `\n\n## Sumários das Entrevistas da Imersão (produzidos a partir das transcrições completas)\n${sumariosData
+          .map((s: any) => {
+            const cab = `### ${s.label ?? "Entrevista"}${s.papel ? ` — ${s.papel}` : ""}${s.data_entrevista ? ` (${s.data_entrevista})` : ""}`;
+            return `${cab}\n${s.sumario}`;
+          })
+          .join("\n\n")}`;
+      }
+    }
+
+    const temFonteRelevante =
+      transcricoesValidas.length > 0 ||
+      sumariosSection ||
+      questionarioSection ||
+      anotacoesSection ||
+      contextoUsuarioSection;
+
+    if ((transcricoes_textos?.length ?? 0) > 0 && transcricoesValidas.length === 0 && !temFonteRelevante) {
       return new Response(JSON.stringify({
         error: "As transcrições anexadas não puderam ser lidas corretamente. Reprocesse os links/arquivos antes de gerar o diagnóstico.",
       }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const promptCompleto = `${promptBase}${historicoSection}\n\n---\n\nINFORMAÇÕES DO CLIENTE:\n\n${contexto}${questionarioSection}${transcricoesSectionLimitada}${anotacoesSection}${trimestreSection}${canaisSection}${contextoUsuarioSection}${documentoModeloSection}`;
+    const promptCompleto = `${promptBase}${historicoSection}\n\n---\n\nINFORMAÇÕES DO CLIENTE:\n\n${contexto}${questionarioSection}${sumariosSection}${transcricoesSectionLimitada}${anotacoesSection}${trimestreSection}${canaisSection}${contextoUsuarioSection}${documentoModeloSection}`;
 
     let conteudo = "";
     let lastStatus = 500;
@@ -324,9 +354,9 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
           model: "gpt-4o",
           messages: [
             { role: "system", content: `${promptBase}${historicoSection}` },
-            { role: "user", content: `${contexto}${questionarioSection}${transcricoesSectionLimitada}${anotacoesSection}${trimestreSection}${canaisSection}${contextoUsuarioSection}${documentoModeloSection}` },
+            { role: "user", content: `${contexto}${questionarioSection}${sumariosSection}${transcricoesSectionLimitada}${anotacoesSection}${trimestreSection}${canaisSection}${contextoUsuarioSection}${documentoModeloSection}` },
           ],
-          temperature: 0.7,
+          temperature: 0.4,
           max_tokens: 8000,
         }),
       });
@@ -348,37 +378,79 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
         return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY não configurada. Adicione a chave nas configurações para usar Claude." }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       const anthropicModel = "claude-sonnet-4-5";
-      const anthropicResponse = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": ANTHROPIC_API_KEY,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: anthropicModel,
-          max_tokens: 8000,
-          system: `${promptBase}${historicoSection}`,
-          messages: [
-            { role: "user", content: `${contexto}${questionarioSection}${transcricoesSectionLimitada}${anotacoesSection}${trimestreSection}${canaisSection}${contextoUsuarioSection}${documentoModeloSection}` },
-          ],
-        }),
-      });
-      if (anthropicResponse.ok) {
-        const anthropicData = await anthropicResponse.json();
+      const systemPrompt = `${promptBase}${historicoSection}`;
+      const userPrompt = `${contexto}${questionarioSection}${sumariosSection}${transcricoesSectionLimitada}${anotacoesSection}${trimestreSection}${canaisSection}${contextoUsuarioSection}${documentoModeloSection}`;
+
+      const messages: Array<{ role: string; content: string }> = [
+        { role: "user", content: userPrompt },
+      ];
+
+      const chamarAnthropic = async () => {
+        for (let tentativa = 1; tentativa <= 3; tentativa++) {
+          const res = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-api-key": ANTHROPIC_API_KEY,
+              "anthropic-version": "2023-06-01",
+            },
+            body: JSON.stringify({
+              model: anthropicModel,
+              max_tokens: 8000,
+              temperature: 0.4,
+              system: systemPrompt,
+              messages,
+            }),
+          });
+          if (res.ok) return { ok: true as const, json: await res.json() };
+          const errText = await res.text();
+          if (res.status === 429 && tentativa < 3) {
+            console.warn("[agente-projeto] 429 recebido, aguardando 30s (tentativa " + tentativa + "/3)");
+            await new Promise((r) => setTimeout(r, 30_000));
+            continue;
+          }
+          return { ok: false as const, status: res.status, text: errText };
+        }
+        return { ok: false as const, status: 429, text: "rate limited" };
+      };
+
+      let anthropicResult = await chamarAnthropic();
+      let totalIn = 0;
+      let totalOut = 0;
+
+      if (anthropicResult.ok) {
+        const anthropicData = anthropicResult.json;
         conteudo = anthropicData.content?.[0]?.text ?? "";
+        totalIn += Number(anthropicData?.usage?.input_tokens ?? 0);
+        totalOut += Number(anthropicData?.usage?.output_tokens ?? 0);
+
+        // Continuações se stop_reason === max_tokens (até 2)
+        let stopReason: string | undefined = anthropicData?.stop_reason;
+        for (let cont = 0; cont < 2 && stopReason === "max_tokens" && conteudo; cont++) {
+          messages.push({ role: "assistant", content: conteudo });
+          messages.push({ role: "user", content: "Continue exatamente de onde parou, sem repetir o que já foi escrito. Mantenha a formatação e o tom." });
+          const contRes = await chamarAnthropic();
+          if (!contRes.ok) break;
+          const trecho = contRes.json.content?.[0]?.text ?? "";
+          if (!trecho) break;
+          conteudo += trecho;
+          totalIn += Number(contRes.json?.usage?.input_tokens ?? 0);
+          totalOut += Number(contRes.json?.usage?.output_tokens ?? 0);
+          stopReason = contRes.json?.stop_reason;
+          // ajusta última mensagem assistant para o texto acumulado (para próxima iteração)
+          messages[messages.length - 2] = { role: "assistant", content: conteudo };
+          messages.pop();
+        }
+
         // Registra uso (best-effort) — preço Claude Sonnet 4.5: $3/MTok in, $15/MTok out
         try {
-          const usage = anthropicData.usage ?? {};
-          const inTok = Number(usage.input_tokens ?? 0);
-          const outTok = Number(usage.output_tokens ?? 0);
-          const cost = (inTok / 1_000_000) * 3 + (outTok / 1_000_000) * 15;
+          const cost = (totalIn / 1_000_000) * 3 + (totalOut / 1_000_000) * 15;
           await serviceClient.from("ai_usage_logs").insert({
             provider: "anthropic",
             model: anthropicModel,
             agente_tipo: tipo,
-            input_tokens: inTok,
-            output_tokens: outTok,
+            input_tokens: totalIn,
+            output_tokens: totalOut,
             cost_usd: cost,
             cliente_id: clienteId,
             consultor_id: consultorIdContexto,
@@ -389,10 +461,9 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
           console.warn("ai_usage_logs insert falhou:", logErr);
         }
       } else {
-        const errText = await anthropicResponse.text();
-        console.error("Anthropic API error:", anthropicResponse.status, errText);
-        lastStatus = anthropicResponse.status;
-        lastErrorMessage = extrairMensagemErroAnthropic(anthropicResponse.status, errText);
+        console.error("Anthropic API error:", anthropicResult.status, anthropicResult.text);
+        lastStatus = anthropicResult.status;
+        lastErrorMessage = extrairMensagemErroAnthropic(anthropicResult.status, anthropicResult.text);
         try {
           await serviceClient.from("ai_usage_logs").insert({
             provider: "anthropic",
