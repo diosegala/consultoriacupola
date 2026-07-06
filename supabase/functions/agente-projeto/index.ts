@@ -214,6 +214,7 @@ serve(async (req) => {
       okrs: ["diagnostico", "okrs"],
       briefing_cliente_oculto: ["diagnostico", "okrs"],
       diagnostico: ["diagnostico"],
+      balanco_periodo: ["diagnostico", "okrs", "briefing_cliente_oculto"],
     };
     const tiposRelevantes = relevanciaPorTipo[tipo] ?? [];
     const docsFiltrados = (docsHistorico ?? []).filter((d: any) =>
@@ -294,6 +295,99 @@ ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observaçõe
     const documentoModeloSection = documentoModelo
       ? `\n\n## Documento Modelo de Referência\n${documentoModelo}\n\nUse o documento acima como referência de estilo, tom e estrutura.`
       : '';
+
+    // === Contexto específico do agente Balanço do Período ===
+    let balancoSection = "";
+    if (isBalanco) {
+      // Contrato ativo (ou aceitar período custom)
+      const { data: contratoAtivo } = await supabase
+        .from("contratos")
+        .select("id, data_inicio, data_fim, valor_total, tipo_consultoria_id, tipos_consultoria(nome)")
+        .eq("cliente_id", clienteId!)
+        .eq("ativo", true)
+        .order("data_inicio", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const inicio = periodo_inicio || contratoAtivo?.data_inicio || null;
+      const fim = periodo_fim || contratoAtivo?.data_fim || null;
+
+      // Reuniões do período (todas analisadas)
+      let reuniaoQ = supabase
+        .from("reunioes")
+        .select("data_reuniao, duracao_minutos, resumo_ia, score_ia, score_cliente")
+        .eq("cliente_id", clienteId!)
+        .eq("status_analise", "concluido")
+        .order("data_reuniao", { ascending: true });
+      if (inicio) reuniaoQ = reuniaoQ.gte("data_reuniao", inicio);
+      if (fim) reuniaoQ = reuniaoQ.lte("data_reuniao", fim);
+      const { data: reunioesPeriodo } = await reuniaoQ;
+
+      // Compromissos do período
+      let compQ = supabase
+        .from("compromissos")
+        .select("descricao, responsavel, status, prazo, created_at")
+        .eq("cliente_id", clienteId!)
+        .order("created_at", { ascending: true });
+      if (inicio) compQ = compQ.gte("created_at", inicio);
+      if (fim) compQ = compQ.lte("created_at", fim + "T23:59:59");
+      const { data: compromissosPeriodo } = await compQ;
+
+      const totalComp = compromissosPeriodo?.length ?? 0;
+      const contaPorResp = (resp: string) => (compromissosPeriodo ?? []).filter((c: any) => c.responsavel === resp);
+      const compCliente = contaPorResp("cliente");
+      const compConsultor = contaPorResp("consultor");
+      const concluidos = (arr: any[]) => arr.filter((c) => c.status === "concluido").length;
+      const taxa = (arr: any[]) => (arr.length ? Math.round((concluidos(arr) / arr.length) * 100) : 0);
+
+      // Documentos do período (com corte por 6000 chars)
+      let docsQ = serviceClient
+        .from("projeto_documentos")
+        .select("tipo, conteudo, created_at")
+        .eq("cliente_id", clienteId!)
+        .in("tipo", ["diagnostico", "okrs", "briefing_cliente_oculto"])
+        .order("created_at", { ascending: true });
+      if (inicio) docsQ = docsQ.gte("created_at", inicio);
+      if (fim) docsQ = docsQ.lte("created_at", fim + "T23:59:59");
+      const { data: docsPeriodo } = await docsQ;
+
+      // Checklist do projeto (se houver)
+      let checklistPeriodo: any[] = [];
+      if (projeto_id) {
+        const { data: cl } = await supabase
+          .from("projeto_checklist")
+          .select("titulo, concluido, updated_at")
+          .eq("projeto_id", projeto_id)
+          .order("updated_at", { ascending: true });
+        checklistPeriodo = cl ?? [];
+      }
+
+      const tipoConsult = (contratoAtivo as any)?.tipos_consultoria?.nome ?? "N/A";
+
+      balancoSection = `
+
+## Período de Referência
+- Início: ${inicio ?? "N/A"}
+- Fim: ${fim ?? "N/A"}
+- Tipo de consultoria: ${tipoConsult}
+
+## Reuniões do Período (${reunioesPeriodo?.length ?? 0} analisadas)
+${(reunioesPeriodo ?? []).map((r: any) => `- ${r.data_reuniao}${r.duracao_minutos ? ` (${r.duracao_minutos}min)` : ""} · score consultor ${r.score_ia ?? "-"} · score cliente ${r.score_cliente ?? "-"}\n  Resumo: ${r.resumo_ia ?? "(sem resumo)"}`).join("\n") || "Nenhuma reunião analisada no período."}
+
+## Compromissos do Período (${totalComp} totais)
+- Cliente: ${compCliente.length} totais, ${concluidos(compCliente)} concluídos (${taxa(compCliente)}%)
+- Consultor: ${compConsultor.length} totais, ${concluidos(compConsultor)} concluídos (${taxa(compConsultor)}%)
+
+### Detalhamento
+${(compromissosPeriodo ?? []).map((c: any) => `- [${c.status}] (${c.responsavel}${c.prazo ? ` até ${c.prazo}` : ""}) ${c.descricao}`).join("\n") || "Sem compromissos registrados no período."}
+
+## Documentos Produzidos no Período
+${(docsPeriodo ?? []).map((d: any) => `\n### ${d.tipo} — ${new Date(d.created_at).toLocaleDateString("pt-BR")}\n${limitarTexto(d.conteudo, 6_000)}`).join("\n\n") || "Nenhum documento gerado no período."}
+
+## Checklist do Projeto (concluídos)
+${checklistPeriodo.filter((c) => c.concluido).map((c: any) => `- [x] ${c.titulo}${c.updated_at ? ` (${new Date(c.updated_at).toLocaleDateString("pt-BR")})` : ""}`).join("\n") || "Sem itens concluídos registrados."}
+`.trim();
+    }
 
     const transcricoesValidas = (transcricoes_textos ?? []).filter((t) =>
       t?.conteudo && !conteudoInvalidoDeFonte(t.conteudo),
