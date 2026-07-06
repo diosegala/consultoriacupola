@@ -7,7 +7,8 @@ import { Separator } from '@/components/ui/separator';
 import { ReuniaoComDetalhes } from '@/hooks/useReunioes';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CheckCircle, AlertTriangle } from 'lucide-react';
+import { CheckCircle, AlertTriangle, CheckSquare, User } from 'lucide-react';
+import { useCompromissosPorReuniao } from '@/hooks/useCompromissos';
 
 interface ReuniaoAnaliseProps {
   reuniao: ReuniaoComDetalhes | null;
@@ -39,6 +40,7 @@ export function ReuniaoAnalise({ reuniao, open, onOpenChange }: ReuniaoAnalisePr
   if (!reuniao) return null;
 
   const analise = reuniao.analise_ia as Record<string, any> | null;
+  const { data: compromissos } = useCompromissosPorReuniao(reuniao.id);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -147,6 +149,29 @@ export function ReuniaoAnalise({ reuniao, open, onOpenChange }: ReuniaoAnalisePr
                     {reuniao.transcricao}
                   </pre>
                 </div>
+              </div>
+            )}
+
+            {(compromissos?.length ?? 0) > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+                  <CheckSquare className="h-4 w-4" /> Compromissos extraídos desta reunião
+                </h3>
+                <ul className="space-y-2">
+                  {compromissos!.map((c) => (
+                    <li key={c.id} className="rounded-md border border-border bg-background p-3 text-sm">
+                      <p className="text-foreground">{c.descricao}</p>
+                      <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs text-muted-foreground">
+                        <Badge variant="outline" className="gap-1">
+                          <User className="h-3 w-3" />
+                          {c.responsavel === 'cliente' ? 'Cliente' : 'Consultor'}
+                        </Badge>
+                        {c.prazo && <span>Prazo: {format(parseISO(c.prazo), 'dd/MM/yyyy')}</span>}
+                        <Badge variant="secondary" className="capitalize">{c.status}</Badge>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
           </div>
