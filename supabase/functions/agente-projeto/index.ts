@@ -10,6 +10,7 @@ const FALLBACK_PROMPTS: Record<string, string> = {
   diagnostico: "Você é um consultor sênior. Elabore um diagnóstico empresarial completo em markdown.",
   okrs: "Você é um especialista em OKRs. Crie OKRs para o próximo trimestre em markdown.",
   briefing_cliente_oculto: "Você é um especialista em cliente oculto. Elabore um briefing completo em markdown.",
+  balanco_periodo: "Você é um consultor sênior preparando o balanço de resultados do período para a conversa de renovação. Produza um documento em markdown estruturado, orientado a valor entregue, com números sempre que possível.",
   pre_analise: `Você recebeu transcrições de entrevistas de imersão em uma empresa. NÃO gere o diagnóstico ainda.
 Apenas:
 (1) liste os 10 temas mais recorrentes nas entrevistas com uma frase de resumo cada,
@@ -119,6 +120,8 @@ serve(async (req) => {
       trimestre,
       canais_atendimento,
       titulo_doc,
+      periodo_inicio,
+      periodo_fim,
     }: {
       tipo: string;
       projeto_id?: string | null;
@@ -131,18 +134,21 @@ serve(async (req) => {
       trimestre?: string;
       canais_atendimento?: string[];
       titulo_doc?: string;
+      periodo_inicio?: string | null;
+      periodo_fim?: string | null;
     } = await req.json();
 
     if (!tipo || (!projeto_id && !cliente_id_in)) {
       return new Response(JSON.stringify({ error: "tipo e (projeto_id OU cliente_id) são obrigatórios" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const validTypes = ["diagnostico", "okrs", "briefing_cliente_oculto", "pre_analise"];
+    const validTypes = ["diagnostico", "okrs", "briefing_cliente_oculto", "pre_analise", "balanco_periodo"];
     if (!validTypes.includes(tipo)) {
       return new Response(JSON.stringify({ error: "Tipo inválido." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const isPreAnalise = tipo === "pre_analise";
+    const isBalanco = tipo === "balanco_periodo";
 
     // Fetch prompt from database using service role
     const serviceClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
