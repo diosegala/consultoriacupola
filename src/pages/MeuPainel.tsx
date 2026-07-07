@@ -550,6 +550,14 @@ export default function MeuPainel() {
         clienteId={novaReuniao?.clienteId}
       />
       <NovaTarefaPessoalDialog open={novaTarefaOpen} onOpenChange={setNovaTarefaOpen} />
+      {interacaoAlvo && (
+        <RegistrarInteracaoDialog
+          open={!!interacaoAlvo}
+          onOpenChange={(o) => !o && setInteracaoAlvo(null)}
+          clienteId={interacaoAlvo.clienteId}
+          consultorId={consultorId ?? null}
+        />
+      )}
     </div>
   );
 }
