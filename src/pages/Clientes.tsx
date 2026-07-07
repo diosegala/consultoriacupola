@@ -220,6 +220,9 @@ export default function Clientes() {
                 <SelectItem value="ativo">Ativo</SelectItem>
                 <SelectItem value="aguardando_renovacao">Aguardando Renovação</SelectItem>
                 <SelectItem value="encerrado">Encerrado</SelectItem>
+                {canArchive && (
+                  <SelectItem value="arquivados">Arquivados</SelectItem>
+                )}
               </SelectContent>
             </Select>
 
@@ -391,12 +394,26 @@ export default function Clientes() {
                           >
                             Ver
                           </Button>
-                          {!isConsultor && (
-                            <Button 
-                              variant="ghost" 
+                          {canArchive && (
+                            <Button
+                              variant="ghost"
                               size="icon"
+                              title={cliente.arquivado_em ? 'Desarquivar' : 'Arquivar'}
+                              className="text-muted-foreground hover:text-foreground"
+                              onClick={(e) => openArchiveDialog(cliente, e)}
+                            >
+                              {cliente.arquivado_em
+                                ? <ArchiveRestore className="h-4 w-4" />
+                                : <Archive className="h-4 w-4" />}
+                            </Button>
+                          )}
+                          {canHardDelete && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Excluir permanentemente"
                               className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                              onClick={(e) => openDeleteDialog(cliente, e)}
+                              onClick={(e) => openHardDeleteDialog(cliente, e)}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -412,26 +429,86 @@ export default function Clientes() {
         </CardContent>
       </Card>
 
-      {/* Dialog de Confirmação de Exclusão */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      {/* Dialog de Arquivamento (soft delete) */}
+      <AlertDialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
         <AlertDialogContent className="bg-card border-border">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-foreground">Excluir Cliente</AlertDialogTitle>
+            <AlertDialogTitle className="text-foreground">
+              {clienteToArchive?.arquivado_em ? 'Desarquivar cliente' : 'Arquivar cliente'}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir o cliente <strong>{clienteToDelete?.nome}</strong>?
-              Esta ação irá remover também todos os contratos, atendimentos e dados relacionados.
-              <span className="block mt-2 text-destructive font-medium">Esta ação não pode ser desfeita.</span>
+              {clienteToArchive?.arquivado_em ? (
+                <>Restaurar <strong>{clienteToArchive?.nome}</strong> para as listagens normais?</>
+              ) : (
+                <>
+                  <strong>{clienteToArchive?.nome}</strong> será marcado como encerrado e
+                  removido das listagens padrão. Os dados históricos (contratos,
+                  atendimentos, reuniões) permanecem preservados e podem ser
+                  restaurados a qualquer momento.
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="border-border">Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDelete}
-              disabled={deleteCliente.isPending}
+              onClick={handleArchive}
+              disabled={arquivarCliente.isPending || desarquivarCliente.isPending}
+            >
+              {(arquivarCliente.isPending || desarquivarCliente.isPending) && (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              )}
+              {clienteToArchive?.arquivado_em ? 'Desarquivar' : 'Arquivar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog de Exclusão Permanente (admin only, confirmação por digitação) */}
+      <AlertDialog open={hardDeleteDialogOpen} onOpenChange={setHardDeleteDialogOpen}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" />
+              Excluir permanentemente
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  Você vai apagar <strong>{clienteToHardDelete?.nome}</strong> e
+                  <strong> todos os dados relacionados</strong> (contratos, atendimentos,
+                  onboarding, ferramentas, pausas, encerramentos, viagens, webhook logs).
+                </p>
+                <p className="text-destructive font-medium">
+                  Esta ação é irreversível. Prefira "Arquivar" sempre que possível.
+                </p>
+                <p>
+                  Para confirmar, digite o nome exato do cliente:
+                  <span className="block mt-1 text-foreground font-mono">
+                    {clienteToHardDelete?.nome}
+                  </span>
+                </p>
+                <Input
+                  value={hardDeleteConfirm}
+                  onChange={(e) => setHardDeleteConfirm(e.target.value)}
+                  placeholder="Digite o nome do cliente"
+                  className="bg-input border-border"
+                />
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-border">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleHardDelete}
+              disabled={
+                hardDeleteCliente.isPending ||
+                hardDeleteConfirm.trim() !== clienteToHardDelete?.nome
+              }
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleteCliente.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Excluir
+              {hardDeleteCliente.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Excluir permanentemente
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
