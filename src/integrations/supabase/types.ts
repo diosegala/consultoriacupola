@@ -365,6 +365,8 @@ export type Database = {
       }
       clientes: {
         Row: {
+          arquivado_em: string | null
+          arquivado_por: string | null
           cidade: string
           consultor_id: string | null
           created_at: string
@@ -376,6 +378,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          arquivado_em?: string | null
+          arquivado_por?: string | null
           cidade: string
           consultor_id?: string | null
           created_at?: string
@@ -387,6 +391,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          arquivado_em?: string | null
+          arquivado_por?: string | null
           cidade?: string
           consultor_id?: string | null
           created_at?: string

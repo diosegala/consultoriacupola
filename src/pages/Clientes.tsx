@@ -16,9 +16,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Search, Plus, Trash2, Loader2, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle } from 'lucide-react';
+import { Search, Plus, Trash2, Loader2, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle, Archive, ArchiveRestore } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useClientes, useDeleteCliente, ClienteComDetalhes } from '@/hooks/useClientes';
+import { useClientes, useArquivarCliente, useDesarquivarCliente, useHardDeleteCliente, ClienteComDetalhes } from '@/hooks/useClientes';
 import { useConsultores } from '@/hooks/useConsultores';
 import { useTiposConsultoria } from '@/hooks/useDadosAuxiliares';
 import { useToast } from '@/hooks/use-toast';
@@ -41,7 +41,9 @@ type SortDirection = 'asc' | 'desc';
 export default function Clientes() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { isConsultor } = useAuth();
+  const { isConsultor, isAdmin, isDirector } = useAuth();
+  const canArchive = isAdmin || isDirector;
+  const canHardDelete = isAdmin;
   const { data: myConsultorId } = useMyConsultorId();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
@@ -50,8 +52,11 @@ export default function Clientes() {
   const [sortField, setSortField] = useState<SortField>('nome');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [clienteToDelete, setClienteToDelete] = useState<ClienteComDetalhes | null>(null);
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [clienteToArchive, setClienteToArchive] = useState<ClienteComDetalhes | null>(null);
+  const [hardDeleteDialogOpen, setHardDeleteDialogOpen] = useState(false);
+  const [clienteToHardDelete, setClienteToHardDelete] = useState<ClienteComDetalhes | null>(null);
+  const [hardDeleteConfirm, setHardDeleteConfirm] = useState('');
 
   const effectiveConsultorId = isConsultor
     ? (myConsultorId || undefined)
@@ -59,13 +64,16 @@ export default function Clientes() {
 
   const { data: clientes, isLoading } = useClientes({
     search: search || undefined,
-    status: statusFilter !== 'todos' ? statusFilter : undefined,
+    status: (statusFilter !== 'todos' && statusFilter !== 'arquivados') ? statusFilter : undefined,
     consultor_id: effectiveConsultorId,
+    apenas_arquivados: statusFilter === 'arquivados',
   });
 
   const { data: consultores } = useConsultores();
   const { data: tiposConsultoria } = useTiposConsultoria();
-  const deleteCliente = useDeleteCliente();
+  const arquivarCliente = useArquivarCliente();
+  const desarquivarCliente = useDesarquivarCliente();
+  const hardDeleteCliente = useHardDeleteCliente();
 
   // Filtro adicional por tipo de consultoria e ordenação
   const clientesFiltrados = useMemo(() => {
@@ -128,29 +136,50 @@ export default function Clientes() {
       : <ArrowDown className="h-4 w-4 ml-1" />;
   };
 
-  const openDeleteDialog = (cliente: ClienteComDetalhes, e: React.MouseEvent) => {
+  const openArchiveDialog = (cliente: ClienteComDetalhes, e: React.MouseEvent) => {
     e.stopPropagation();
-    setClienteToDelete(cliente);
-    setDeleteDialogOpen(true);
+    setClienteToArchive(cliente);
+    setArchiveDialogOpen(true);
   };
 
-  const handleDelete = async () => {
-    if (!clienteToDelete) return;
+  const openHardDeleteDialog = (cliente: ClienteComDetalhes, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setClienteToHardDelete(cliente);
+    setHardDeleteConfirm('');
+    setHardDeleteDialogOpen(true);
+  };
 
+  const handleArchive = async () => {
+    if (!clienteToArchive) return;
     try {
-      await deleteCliente.mutateAsync(clienteToDelete.id);
-      toast({
-        title: 'Sucesso',
-        description: 'Cliente excluído com sucesso'
-      });
-      setDeleteDialogOpen(false);
-      setClienteToDelete(null);
+      if (clienteToArchive.arquivado_em) {
+        await desarquivarCliente.mutateAsync(clienteToArchive.id);
+        toast({ title: 'Sucesso', description: 'Cliente desarquivado' });
+      } else {
+        await arquivarCliente.mutateAsync(clienteToArchive.id);
+        toast({ title: 'Sucesso', description: 'Cliente arquivado' });
+      }
+      setArchiveDialogOpen(false);
+      setClienteToArchive(null);
     } catch (error: any) {
-      toast({
-        title: 'Erro',
-        description: error.message || 'Erro ao excluir cliente',
-        variant: 'destructive'
-      });
+      toast({ title: 'Erro', description: error.message || 'Falha na operação', variant: 'destructive' });
+    }
+  };
+
+  const handleHardDelete = async () => {
+    if (!clienteToHardDelete) return;
+    if (hardDeleteConfirm.trim() !== clienteToHardDelete.nome) {
+      toast({ title: 'Nome não confere', description: 'Digite o nome exato do cliente para confirmar.', variant: 'destructive' });
+      return;
+    }
+    try {
+      await hardDeleteCliente.mutateAsync(clienteToHardDelete.id);
+      toast({ title: 'Cliente excluído permanentemente' });
+      setHardDeleteDialogOpen(false);
+      setClienteToHardDelete(null);
+      setHardDeleteConfirm('');
+    } catch (error: any) {
+      toast({ title: 'Erro', description: error.message || 'Erro ao excluir cliente', variant: 'destructive' });
     }
   };
 
@@ -191,6 +220,9 @@ export default function Clientes() {
                 <SelectItem value="ativo">Ativo</SelectItem>
                 <SelectItem value="aguardando_renovacao">Aguardando Renovação</SelectItem>
                 <SelectItem value="encerrado">Encerrado</SelectItem>
+                {canArchive && (
+                  <SelectItem value="arquivados">Arquivados</SelectItem>
+                )}
               </SelectContent>
             </Select>
 
@@ -362,12 +394,26 @@ export default function Clientes() {
                           >
                             Ver
                           </Button>
-                          {!isConsultor && (
-                            <Button 
-                              variant="ghost" 
+                          {canArchive && (
+                            <Button
+                              variant="ghost"
                               size="icon"
+                              title={cliente.arquivado_em ? 'Desarquivar' : 'Arquivar'}
+                              className="text-muted-foreground hover:text-foreground"
+                              onClick={(e) => openArchiveDialog(cliente, e)}
+                            >
+                              {cliente.arquivado_em
+                                ? <ArchiveRestore className="h-4 w-4" />
+                                : <Archive className="h-4 w-4" />}
+                            </Button>
+                          )}
+                          {canHardDelete && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Excluir permanentemente"
                               className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                              onClick={(e) => openDeleteDialog(cliente, e)}
+                              onClick={(e) => openHardDeleteDialog(cliente, e)}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -383,26 +429,86 @@ export default function Clientes() {
         </CardContent>
       </Card>
 
-      {/* Dialog de Confirmação de Exclusão */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      {/* Dialog de Arquivamento (soft delete) */}
+      <AlertDialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
         <AlertDialogContent className="bg-card border-border">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-foreground">Excluir Cliente</AlertDialogTitle>
+            <AlertDialogTitle className="text-foreground">
+              {clienteToArchive?.arquivado_em ? 'Desarquivar cliente' : 'Arquivar cliente'}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir o cliente <strong>{clienteToDelete?.nome}</strong>?
-              Esta ação irá remover também todos os contratos, atendimentos e dados relacionados.
-              <span className="block mt-2 text-destructive font-medium">Esta ação não pode ser desfeita.</span>
+              {clienteToArchive?.arquivado_em ? (
+                <>Restaurar <strong>{clienteToArchive?.nome}</strong> para as listagens normais?</>
+              ) : (
+                <>
+                  <strong>{clienteToArchive?.nome}</strong> será marcado como encerrado e
+                  removido das listagens padrão. Os dados históricos (contratos,
+                  atendimentos, reuniões) permanecem preservados e podem ser
+                  restaurados a qualquer momento.
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="border-border">Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDelete}
-              disabled={deleteCliente.isPending}
+              onClick={handleArchive}
+              disabled={arquivarCliente.isPending || desarquivarCliente.isPending}
+            >
+              {(arquivarCliente.isPending || desarquivarCliente.isPending) && (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              )}
+              {clienteToArchive?.arquivado_em ? 'Desarquivar' : 'Arquivar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog de Exclusão Permanente (admin only, confirmação por digitação) */}
+      <AlertDialog open={hardDeleteDialogOpen} onOpenChange={setHardDeleteDialogOpen}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" />
+              Excluir permanentemente
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  Você vai apagar <strong>{clienteToHardDelete?.nome}</strong> e
+                  <strong> todos os dados relacionados</strong> (contratos, atendimentos,
+                  onboarding, ferramentas, pausas, encerramentos, viagens, webhook logs).
+                </p>
+                <p className="text-destructive font-medium">
+                  Esta ação é irreversível. Prefira "Arquivar" sempre que possível.
+                </p>
+                <p>
+                  Para confirmar, digite o nome exato do cliente:
+                  <span className="block mt-1 text-foreground font-mono">
+                    {clienteToHardDelete?.nome}
+                  </span>
+                </p>
+                <Input
+                  value={hardDeleteConfirm}
+                  onChange={(e) => setHardDeleteConfirm(e.target.value)}
+                  placeholder="Digite o nome do cliente"
+                  className="bg-input border-border"
+                />
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-border">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleHardDelete}
+              disabled={
+                hardDeleteCliente.isPending ||
+                hardDeleteConfirm.trim() !== clienteToHardDelete?.nome
+              }
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleteCliente.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Excluir
+              {hardDeleteCliente.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Excluir permanentemente
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
