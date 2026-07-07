@@ -100,18 +100,20 @@ export function ContratoTab({ clienteId, clienteStatus, consultorId }: ContratoT
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Renovar
               </Button>
-              <Button 
-                variant="outline" 
-                size="sm"
-                className="text-destructive hover:text-destructive"
-                onClick={() => {
-                  setDeletingContrato(contratoAtivo);
-                  setShowDeleteConfirm(true);
-                }}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Excluir
-              </Button>
+              {!isConsultor && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => {
+                    setDeletingContrato(contratoAtivo);
+                    setShowDeleteConfirm(true);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Excluir
+                </Button>
+              )}
             </div>
           </CardHeader>
           <CardContent>
@@ -236,17 +238,19 @@ export function ContratoTab({ clienteId, clienteStatus, consultorId }: ContratoT
                       <Badge variant="secondary">Encerrado</Badge>
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => {
-                          setDeletingContrato(contrato);
-                          setShowDeleteConfirm(true);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {!isConsultor && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => {
+                            setDeletingContrato(contrato);
+                            setShowDeleteConfirm(true);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
