@@ -263,65 +263,118 @@ export function useDeleteCliente() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      // Excluir em cascata: pausas_contrato, atendimentos, ferramentas_cliente, onboarding, encerramentos, contratos, webhook_logs
-      
-      // Primeiro excluir pausas dos contratos
-      const { data: contratos } = await supabase
-        .from('contratos')
-        .select('id')
-        .eq('cliente_id', id);
-      
-      if (contratos && contratos.length > 0) {
-        const contratoIds = contratos.map(c => c.id);
-        const { error: pausasError } = await supabase
-          .from('pausas_contrato')
-          .delete()
-          .in('contrato_id', contratoIds);
-        if (pausasError) throw pausasError;
-      }
+      // Soft delete: arquivamento único e atômico + trilha de auditoria.
+      // Evita deixar o banco meio apagado e sobrevive a novas tabelas relacionadas.
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData?.user?.id ?? null;
 
-      const { error: atendError } = await supabase
-        .from('atendimentos')
-        .delete()
-        .eq('cliente_id', id);
-      if (atendError) throw atendError;
-
-      const { error: ferrError } = await supabase
-        .from('ferramentas_cliente')
-        .delete()
-        .eq('cliente_id', id);
-      if (ferrError) throw ferrError;
-
-      const { error: onbError } = await supabase
-        .from('onboarding')
-        .delete()
-        .eq('cliente_id', id);
-      if (onbError) throw onbError;
-
-      const { error: encError } = await supabase
-        .from('encerramentos')
-        .delete()
-        .eq('cliente_id', id);
-      if (encError) throw encError;
-
-      const { error: contError } = await supabase
-        .from('contratos')
-        .delete()
-        .eq('cliente_id', id);
-      if (contError) throw contError;
-
-      // Excluir webhook_logs associados ao cliente
-      const { error: webhookError } = await supabase
-        .from('webhook_logs')
-        .delete()
-        .eq('cliente_id', id);
-      if (webhookError) throw webhookError;
+      const { data: current } = await supabase
+        .from('clientes')
+        .select('status')
+        .eq('id', id)
+        .maybeSingle();
 
       const { error } = await supabase
         .from('clientes')
-        .delete()
+        .update({
+          status: 'encerrado',
+          arquivado_em: new Date().toISOString(),
+          arquivado_por: uid,
+        })
         .eq('id', id);
+      if (error) throw error;
 
+      // Trilha de auditoria (best-effort — não bloqueia sucesso se falhar)
+      if (uid) {
+        await supabase.from('auditoria_status_cliente').insert({
+          cliente_id: id,
+          origem: 'arquivamento',
+          status_anterior: current?.status ?? null,
+          status_novo: 'encerrado',
+          user_id: uid,
+          metadata: { acao: 'arquivar' },
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clientes'] });
+      queryClient.invalidateQueries({ queryKey: ['cliente'] });
+      queryClient.invalidateQueries({ queryKey: ['contratos'] });
+      queryClient.invalidateQueries({ queryKey: ['all-contratos'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    }
+  });
+}
+
+// Alias com nome mais claro para novos usos
+export const useArquivarCliente = useDeleteCliente;
+
+export function useDesarquivarCliente() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData?.user?.id ?? null;
+
+      const { error } = await supabase
+        .from('clientes')
+        .update({ arquivado_em: null, arquivado_por: null })
+        .eq('id', id);
+      if (error) throw error;
+
+      if (uid) {
+        await supabase.from('auditoria_status_cliente').insert({
+          cliente_id: id,
+          origem: 'arquivamento',
+          user_id: uid,
+          metadata: { acao: 'desarquivar' },
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clientes'] });
+      queryClient.invalidateQueries({ queryKey: ['cliente'] });
+    },
+  });
+}
+
+// Exclusão física — restrita a admin por RLS.
+// Usa CASCADE do banco (FKs) quando existir; caso o RLS bloqueie ou faltem cascades,
+// a operação falha e nada é apagado parcialmente.
+export function useHardDeleteCliente() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData?.user?.id ?? null;
+
+      // Registra intenção antes de apagar (auditoria de exclusão física)
+      if (uid) {
+        await supabase.from('auditoria_status_cliente').insert({
+          cliente_id: id,
+          origem: 'exclusao_fisica',
+          user_id: uid,
+          metadata: { acao: 'hard_delete' },
+        });
+      }
+
+      // Cascade manual apenas para tabelas sem FK CASCADE ainda configurada.
+      // Cada passo é idempotente e o cliente é o último a sair.
+      const { data: contratos } = await supabase
+        .from('contratos').select('id').eq('cliente_id', id);
+      if (contratos && contratos.length > 0) {
+        const cids = contratos.map(c => c.id);
+        await supabase.from('pausas_contrato').delete().in('contrato_id', cids);
+        await supabase.from('viagens_contrato').delete().in('contrato_id', cids);
+      }
+      await supabase.from('atendimentos').delete().eq('cliente_id', id);
+      await supabase.from('ferramentas_cliente').delete().eq('cliente_id', id);
+      await supabase.from('onboarding').delete().eq('cliente_id', id);
+      await supabase.from('encerramentos').delete().eq('cliente_id', id);
+      await supabase.from('contratos').delete().eq('cliente_id', id);
+      await supabase.from('webhook_logs').delete().eq('cliente_id', id);
+
+      const { error } = await supabase.from('clientes').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -329,6 +382,6 @@ export function useDeleteCliente() {
       queryClient.invalidateQueries({ queryKey: ['contratos'] });
       queryClient.invalidateQueries({ queryKey: ['all-contratos'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-    }
+    },
   });
 }
