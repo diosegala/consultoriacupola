@@ -21,9 +21,11 @@ function base64ToBytes(b64: string): Uint8Array {
 }
 
 async function extractPdfText(bytes: Uint8Array): Promise<string> {
-  const pdfParse = (await import("https://esm.sh/pdf-parse@1.1.1")).default;
-  const result = await pdfParse(bytes);
-  return (result.text || "").trim();
+  // unpdf é compatível com Deno (pdf-parse tenta ler um arquivo de teste local no init e falha)
+  const { extractText, getDocumentProxy } = await import("https://esm.sh/unpdf@0.12.1");
+  const pdf = await getDocumentProxy(bytes);
+  const { text } = await extractText(pdf, { mergePages: true });
+  return (Array.isArray(text) ? text.join("\n") : text ?? "").trim();
 }
 
 function safeJsonParse(raw: string): any {
