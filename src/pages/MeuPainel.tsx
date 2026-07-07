@@ -16,6 +16,7 @@ import {
   Sparkles,
   Copy,
   Check,
+  MessageSquare,
 } from 'lucide-react';
 import { format, addDays, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -27,6 +28,7 @@ import { useToggleChecklistItem } from '@/hooks/useProjetoChecklist';
 import { useUpdateTodoPessoal } from '@/hooks/useTodoPessoal';
 import { NovaReuniaoDialog } from '@/components/consultor/NovaReuniaoDialog';
 import { NovaTarefaPessoalDialog } from '@/components/tarefas/NovaTarefaPessoalDialog';
+import { RegistrarInteracaoDialog } from '@/components/cliente/RegistrarInteracaoDialog';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -192,6 +194,7 @@ export default function MeuPainel() {
 
   const [novaReuniao, setNovaReuniao] = useState<{ clienteId: string } | null>(null);
   const [novaTarefaOpen, setNovaTarefaOpen] = useState(false);
+  const [interacaoAlvo, setInteracaoAlvo] = useState<{ clienteId: string } | null>(null);
 
   async function copiarMensagem(id: string, texto: string) {
     try {
@@ -315,6 +318,16 @@ export default function MeuPainel() {
                       {n.link && (
                         <Button asChild size="sm" variant="outline">
                           <Link to={n.link}>Abrir</Link>
+                        </Button>
+                      )}
+                      {n.tipo === 'sem_contato' && n.entidade_id && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setInteracaoAlvo({ clienteId: n.entidade_id })}
+                        >
+                          <MessageSquare className="h-3 w-3 mr-1" />
+                          Registrar contato
                         </Button>
                       )}
                       {n.tipo === 'contrato_sem_renovacao' && n.metadata?.link_balanco && (
