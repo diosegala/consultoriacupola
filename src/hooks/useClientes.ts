@@ -21,6 +21,8 @@ interface UseClientesFilters {
   tipo_consultoria_id?: string;
   cidade?: string;
   search?: string;
+  incluir_arquivados?: boolean;
+  apenas_arquivados?: boolean;
 }
 
 export function useClientes(filters?: UseClientesFilters) {
@@ -51,6 +53,11 @@ export function useClientes(filters?: UseClientesFilters) {
       }
       if (filters?.cidade) {
         query = query.ilike('cidade', `%${filters.cidade}%`);
+      }
+      if (filters?.apenas_arquivados) {
+        query = query.not('arquivado_em', 'is', null);
+      } else if (!filters?.incluir_arquivados) {
+        query = query.is('arquivado_em', null);
       }
 
       const { data, error } = await query;
