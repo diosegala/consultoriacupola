@@ -162,7 +162,17 @@ Deno.serve(async (req) => {
                     .filter((c: any) => consultorHits.includes(c.id))
                     .map((c: any) => (c.nome ?? "").split(/\s+/)[0])
                     .filter(Boolean);
-                  const tipo = consultorHits.length >= 2 ? "equipe" : "individual";
+                   const nameLc = String(d.name ?? "").toLowerCase();
+                   const isWeekly = /\bweekly\b|semanal de equipe/.test(nameLc);
+                   const is1on1 = /1:1|1 a 1|one[-\s]?on[-\s]?one/.test(nameLc);
+                   const tipo =
+                     consultorHits.length >= 2
+                       ? "equipe"
+                       : isWeekly
+                         ? "weekly"
+                         : is1on1
+                           ? "1on1"
+                           : "1on1";
                   const { data: rg, error: rgErr } = await admin
                     .from("reunioes_gestao")
                     .insert({
