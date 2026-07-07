@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils';
 import { EventoFormDialog } from '@/components/agenda/EventoFormDialog';
 import { usePerfisDiscBatch } from '@/hooks/useDisc';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ReunioesGestaoPorLiderada } from './ReunioesGestaoPorLiderada';
 
 type RadarConsultor = {
   id: string;
@@ -155,23 +156,6 @@ function useAlertasSentimento(userId: string | null) {
         .eq('lida', false)
         .eq('tipo', 'sentimento_negativo_cliente')
         .order('created_at', { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as any[];
-    },
-  });
-}
-
-function useReunioesGestao(diretorId: string | null | undefined) {
-  return useQuery({
-    queryKey: ['painel-diretor', 'reunioes-gestao', diretorId],
-    queryFn: async () => {
-      let query = supabase
-        .from('reunioes_gestao' as any)
-        .select('*')
-        .order('data_reuniao', { ascending: false })
-        .limit(20);
-      if (diretorId) query = query.eq('diretor_id', diretorId);
-      const { data, error } = await query;
       if (error) throw error;
       return (data ?? []) as any[];
     },
