@@ -850,6 +850,60 @@ export type Database = {
         }
         Relationships: []
       }
+      interacoes_cliente: {
+        Row: {
+          canal: Database["public"]["Enums"]["canal_interacao"]
+          cliente_id: string
+          consultor_id: string | null
+          conteudo: string | null
+          created_at: string
+          created_by: string | null
+          data_interacao: string
+          id: string
+          resumo: string
+          updated_at: string
+        }
+        Insert: {
+          canal: Database["public"]["Enums"]["canal_interacao"]
+          cliente_id: string
+          consultor_id?: string | null
+          conteudo?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_interacao?: string
+          id?: string
+          resumo: string
+          updated_at?: string
+        }
+        Update: {
+          canal?: Database["public"]["Enums"]["canal_interacao"]
+          cliente_id?: string
+          consultor_id?: string | null
+          conteudo?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_interacao?: string
+          id?: string
+          resumo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interacoes_cliente_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interacoes_cliente_consultor_id_fkey"
+            columns: ["consultor_id"]
+            isOneToOne: false
+            referencedRelation: "consultores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       interacoes_tempo: {
         Row: {
           cliente_id: string | null
@@ -2228,6 +2282,12 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "director" | "consultor"
+      canal_interacao:
+        | "whatsapp"
+        | "ligacao"
+        | "email"
+        | "reuniao_informal"
+        | "outro"
       classificacao_encerramento: "churn" | "fim_contrato"
       etapa_onboarding:
         | "pre_onboarding"
@@ -2366,6 +2426,13 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "director", "consultor"],
+      canal_interacao: [
+        "whatsapp",
+        "ligacao",
+        "email",
+        "reuniao_informal",
+        "outro",
+      ],
       classificacao_encerramento: ["churn", "fim_contrato"],
       etapa_onboarding: [
         "pre_onboarding",
