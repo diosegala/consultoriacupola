@@ -16,9 +16,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Search, Plus, Trash2, Loader2, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle } from 'lucide-react';
+import { Search, Plus, Trash2, Loader2, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle, Archive, ArchiveRestore } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useClientes, useDeleteCliente, ClienteComDetalhes } from '@/hooks/useClientes';
+import { useClientes, useArquivarCliente, useDesarquivarCliente, useHardDeleteCliente, ClienteComDetalhes } from '@/hooks/useClientes';
 import { useConsultores } from '@/hooks/useConsultores';
 import { useTiposConsultoria } from '@/hooks/useDadosAuxiliares';
 import { useToast } from '@/hooks/use-toast';
@@ -41,7 +41,9 @@ type SortDirection = 'asc' | 'desc';
 export default function Clientes() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { isConsultor } = useAuth();
+  const { isConsultor, isAdmin, isDirector } = useAuth();
+  const canArchive = isAdmin || isDirector;
+  const canHardDelete = isAdmin;
   const { data: myConsultorId } = useMyConsultorId();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
@@ -50,8 +52,11 @@ export default function Clientes() {
   const [sortField, setSortField] = useState<SortField>('nome');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [clienteToDelete, setClienteToDelete] = useState<ClienteComDetalhes | null>(null);
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [clienteToArchive, setClienteToArchive] = useState<ClienteComDetalhes | null>(null);
+  const [hardDeleteDialogOpen, setHardDeleteDialogOpen] = useState(false);
+  const [clienteToHardDelete, setClienteToHardDelete] = useState<ClienteComDetalhes | null>(null);
+  const [hardDeleteConfirm, setHardDeleteConfirm] = useState('');
 
   const effectiveConsultorId = isConsultor
     ? (myConsultorId || undefined)
@@ -59,13 +64,16 @@ export default function Clientes() {
 
   const { data: clientes, isLoading } = useClientes({
     search: search || undefined,
-    status: statusFilter !== 'todos' ? statusFilter : undefined,
+    status: (statusFilter !== 'todos' && statusFilter !== 'arquivados') ? statusFilter : undefined,
     consultor_id: effectiveConsultorId,
+    apenas_arquivados: statusFilter === 'arquivados',
   });
 
   const { data: consultores } = useConsultores();
   const { data: tiposConsultoria } = useTiposConsultoria();
-  const deleteCliente = useDeleteCliente();
+  const arquivarCliente = useArquivarCliente();
+  const desarquivarCliente = useDesarquivarCliente();
+  const hardDeleteCliente = useHardDeleteCliente();
 
   // Filtro adicional por tipo de consultoria e ordenação
   const clientesFiltrados = useMemo(() => {
@@ -128,29 +136,50 @@ export default function Clientes() {
       : <ArrowDown className="h-4 w-4 ml-1" />;
   };
 
-  const openDeleteDialog = (cliente: ClienteComDetalhes, e: React.MouseEvent) => {
+  const openArchiveDialog = (cliente: ClienteComDetalhes, e: React.MouseEvent) => {
     e.stopPropagation();
-    setClienteToDelete(cliente);
-    setDeleteDialogOpen(true);
+    setClienteToArchive(cliente);
+    setArchiveDialogOpen(true);
   };
 
-  const handleDelete = async () => {
-    if (!clienteToDelete) return;
+  const openHardDeleteDialog = (cliente: ClienteComDetalhes, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setClienteToHardDelete(cliente);
+    setHardDeleteConfirm('');
+    setHardDeleteDialogOpen(true);
+  };
 
+  const handleArchive = async () => {
+    if (!clienteToArchive) return;
     try {
-      await deleteCliente.mutateAsync(clienteToDelete.id);
-      toast({
-        title: 'Sucesso',
-        description: 'Cliente excluído com sucesso'
-      });
-      setDeleteDialogOpen(false);
-      setClienteToDelete(null);
+      if (clienteToArchive.arquivado_em) {
+        await desarquivarCliente.mutateAsync(clienteToArchive.id);
+        toast({ title: 'Sucesso', description: 'Cliente desarquivado' });
+      } else {
+        await arquivarCliente.mutateAsync(clienteToArchive.id);
+        toast({ title: 'Sucesso', description: 'Cliente arquivado' });
+      }
+      setArchiveDialogOpen(false);
+      setClienteToArchive(null);
     } catch (error: any) {
-      toast({
-        title: 'Erro',
-        description: error.message || 'Erro ao excluir cliente',
-        variant: 'destructive'
-      });
+      toast({ title: 'Erro', description: error.message || 'Falha na operação', variant: 'destructive' });
+    }
+  };
+
+  const handleHardDelete = async () => {
+    if (!clienteToHardDelete) return;
+    if (hardDeleteConfirm.trim() !== clienteToHardDelete.nome) {
+      toast({ title: 'Nome não confere', description: 'Digite o nome exato do cliente para confirmar.', variant: 'destructive' });
+      return;
+    }
+    try {
+      await hardDeleteCliente.mutateAsync(clienteToHardDelete.id);
+      toast({ title: 'Cliente excluído permanentemente' });
+      setHardDeleteDialogOpen(false);
+      setClienteToHardDelete(null);
+      setHardDeleteConfirm('');
+    } catch (error: any) {
+      toast({ title: 'Erro', description: error.message || 'Erro ao excluir cliente', variant: 'destructive' });
     }
   };
 
