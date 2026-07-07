@@ -452,7 +452,7 @@ Deno.serve(async (req) => {
         (consAtivos ?? []).map((c: any) => [c.id, c.nome as string]),
       );
 
-      const D14 = 14, D21 = 21;
+      const D14 = 14, D21 = 21, D10 = 10;
       for (const diretorUserId of diretorUserIds) {
         const diretorConsultorId = consultorByUser.get(diretorUserId);
         if (!diretorConsultorId) continue;
@@ -466,7 +466,7 @@ Deno.serve(async (req) => {
             .from("reunioes_gestao")
             .select("data_reuniao, participantes")
             .eq("diretor_id", diretorConsultorId)
-            .eq("tipo", "individual")
+            .in("tipo", ["1on1", "individual"])
             .contains("participantes", [(c.nome ?? "").split(/\s+/)[0]])
             .order("data_reuniao", { ascending: false })
             .limit(1).maybeSingle();
@@ -493,6 +493,44 @@ Deno.serve(async (req) => {
             entidade_tipo: "consultor",
             entidade_id: c.id,
             metadata: { escopo: "individual", consultor_id: c.id, consultor_nome: c.nome, dias },
+          });
+          summary.lembrete_gestao++;
+        }
+
+        // --- Weekly sem acontecer há mais de 10 dias por consultora ---
+        for (const c of equipe) {
+          const { data: ult } = await admin
+            .from("reunioes_gestao")
+            .select("data_reuniao")
+            .eq("diretor_id", diretorConsultorId)
+            .eq("tipo", "weekly")
+            .contains("participantes", [(c.nome ?? "").split(/\s+/)[0]])
+            .order("data_reuniao", { ascending: false })
+            .limit(1).maybeSingle();
+          const ultDate = ult?.data_reuniao ?? null;
+          const dias = ultDate ? daysBetween(hoje, new Date(ultDate + "T00:00:00")) : 999;
+          if (dias < D10) continue;
+
+          const { data: exists } = await admin
+            .from("notificacoes").select("id")
+            .eq("user_id", diretorUserId)
+            .eq("tipo", "lembrete_gestao")
+            .eq("entidade_id", c.id)
+            .contains("metadata", { escopo: "weekly" })
+            .eq("lida", false).maybeSingle();
+          if (exists) continue;
+
+          await admin.from("notificacoes").insert({
+            user_id: diretorUserId,
+            tipo: "lembrete_gestao",
+            titulo: `Weekly com ${c.nome} está atrasada`,
+            descricao: ultDate
+              ? `Última Weekly há ${dias} dias (${ultDate}). Alinhe as prioridades da semana.`
+              : "Nenhuma Weekly registrada. Alinhe as prioridades da semana.",
+            link: `/meu-painel`,
+            entidade_tipo: "consultor",
+            entidade_id: c.id,
+            metadata: { escopo: "weekly", consultor_id: c.id, consultor_nome: c.nome, dias },
           });
           summary.lembrete_gestao++;
         }
@@ -540,7 +578,7 @@ Deno.serve(async (req) => {
           .from("reunioes_gestao")
           .select("id, tipo, participantes, data_reuniao")
           .eq("diretor_id", diretorConsultorId)
-          .eq("tipo", "individual")
+          .in("tipo", ["1on1", "individual"])
           .gte("data_reuniao", amanhaISO)
           .lte("data_reuniao", em2ISO);
 
