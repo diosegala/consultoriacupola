@@ -15,11 +15,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Loader2, ArrowLeft, FileText, Users, Calendar, Pencil, Trash2, BarChart3, Video, CalendarPlus, LineChart, Sparkles, CheckSquare, FolderOpen } from 'lucide-react';
+import { Loader2, ArrowLeft, FileText, Users, Calendar, Pencil, Trash2, BarChart3, Video, CalendarPlus, LineChart, Sparkles, CheckSquare, FolderOpen, MessageSquare } from 'lucide-react';
 import { useCliente, useDeleteCliente } from '@/hooks/useClientes';
 import { ContratoTab } from '@/components/cliente/ContratoTab';
 import { OnboardingTab } from '@/components/cliente/OnboardingTab';
 import { AtendimentoTab } from '@/components/cliente/AtendimentoTab';
+import { InteracoesTab } from '@/components/cliente/InteracoesTab';
 import { DesempenhoClienteTab } from '@/components/cliente/DesempenhoClienteTab';
 import { ReunioesClienteTab } from '@/components/cliente/ReunioesClienteTab';
 import { AgentesTab } from '@/components/cliente/AgentesTab';
@@ -156,6 +157,10 @@ export default function ClienteDetalhe() {
             <Calendar className="h-4 w-4" />
             Atendimento
           </TabsTrigger>
+          <TabsTrigger value="interacoes" className="flex items-center gap-2">
+            <MessageSquare className="h-4 w-4" />
+            Interações
+          </TabsTrigger>
           <TabsTrigger value="compromissos" className="flex items-center gap-2">
             <CheckSquare className="h-4 w-4" />
             Compromissos
@@ -194,6 +199,10 @@ export default function ClienteDetalhe() {
 
         <TabsContent value="atendimento" className="mt-6">
           <AtendimentoTab clienteId={cliente.id} />
+        </TabsContent>
+
+        <TabsContent value="interacoes" className="mt-6">
+          <InteracoesTab clienteId={cliente.id} consultorId={cliente.consultor_id} />
         </TabsContent>
 
         <TabsContent value="compromissos" className="mt-6">
