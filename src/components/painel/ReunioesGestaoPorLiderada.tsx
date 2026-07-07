@@ -71,7 +71,10 @@ function useConsultoresAtivos() {
         .eq('ativo', true)
         .order('nome');
       if (error) throw error;
-      return (data ?? []) as Consultor[];
+      const EXCLUIDOS = ['sidenir', 'cristiano'];
+      return ((data ?? []) as Consultor[]).filter(
+        (c) => !EXCLUIDOS.includes(firstName(c.nome)),
+      );
     },
   });
 }
