@@ -206,7 +206,6 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
 export function GestaoEquipeSection({ userId }: { userId: string | null }) {
   const { data: radar, isLoading: loadingRadar } = useRadarEquipe(userId);
   const { data: alertas, isLoading: loadingAlertas } = useAlertasSentimento(userId);
-  const { data: reunioesGestao, isLoading: loadingRG } = useReunioesGestao(undefined);
   const { data: lembretes, isLoading: loadingLembretes } = useLembretesGestao(userId);
   const consultorIds = useMemo(() => (radar ?? []).map((c) => c.id), [radar]);
   const { data: discMap } = usePerfisDiscBatch(consultorIds);
@@ -398,106 +397,28 @@ export function GestaoEquipeSection({ userId }: { userId: string | null }) {
         </CardContent>
       </Card>
 
-      {/* BLOCO C — Reuniões de gestão + briefings */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Video className="h-4 w-4 text-primary" /> Minhas reuniões de gestão
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {briefings.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs uppercase tracking-wide text-primary font-semibold">Prepare-se para amanhã</p>
-              {briefings.map((b: any) => (
-                <div key={b.id} className="p-3 rounded-md border border-primary/40 bg-primary/5 space-y-1">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                    <p className="text-sm font-medium text-foreground">{b.titulo}</p>
-                  </div>
-                  {b.descricao && (
-                    <p className="text-xs text-muted-foreground whitespace-pre-wrap">{b.descricao}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
+      {/* BLOCO C — Briefings + reuniões de gestão por liderada */}
+      {briefings.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" /> Prepare-se para amanhã
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {briefings.map((b: any) => (
+              <div key={b.id} className="p-3 rounded-md border border-primary/40 bg-primary/5 space-y-1">
+                <p className="text-sm font-medium text-foreground">{b.titulo}</p>
+                {b.descricao && (
+                  <p className="text-xs text-muted-foreground whitespace-pre-wrap">{b.descricao}</p>
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
-          {loadingRG ? (
-            <Skeleton className="h-20 w-full" />
-          ) : (reunioesGestao?.length ?? 0) === 0 ? (
-            <div className="text-sm text-muted-foreground flex items-start gap-2">
-              <Info className="h-4 w-4 mt-0.5 shrink-0" />
-              <span>Suas reuniões de gestão serão analisadas automaticamente quando as transcrições forem importadas do Google Drive.</span>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {reunioesGestao!.map((r: any) => {
-                const analise = r.analise_ia ?? {};
-                const scores = analise.scores ?? {};
-                const pontos = (analise.pontos_fortes ?? []) as string[];
-                const sugestao = analise.sugestao_melhoria as string | undefined;
-                const acoes = (analise.acoes ?? []) as Array<{ responsavel: string; descricao: string; prazo?: string }>;
-                return (
-                  <div key={r.id} className="p-3 rounded-md border border-border/50 space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">
-                          {r.tipo === 'individual' ? '1:1' : 'Reunião de equipe'}
-                          {r.participantes?.length ? ` · ${r.participantes.join(', ')}` : ''}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground">
-                          {format(new Date(r.data_reuniao + 'T00:00:00'), "dd 'de' MMM yyyy", { locale: ptBR })}
-                        </p>
-                      </div>
-                      <Badge variant="outline" className="text-[10px]">{r.status_analise}</Badge>
-                    </div>
-                    {r.resumo_ia && (
-                      <p className="text-xs text-muted-foreground whitespace-pre-wrap">{r.resumo_ia}</p>
-                    )}
-                    {Object.keys(scores).length > 0 && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2">
-                        {SCORE_DIMENSOES.map((d) =>
-                          scores[d.key] != null ? (
-                            <ScoreBar key={d.key} label={d.label} value={Number(scores[d.key])} />
-                          ) : null,
-                        )}
-                      </div>
-                    )}
-                    {sugestao && (
-                      <div className="rounded-md border border-primary/30 bg-primary/5 p-2">
-                        <p className="text-[10px] uppercase tracking-wide text-primary font-semibold mb-1">Próxima reunião: melhoria</p>
-                        <p className="text-xs text-foreground">{sugestao}</p>
-                      </div>
-                    )}
-                    {pontos.length > 0 && (
-                      <div>
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Pontos fortes</p>
-                        <ul className="text-xs list-disc pl-4 space-y-0.5">
-                          {pontos.map((p, i) => <li key={i}>{p}</li>)}
-                        </ul>
-                      </div>
-                    )}
-                    {acoes.length > 0 && (
-                      <div>
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Ações combinadas</p>
-                        <ul className="text-xs space-y-1">
-                          {acoes.map((a, i) => (
-                            <li key={i}>
-                              <span className="font-medium">{a.responsavel}:</span> {a.descricao}
-                              {a.prazo && <span className="text-muted-foreground"> · até {a.prazo}</span>}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <ReunioesGestaoPorLiderada />
 
       {/* BLOCO D — Lembretes de gestão */}
       <Card>
