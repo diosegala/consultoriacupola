@@ -95,6 +95,8 @@ Deno.serve(async (req) => {
     if (!raw_text || raw_text.length < 50) {
       throw new Error("PDF vazio ou sem texto extraível.");
     }
+    // Postgres text não aceita \u0000; remove NULs e chars de controle problemáticos
+    raw_text = raw_text.replace(/\u0000/g, "").replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
     const texto = raw_text.length > 25000 ? raw_text.slice(0, 25000) + "\n\n[truncado]" : raw_text;
 
     // 3) Estruturar via Claude (tool use)
