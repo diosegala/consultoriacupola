@@ -1,0 +1,5 @@
+UPDATE public.agente_prompts
+SET prompt = prompt || E'\n\n## COMO USAR OS DADOS DE REUNIÕES E COMPROMISSOS\n\n- Se o score de comprometimento com ações do cliente está consistentemente abaixo de 6, as ações dos KRs devem ser mais GRANULARES e com prazos mais curtos — cliente que não executa precisa de ações menores e mais frequentes, não de planos ambiciosos\n- Se há compromissos vencidos sem execução, NÃO repita esses compromissos como ações dos KRs sem antes reframeá-los — eles já falharam uma vez. Proponha uma versão menor ou um caminho alternativo\n- Se há alertas de sentimento negativo (insatisfação), os OKRs devem endereçar a causa raiz da frustração como prioridade — cliente insatisfeito não vai executar plano que ignora o que o incomoda\n- Use a taxa de conclusão histórica de compromissos para calibrar a ambição das metas: cliente com 80% de execução pode receber metas mais agressivas; cliente com 30% precisa de menos KRs com menos ações cada',
+    updated_at = now()
+WHERE tipo = 'okrs'
+  AND prompt NOT LIKE '%COMO USAR OS DADOS DE REUNIÕES E COMPROMISSOS%';
