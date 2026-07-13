@@ -149,6 +149,7 @@ serve(async (req) => {
 
     const isPreAnalise = tipo === "pre_analise";
     const isBalanco = tipo === "balanco_periodo";
+    const isOkrs = tipo === "okrs";
 
     // Fetch prompt from database using service role
     const serviceClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -233,6 +234,87 @@ serve(async (req) => {
       .order("data_reuniao", { ascending: false })
       .limit(10);
 
+    // ===== Seções extras específicas para OKRs =====
+    // 1) Reuniões enriquecidas (top 5, com analise_cliente e pontos_melhoria)
+    // 2) Compromissos pendentes + taxa de conclusão histórica
+    // 3) Alertas de sentimento negativo dos últimos 90 dias
+    let reunioesSection = "";
+    let compromissosSection = "";
+    let alertasSection = "";
+
+    if (isOkrs) {
+      const topReunioes = (reunioes ?? []).slice(0, 5);
+      reunioesSection = `## Reuniões Analisadas (${topReunioes.length} mais recentes de ${reunioes?.length ?? 0})\n${
+        topReunioes.length
+          ? topReunioes.map((r: any) => {
+              const ac = r.analise_cliente || {};
+              const ai = r.analise_ia || {};
+              const engajamentoLinha = [
+                ac.participacao_ativa != null ? `participação ativa ${ac.participacao_ativa}/10` : null,
+                ac.abertura_sugestoes != null ? `abertura a sugestões ${ac.abertura_sugestoes}/10` : null,
+                ac.comprometimento_acoes != null ? `comprometimento com ações ${ac.comprometimento_acoes}/10` : null,
+                ac.clareza_demandas != null ? `clareza de demandas ${ac.clareza_demandas}/10` : null,
+                ac.engajamento_estrategico != null ? `engajamento estratégico ${ac.engajamento_estrategico}/10` : null,
+              ].filter(Boolean).join(", ");
+              const melhorias = Array.isArray(ai.pontos_melhoria) ? ai.pontos_melhoria : [];
+              return `\n### Reunião ${r.data_reuniao}${r.duracao_minutos ? ` (${r.duracao_minutos} min)` : ""}\n- Score Consultor: ${r.score_ia ?? "N/A"} · Score Cliente: ${r.score_cliente ?? "N/A"}\n${r.resumo_ia ? `- Resumo: ${r.resumo_ia}\n` : ""}${engajamentoLinha ? `- Engajamento do cliente: ${engajamentoLinha}\n` : ""}${melhorias.length ? `- Pontos de melhoria observados na dinâmica: ${melhorias.join("; ")}\n` : ""}`;
+            }).join("\n")
+          : "Nenhuma reunião analisada."
+      }`;
+
+      // Compromissos: pendentes + histórico para taxa
+      const { data: compsPendentes } = await supabase
+        .from("compromissos")
+        .select("descricao, responsavel, prazo, status")
+        .eq("cliente_id", projeto.cliente_id)
+        .eq("status", "pendente")
+        .order("prazo", { ascending: true, nullsFirst: false });
+
+      const { data: compsTodos } = await supabase
+        .from("compromissos")
+        .select("status, responsavel")
+        .eq("cliente_id", projeto.cliente_id)
+        .eq("responsavel", "cliente");
+
+      const totalCli = compsTodos?.length ?? 0;
+      const concluidosCli = (compsTodos ?? []).filter((c: any) => c.status === "concluido").length;
+      const taxaCli = totalCli ? Math.round((concluidosCli / totalCli) * 100) : null;
+
+      const hoje = new Date();
+      const fmtLinha = (c: any) => {
+        let sufixo = c.prazo ? ` — prazo: ${c.prazo}` : " — sem prazo";
+        if (c.prazo) {
+          const prazoDate = new Date(c.prazo + "T00:00:00");
+          const diffDias = Math.floor((hoje.getTime() - prazoDate.getTime()) / (1000 * 60 * 60 * 24));
+          if (diffDias > 0) sufixo += ` — VENCIDO HÁ ${diffDias} DIA${diffDias > 1 ? "S" : ""}`;
+        }
+        return `- ${c.descricao}${sufixo}`;
+      };
+
+      const pendCliente = (compsPendentes ?? []).filter((c: any) => c.responsavel === "cliente");
+      const pendConsultor = (compsPendentes ?? []).filter((c: any) => c.responsavel === "consultor");
+
+      compromissosSection = `\n\n## Compromissos Pendentes do Cliente\n${pendCliente.length ? pendCliente.map(fmtLinha).join("\n") : "Nenhum compromisso pendente do cliente."}\n\n## Compromissos Pendentes do Consultor\n${pendConsultor.length ? pendConsultor.map(fmtLinha).join("\n") : "Nenhum compromisso pendente do consultor."}\n\nTaxa de conclusão histórica do cliente: ${taxaCli != null ? `${taxaCli}% (${concluidosCli} de ${totalCli} compromissos concluídos)` : "sem histórico suficiente"}`;
+
+      // Alertas de sentimento (últimos 90 dias)
+      const noventaDias = new Date();
+      noventaDias.setDate(noventaDias.getDate() - 90);
+      const { data: alertas } = await serviceClient
+        .from("notificacoes")
+        .select("descricao, created_at, tipo, entidade_id")
+        .eq("tipo", "sentimento_negativo_cliente")
+        .eq("entidade_id", projeto.cliente_id)
+        .gte("created_at", noventaDias.toISOString())
+        .order("created_at", { ascending: false });
+
+      if (alertas && alertas.length) {
+        alertasSection = `\n\n## Sinais de Atenção Detectados em Reuniões\n${alertas.map((a: any) => {
+          const data = new Date(a.created_at).toLocaleDateString("pt-BR");
+          return `- ${data}: ${a.descricao ?? "(sem descrição)"}`;
+        }).join("\n")}`;
+      }
+    }
+
     const { data: checklist } = projeto_id
       ? await supabase
           .from("projeto_checklist")
@@ -259,13 +341,13 @@ ${projeto.observacoes || "Sem observações registradas."}
 ## Checklist do Projeto
 ${checklist?.length ? checklist.map((c: any) => `- [${c.concluido ? "x" : " "}] ${c.titulo}`).join("\n") : "Sem itens no checklist."}
 
-## Reuniões Analisadas (${reunioes?.length ?? 0})
+${isOkrs ? reunioesSection : `## Reuniões Analisadas (${reunioes?.length ?? 0})
 ${reunioes?.length ? reunioes.map((r: any) => `
 ### Reunião ${r.data_reuniao}${r.duracao_minutos ? ` (${r.duracao_minutos} min)` : ""}
 - Score Consultor: ${r.score_ia ?? "N/A"}
 - Score Cliente: ${r.score_cliente ?? "N/A"}
 ${r.resumo_ia ? `- Resumo: ${r.resumo_ia}` : ""}
-`).join("\n") : "Nenhuma reunião analisada."}
+`).join("\n") : "Nenhuma reunião analisada."}`}${compromissosSection}${alertasSection}
 
 ## Onboarding
 ${onboarding?.[0] ? `- Etapa atual: ${onboarding[0].etapa_atual}\n- Observações: ${onboarding[0].observacoes ?? "N/A"}` : "Sem dados de onboarding."}
