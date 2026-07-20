@@ -457,8 +457,13 @@ Deno.serve(async (req) => {
         const diretorConsultorId = consultorByUser.get(diretorUserId);
         if (!diretorConsultorId) continue;
 
-        // Consultoras da equipe = ativos, exceto o próprio diretor
-        const equipe = (consAtivos ?? []).filter((c: any) => c.id !== diretorConsultorId);
+        // Consultoras da equipe = ativos, exceto o próprio diretor e parceiros externos
+        const EXCLUIDOS_GESTAO = ["sidenir", "cristiano"];
+        const equipe = (consAtivos ?? []).filter((c: any) => {
+          if (c.id === diretorConsultorId) return false;
+          const nome = String(c.nome ?? "").toLowerCase();
+          return !EXCLUIDOS_GESTAO.some((ex) => nome.includes(ex));
+        });
 
         // --- 1:1 sem acontecer há mais de 14 dias por consultora ---
         for (const c of equipe) {
