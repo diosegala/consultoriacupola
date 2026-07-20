@@ -230,3 +230,24 @@ export function useUpdateEtapaStatusCliente() {
     },
   });
 }
+
+export function useArquivarProjeto() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ projetoId, arquivar }: { projetoId: string; arquivar: boolean }) => {
+      const { data: userRes } = await supabase.auth.getUser();
+      const uid = userRes.user?.id ?? null;
+      const { error } = await supabase
+        .from('projetos')
+        .update({
+          arquivado_em: arquivar ? new Date().toISOString() : null,
+          arquivado_por: arquivar ? uid : null,
+        })
+        .eq('id', projetoId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projetos'] });
+    },
+  });
+}
