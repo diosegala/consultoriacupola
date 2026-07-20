@@ -77,7 +77,6 @@ serve(async (req) => {
     const consolidados: any[] = [];
     for (const [cid, v] of agg.entries()) {
       if (v.scores.length < 3) continue;
-      if (!qMap.has(cid)) continue;
       const info = clienteInfo.get(cid) || {};
       consolidados.push({
         cliente_id: cid,
@@ -90,13 +89,13 @@ serve(async (req) => {
           clareza_demandas_media: media(v.dims.clareza_demandas || []),
           engajamento_estrategico_media: media(v.dims.engajamento_estrategico || []),
         },
-        respostas_questionario: qMap.get(cid),
+        respostas_questionario: qMap.get(cid) ?? null,
         tem_diagnostico: diagSet.has(cid),
       });
     }
 
     if (consolidados.length === 0) {
-      return new Response(JSON.stringify({ error: "Nenhum cliente com questionário respondido + 3 reuniões analisadas." }), {
+      return new Response(JSON.stringify({ error: "Nenhum cliente com 3+ reuniões analisadas ainda. Analise mais reuniões e tente novamente." }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
