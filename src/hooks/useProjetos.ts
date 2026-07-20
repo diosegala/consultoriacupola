@@ -21,6 +21,8 @@ export interface Projeto {
   due_date: string | null;
   due_date_start: string | null;
   tipo: 'normal' | 'renovacao';
+  arquivado_em?: string | null;
+  arquivado_por?: string | null;
   created_at: string;
   updated_at: string;
   clientes?: { nome: string; cidade: string; uf: string; atendimentos?: Array<{ proxima_reuniao: string | null }> };
@@ -70,6 +72,7 @@ export function useProjetos(consultorId?: string) {
           ),
           projeto_comentarios(id)
         `)
+        .is('arquivado_em', null)
         .order('ordem_na_etapa');
       
       if (consultorId) {
