@@ -1,0 +1,1 @@
+DELETE FROM public.notificacoes WHERE tipo IN ('lembrete_gestao','briefing_1x1') AND entidade_tipo='consultor' AND entidade_id IN (SELECT id FROM public.consultores WHERE lower(nome) LIKE '%sidenir%' OR lower(nome) LIKE '%cristiano%');
