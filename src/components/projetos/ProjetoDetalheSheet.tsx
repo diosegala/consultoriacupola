@@ -985,6 +985,25 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
           }}
         />
       )}
+      {contratoAtivo && (
+        <EncerrarContratoDialog
+          open={showEncerrar}
+          onOpenChange={setShowEncerrar}
+          clienteId={projeto.cliente_id}
+          contrato={contratoAtivo}
+          onSuccess={() => {
+            arquivarProjeto.mutate(
+              { projetoId: projeto.id, arquivar: true },
+              {
+                onSuccess: () => {
+                  toast.success('Contrato encerrado e card arquivado');
+                  onOpenChange(false);
+                },
+              }
+            );
+          }}
+        />
+      )}
     </Dialog>
   );
 }
