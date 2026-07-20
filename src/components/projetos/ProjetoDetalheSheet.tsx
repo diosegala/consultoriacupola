@@ -12,12 +12,14 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
 import { CalendarIcon, Plus, Trash2, MessageSquare, CheckSquare, Video, Send, Tag, X, FileText, Target, ClipboardList, Loader2, Eye, Sparkles, Upload, Link as LinkIcon, RefreshCw } from 'lucide-react';
+import { Archive, ArchiveRestore, XCircle } from 'lucide-react';
 import { format, isPast } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Projeto } from '@/hooks/useProjetos';
+import { useArquivarProjeto } from '@/hooks/useProjetos';
 import { useProjetoComentarios, useCreateComentario, useDeleteComentario } from '@/hooks/useProjetoComentarios';
 import { useProjetoChecklist, useCreateChecklistItem, useToggleChecklistItem, useDeleteChecklistItem, useUpdateChecklistItem } from '@/hooks/useProjetoChecklist';
 import { useConsultores } from '@/hooks/useConsultores';
@@ -28,7 +30,7 @@ import { useProjetoTags, useProjetoTagVinculos, useAddTagToProjeto, useRemoveTag
 import { useProjetoDocumentos, useClienteDocumentos, useGerarDocumento, useParseDocumento } from '@/hooks/useProjetoDocumentos';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { RenovarContratoDialog } from '@/components/cliente/ClienteDialogs';
+import { RenovarContratoDialog, EncerrarContratoDialog } from '@/components/cliente/ClienteDialogs';
 import { useContratoAtivo } from '@/hooks/useContratos';
 
 interface ProjetoDetalheSheetProps {
@@ -51,6 +53,8 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [showRenovar, setShowRenovar] = useState(false);
+  const [showEncerrar, setShowEncerrar] = useState(false);
+  const arquivarProjeto = useArquivarProjeto();
   const [novoComentario, setNovoComentario] = useState('');
   const [novoCheckItem, setNovoCheckItem] = useState('');
   const [editingObs, setEditingObs] = useState(false);
@@ -182,20 +186,60 @@ export function ProjetoDetalheSheet({ projeto, open, onOpenChange, etapaNome, on
   if (!projeto) return null;
 
   const dueDate = projeto.due_date ? new Date(projeto.due_date + 'T00:00:00') : undefined;
+  const isArquivado = !!projeto.arquivado_em;
+
+  const handleArquivar = () => {
+    if (!projeto) return;
+    const arquivar = !isArquivado;
+    if (arquivar && !confirm('Arquivar este card? Ele deixará de aparecer no Kanban.')) return;
+    arquivarProjeto.mutate(
+      { projetoId: projeto.id, arquivar },
+      {
+        onSuccess: () => {
+          toast.success(arquivar ? 'Card arquivado' : 'Card desarquivado');
+          if (arquivar) onOpenChange(false);
+        },
+        onError: (e: any) => toast.error('Erro ao arquivar: ' + e.message),
+      }
+    );
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0">
         <DialogHeader className="px-6 pt-6 pb-2">
-          <DialogTitle className="text-xl">{projeto.clientes?.nome ?? 'Projeto'}</DialogTitle>
-          <div className="flex items-center gap-2 flex-wrap mt-1">
-            {etapaNome && <Badge variant="outline">{etapaNome}</Badge>}
-            {projeto.consultores?.nome && <Badge variant="secondary">{projeto.consultores.nome}</Badge>}
-            {projeto.tipo === 'renovacao' && (
-              <Badge variant="outline" className="bg-amber-500/15 text-amber-600 border-amber-500/30 gap-1">
-                <RefreshCw className="h-3 w-3" /> Renovação
-              </Badge>
-            )}
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <DialogTitle className="text-xl">{projeto.clientes?.nome ?? 'Projeto'}</DialogTitle>
+              <div className="flex items-center gap-2 flex-wrap mt-1">
+                {etapaNome && <Badge variant="outline">{etapaNome}</Badge>}
+                {projeto.consultores?.nome && <Badge variant="secondary">{projeto.consultores.nome}</Badge>}
+                {projeto.tipo === 'renovacao' && (
+                  <Badge variant="outline" className="bg-amber-500/15 text-amber-600 border-amber-500/30 gap-1">
+                    <RefreshCw className="h-3 w-3" /> Renovação
+                  </Badge>
+                )}
+                {isArquivado && (
+                  <Badge variant="outline" className="bg-muted text-muted-foreground gap-1">
+                    <Archive className="h-3 w-3" /> Arquivado
+                  </Badge>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 mr-6">
+              {contratoAtivo && !(contratoAtivo as any).encerrado_em && (
+                <Button size="sm" variant="outline" onClick={() => setShowEncerrar(true)}>
+                  <XCircle className="h-3.5 w-3.5 mr-1" /> Encerrar contrato
+                </Button>
+              )}
+              <Button size="sm" variant="outline" onClick={handleArquivar} disabled={arquivarProjeto.isPending}>
+                {isArquivado ? (
+                  <><ArchiveRestore className="h-3.5 w-3.5 mr-1" /> Desarquivar</>
+                ) : (
+                  <><Archive className="h-3.5 w-3.5 mr-1" /> Arquivar</>
+                )}
+              </Button>
+            </div>
           </div>
         </DialogHeader>
 
