@@ -1669,6 +1669,8 @@ export type Database = {
       }
       projetos: {
         Row: {
+          arquivado_em: string | null
+          arquivado_por: string | null
           cliente_id: string
           consultor_id: string
           contrato_id: string | null
@@ -1683,6 +1685,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          arquivado_em?: string | null
+          arquivado_por?: string | null
           cliente_id: string
           consultor_id: string
           contrato_id?: string | null
@@ -1697,6 +1701,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          arquivado_em?: string | null
+          arquivado_por?: string | null
           cliente_id?: string
           consultor_id?: string
           contrato_id?: string | null
