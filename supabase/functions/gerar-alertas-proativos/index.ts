@@ -434,6 +434,143 @@ Deno.serve(async (req) => {
       summary.compromisso_vencido++;
     }
 
+    // --------- 4c-bis. Score de engajamento do cliente baixo / em queda ---------
+    // Sinal precoce de risco de rescisão: dispara para a consultora responsável
+    // e para diretores/admins.
+    try {
+      const SCORE_CRITICO = 6.0;
+      const MEDIA_CRITICA = 6.5;
+      const QUEDA_MINIMA = 1.5;
+      const JANELA_DIAS = 180;
+      const DEDUP_DIAS = 14;
+
+      const desdeRisco = new Date(hoje);
+      desdeRisco.setDate(desdeRisco.getDate() - JANELA_DIAS);
+      const desdeRiscoISO = desdeRisco.toISOString().slice(0, 10);
+      const dedupDesde = new Date(hoje);
+      dedupDesde.setDate(dedupDesde.getDate() - DEDUP_DIAS);
+
+      const [{ data: clientesRisco }, { data: reunioesRisco }, { data: contratosRisco }, { data: rolesGest }] =
+        await Promise.all([
+          admin
+            .from("clientes")
+            .select("id, nome, consultor_id, status, arquivado_em")
+            .in("status", ["ativo", "aguardando_renovacao"])
+            .is("arquivado_em", null),
+          admin
+            .from("reunioes")
+            .select("cliente_id, data_reuniao, score_cliente")
+            .eq("status_analise", "concluido")
+            .not("score_cliente", "is", null)
+            .gte("data_reuniao", desdeRiscoISO)
+            .order("data_reuniao", { ascending: false }),
+          admin
+            .from("contratos")
+            .select("cliente_id, data_fim")
+            .eq("ativo", true)
+            .is("encerrado_em", null)
+            .gte("data_fim", hojeISO),
+          admin.from("user_roles").select("user_id, role").in("role", ["admin", "director"]),
+        ]);
+
+      const gestorUserIds = Array.from(new Set((rolesGest ?? []).map((r: any) => r.user_id)));
+
+      const venceEmPorCliente = new Map<string, number>();
+      for (const ct of contratosRisco ?? []) {
+        const dias = daysBetween(new Date((ct as any).data_fim + "T00:00:00"), hoje);
+        const atual = venceEmPorCliente.get((ct as any).cliente_id);
+        if (atual == null || dias < atual) venceEmPorCliente.set((ct as any).cliente_id, dias);
+      }
+
+      const reunioesPorCliente = new Map<string, number[]>();
+      for (const r of reunioesRisco ?? []) {
+        const arr = reunioesPorCliente.get((r as any).cliente_id) ?? [];
+        arr.push(Number((r as any).score_cliente));
+        reunioesPorCliente.set((r as any).cliente_id, arr);
+      }
+
+      const avg = (a: number[]) => a.reduce((s, x) => s + x, 0) / a.length;
+
+      for (const cli of clientesRisco ?? []) {
+        const scores = reunioesPorCliente.get((cli as any).id) ?? []; // já em ordem desc
+        if (scores.length < 2) continue;
+
+        const scoreAtual = scores[0];
+        const recentes = scores.slice(0, 3);
+        const anteriores = scores.slice(3, 6);
+        const mediaRecente = avg(recentes);
+        const mediaAnterior = anteriores.length >= 2 ? avg(anteriores) : null;
+        const variacao = mediaAnterior != null ? mediaRecente - mediaAnterior : null;
+
+        const motivos: string[] = [];
+        let severidade: "critico" | "atencao" | null = null;
+
+        if (scoreAtual < SCORE_CRITICO) {
+          severidade = "critico";
+          motivos.push(`última reunião com score ${scoreAtual.toFixed(1)}`);
+        }
+        if (mediaRecente < MEDIA_CRITICA) {
+          severidade = "critico";
+          motivos.push(`média das últimas ${recentes.length} reuniões em ${mediaRecente.toFixed(1)}`);
+        }
+        if (variacao != null && variacao <= -QUEDA_MINIMA) {
+          severidade = severidade ?? "atencao";
+          motivos.push(`queda de ${Math.abs(variacao).toFixed(1)} ponto(s) (${mediaAnterior!.toFixed(1)} → ${mediaRecente.toFixed(1)})`);
+        }
+        if (scores.length >= 3 && scores[0] < scores[1] && scores[1] < scores[2]) {
+          severidade = severidade ?? "atencao";
+          motivos.push("três reuniões seguidas em queda");
+        }
+        if (!severidade) continue;
+
+        const venceEm = venceEmPorCliente.get((cli as any).id) ?? null;
+        if (venceEm != null && venceEm >= 0 && venceEm <= 90) {
+          severidade = "critico";
+          motivos.push(`contrato vence em ${venceEm} dia(s)`);
+        }
+
+        const destinatarios = new Set<string>(gestorUserIds);
+        const userConsultora = (cli as any).consultor_id
+          ? userByConsultor.get((cli as any).consultor_id)
+          : undefined;
+        if (userConsultora) destinatarios.add(userConsultora);
+
+        for (const destino of destinatarios) {
+          const { data: jaEnviado } = await admin
+            .from("notificacoes")
+            .select("id")
+            .eq("user_id", destino)
+            .eq("tipo", "score_cliente_em_queda")
+            .eq("entidade_id", (cli as any).id)
+            .gte("created_at", dedupDesde.toISOString())
+            .maybeSingle();
+          if (jaEnviado) continue;
+
+          await admin.from("notificacoes").insert({
+            user_id: destino,
+            tipo: "score_cliente_em_queda",
+            titulo: `${severidade === "critico" ? "Risco alto" : "Atenção"} — engajamento de ${(cli as any).nome} em queda`,
+            descricao: `Score de engajamento: ${motivos.join("; ")}. Vale um contato ativo e revisão do plano antes da renovação.`,
+            link: `/clientes/${(cli as any).id}?tab=desempenho`,
+            entidade_tipo: "cliente",
+            entidade_id: (cli as any).id,
+            metadata: {
+              severidade,
+              score_atual: Number(scoreAtual.toFixed(1)),
+              media_recente: Number(mediaRecente.toFixed(1)),
+              media_anterior: mediaAnterior != null ? Number(mediaAnterior.toFixed(1)) : null,
+              variacao: variacao != null ? Number(variacao.toFixed(1)) : null,
+              contrato_vence_em: venceEm,
+              motivos,
+            },
+          });
+          summary.score_cliente_em_queda++;
+        }
+      }
+    } catch (riscoErr) {
+      console.error("[gerar-alertas-proativos] erro bloco risco engajamento:", riscoErr);
+    }
+
     // --------- 4d. Cadência de gestão (1:1 / equipe) + briefings 1:1 ---------
     try {
       // Descobre diretores/admins ativos
@@ -713,7 +850,7 @@ Deno.serve(async (req) => {
         .select("id", { count: "exact", head: true })
         .eq("user_id", userId)
         .eq("lida", false)
-        .in("tipo", ["sem_contato", "checklist_parado", "okr_sem_progresso", "contrato_sem_renovacao", "briefing_pre_reuniao", "compromisso_vencido", "lembrete_gestao", "briefing_1x1", "sentimento_negativo_cliente"]);
+        .in("tipo", ["sem_contato", "checklist_parado", "okr_sem_progresso", "contrato_sem_renovacao", "briefing_pre_reuniao", "compromisso_vencido", "score_cliente_em_queda", "lembrete_gestao", "briefing_1x1", "sentimento_negativo_cliente"]);
       const total = count ?? 0;
       if (total === 0) continue;
 
