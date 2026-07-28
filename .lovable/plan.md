@@ -1,68 +1,36 @@
-# Endurecer RLS por papel (admin / diretor / consultor)
+## Objetivo
 
-## Contexto
+Transformar o score de engajamento do cliente (gerado hoje em cada análise de reunião, campo `score_cliente` / `analise_cliente`) em um sinal ativo de risco de rescisão, visível no painel do diretor.
 
-Hoje quase tudo usa `is_authorized_user(uid)` — que retorna `true` para qualquer usuário com role. Ou seja: consultor tem, no banco, o mesmo poder que admin em `clientes`, `contratos`, `atendimentos`, `ferramentas_cliente`, `encerramentos`, `pausas_contrato`, `onboarding`, `consultores`, `crms`, `cliente_aliases`. A restrição hoje é só de frontend.
+Situação atual verificada: 76 reuniões analisadas, 72 com score de cliente, média 7,74, apenas 2 abaixo de 6. Ou seja, um alerta baseado só em "score baixo" dispararia pouquíssimo — por isso o critério inclui também **queda de tendência**, que é o sinal precoce mais útil.
 
-Vou reescrever as políticas para refletir o modelo real da consultoria.
+## Regras do alerta (por cliente ativo)
 
-## Regras aprovadas
+Avaliado sobre reuniões com análise concluída:
 
-- **Admin**: tudo.
-- **Diretor**: leitura e edição globais; pode excluir cadastros; gerencia configs.
-- **Consultor**: apenas a própria carteira, **ler e editar**, sem criar cliente/contrato e sem excluir nada crítico.
+- **Crítico** — última reunião com score < 6,0, ou média das 3 últimas < 6,5.
+- **Atenção** — queda ≥ 1,5 ponto entre a média das 3 últimas e a média das 3 anteriores, mesmo com score absoluto bom (ex.: 9,0 → 7,2).
+- **Atenção** — 3 reuniões seguidas em queda contínua.
+- Reforço de contexto: cliente com contrato terminando em até 90 dias sobe um nível de severidade (risco de não renovação).
+- Mínimo de 2 reuniões analisadas para entrar na régua; janela de análise: últimos 180 dias.
 
-## Helpers no banco
+## Onde aparece
 
-Uma nova função `security definer` para expressar "admin ou diretor":
+**1. Novo bloco "Risco de Churn — Engajamento" no Meu Painel** (dentro da seção de gestão, junto do Radar da Equipe)
 
-```sql
-create or replace function public.is_admin_or_director(_uid uuid)
-returns boolean language sql stable security definer set search_path=public
-as $$ select public.has_role(_uid,'admin') or public.has_role(_uid,'director') $$;
-```
+- Lista de cards ordenada por severidade: nome do cliente, consultora responsável, score atual, seta de tendência (↓ com a variação), nº de reuniões avaliadas e data da última.
+- Mini-sparkline da evolução dos últimos scores.
+- Ao clicar: abre detalhamento com os critérios que caíram (participação ativa, comprometimento com ações, etc.), os pontos de melhoria da última análise e atalhos para o cliente, para registrar interação e para gerar o Balanço do Período.
+- Contadores no topo: X clientes críticos / Y em atenção.
 
-`is_authorized_user` continua existindo (é usada em muitas policies de leitura onde o consultor precisa ler), mas onde ela hoje libera escrita/exclusão indevida, será substituída.
+**2. Notificação proativa** — novo tipo `score_cliente_em_queda` no cron `gerar-alertas-proativos`, enviada ao diretor (e à consultora responsável), com deduplicação: no máximo 1 alerta por cliente a cada 14 dias, e auto-resolução quando uma nova reunião subir o score acima do limite.
 
-## Matriz de acesso por tabela
+**3. Coluna no Radar da Equipe** — cada consultora passa a exibir "clientes em risco de engajamento", conectando o indicador ao acompanhamento individual.
 
-| Tabela | SELECT | INSERT | UPDATE | DELETE |
-|---|---|---|---|---|
-| clientes | admin+diretor: todos; consultor: própria carteira | admin+diretor | admin+diretor OR consultor da carteira | admin+diretor |
-| contratos | idem clientes (via cliente) | admin+diretor | admin+diretor OR consultor da carteira | admin+diretor |
-| atendimentos, onboarding, ferramentas_cliente, encerramentos, pausas_contrato, viagens_contrato | idem (via cliente/contrato) | admin+diretor OR consultor da carteira | idem | admin+diretor |
-| consultores | autenticados leem | admin+diretor | admin+diretor OR próprio consultor (campos limitados via trigger) | admin+diretor |
-| cliente_aliases | via cliente | via cliente | via cliente | admin+diretor |
-| crms | autenticados leem | admin+diretor | admin+diretor | admin+diretor |
-| checklist_templates, tipos_consultoria, questionarios_template, projetos_etapas, projeto_tags | autenticados leem | admin+diretor | admin+diretor | admin+diretor |
-| agente_prompts, oraculo_knowledge, oraculo_settings | admin+diretor leem/escrevem (oraculo_knowledge leitura permanece p/ autenticados pois é consumido pelo chat) | admin+diretor | admin+diretor | admin+diretor |
-| notion_documents | admin+diretor | edge function (service_role) | edge function | admin+diretor |
-| ai_usage_logs, insights_agregados, auditoria_status_cliente, webhook_logs, parse_erros_log, reunioes_importadas_log, oportunidades_produto | admin+diretor leem; escrita via edge function/service_role; usuário lê os próprios quando aplicável (já é o caso hoje) | — | — | admin |
-| consultor_user, user_roles | mantém regras atuais (admin gerencia; user vê própria) | admin | admin | admin |
-| consultor_google_tokens, perfis_comportamentais, cruzamentos_disc | mantém (já corretas: próprio consultor + admin/diretor) | — | — | — |
-| notificacoes, todo_pessoal, oraculo_conversas/mensagens, agentes_ia_rascunhos, interacoes_tempo | mantém (escopo por `user_id`) | — | — | — |
-| reunioes, reunioes_gestao, transcricoes_sumarios | revisar para: admin+diretor tudo; consultor só onde é o consultor da reunião | — | — | admin+diretor |
-| projetos, projeto_checklist, projeto_checklist_responsaveis, projeto_comentarios, projeto_documentos, projeto_tag_vinculo, compromissos, interacoes_cliente, cliente_arquivos, questionarios | políticas atuais já são por carteira; só remover `is_authorized_user` de DELETE onde consultor não deve apagar (documentos/checklist mantém autor pode apagar o próprio; cliente_arquivos mantém regra atual) | — | — | admin+diretor para exclusões amplas |
+## Detalhes técnicos
 
-## Frontend
-
-Nenhuma mudança funcional pedida. As guardas de rota atuais continuam. Ajustes eventuais só se um botão passar a receber 403 — nesse caso escondemos via `useUserRoles` (`isAdmin || isDirector`). Vou revisar rapidamente páginas que hoje mostram botão "excluir" para consultor e esconder quando não for admin/diretor: `Clientes`, `Contratos`, `ContratoTab`, `ClienteDialogs`, `FerramentasTab`, `AtendimentoDialogs`, `OnboardingTab`, `PausaContratoDialog`, `EncerramentosDialog`.
-
-## Edge functions
-
-As functions que rodam com `service_role` (webhooks, crons, imports) já contornam RLS — sem mudança. As que rodam com JWT do usuário (`create-user`, `list-auth-users`, `importar-documento-agente`, `oraculo-*`) já verificam admin/diretor no início; vou reconferir e adicionar a checagem onde estiver faltando.
-
-## Entregas
-
-1. **Migração 1 — helpers e reescrita RLS** (arquivo único):
-   - Cria `is_admin_or_director`.
-   - Para cada tabela da matriz: `DROP POLICY` das políticas atuais problemáticas + `CREATE POLICY` novas. Nada de dados alterado.
-2. **Ajustes de frontend**: esconder ações destrutivas para consultor (usa `useUserRoles`).
-3. **Revisão das edge functions sensíveis**: garantir checagem de role no topo.
-4. **Rodar `supabase--linter`** ao final e endereçar avisos.
-
-## Riscos / validação
-
-- Risco: quebrar telas onde o consultor legitimamente edita cliente da carteira — mitigado mantendo UPDATE por carteira.
-- Risco: consultor perder acesso a listagens agregadas — os SELECTs continuam permissivos para autenticados nas tabelas onde a UI já filtra (ex.: `consultores`, templates).
-- Validação: após aplicar, logar como consultor no preview e conferir que fluxos essenciais (registrar interação, editar cliente da carteira, marcar checklist) continuam funcionando, e que "excluir cliente/contrato" retorna erro.
+- Sem nova tabela: o cálculo é derivado de `reunioes.score_cliente` + `analise_cliente`, cruzado com `clientes` (não arquivados, status ativo/aguardando_renovacao) e `contratos` ativos.
+- Novo hook `useRiscoEngajamento.ts` com a lógica de tendência (compartilhada em util puro para reuso na edge function).
+- Novo componente `src/components/painel/RiscoChurnSection.tsx`, renderizado em `MeuPainel.tsx`.
+- `gerar-alertas-proativos/index.ts`: novo bloco de geração + inclusão do tipo na lista de tipos considerados no resumo diário.
+- Consultoras parceiras já excluídas dos alertas de gestão (Sidenir e Cristiano) permanecem fora dos lembretes, mas seus clientes continuam contando no bloco de risco (é indicador de cliente, não de liderança) — ajusto se preferir excluí-los também.
