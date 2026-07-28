@@ -25,6 +25,8 @@ import { EventoFormDialog } from '@/components/agenda/EventoFormDialog';
 import { usePerfisDiscBatch } from '@/hooks/useDisc';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ReunioesGestaoPorLiderada } from './ReunioesGestaoPorLiderada';
+import { RiscoChurnSection } from './RiscoChurnSection';
+import { useClientesEmRisco } from '@/hooks/useRiscoEngajamento';
 
 type RadarConsultor = {
   id: string;
@@ -209,6 +211,15 @@ export function GestaoEquipeSection({ userId }: { userId: string | null }) {
   const { data: lembretes, isLoading: loadingLembretes } = useLembretesGestao(userId);
   const consultorIds = useMemo(() => (radar ?? []).map((c) => c.id), [radar]);
   const { data: discMap } = usePerfisDiscBatch(consultorIds);
+  const { data: clientesRisco } = useClientesEmRisco();
+  const riscoPorConsultor = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const c of clientesRisco ?? []) {
+      if (!c.consultor_id) continue;
+      m.set(c.consultor_id, (m.get(c.consultor_id) ?? 0) + 1);
+    }
+    return m;
+  }, [clientesRisco]);
 
   const [agendarPara, setAgendarPara] = useState<{ consultora: string; cliente: string } | null>(null);
 
@@ -330,6 +341,14 @@ export function GestaoEquipeSection({ userId }: { userId: string | null }) {
                         <span>Sem próxima reunião agendada</span>
                       )}
                     </div>
+                    {(riscoPorConsultor.get(c.id) ?? 0) > 0 && (
+                      <div className="flex items-center gap-2 text-[11px] text-destructive">
+                        <TrendingDown className="h-3 w-3" />
+                        <span>
+                          {riscoPorConsultor.get(c.id)} cliente(s) em risco de engajamento
+                        </span>
+                      </div>
+                    )}
                   </Link>
                 );
               })}
@@ -337,6 +356,9 @@ export function GestaoEquipeSection({ userId }: { userId: string | null }) {
           )}
         </CardContent>
       </Card>
+
+      {/* BLOCO A2 — Risco de churn por engajamento do cliente */}
+      <RiscoChurnSection />
 
       {/* BLOCO B — Alertas críticos */}
       <Card>
