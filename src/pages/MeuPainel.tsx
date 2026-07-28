@@ -35,7 +35,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { GestaoEquipeSection } from '@/components/painel/GestaoEquipeSection';
 
-const TIPOS_PROATIVOS = ['sem_contato', 'checklist_parado', 'okr_sem_progresso', 'contrato_sem_renovacao'] as const;
+const TIPOS_PROATIVOS = ['sem_contato', 'checklist_parado', 'okr_sem_progresso', 'contrato_sem_renovacao', 'score_cliente_em_queda'] as const;
 type TipoProativo = (typeof TIPOS_PROATIVOS)[number];
 
 const TIPO_META: Record<TipoProativo, { label: string; className: string }> = {
@@ -43,6 +43,7 @@ const TIPO_META: Record<TipoProativo, { label: string; className: string }> = {
   checklist_parado: { label: 'Checklist parado', className: 'bg-yellow-500/15 text-yellow-600 border-yellow-600/30' },
   okr_sem_progresso: { label: 'OKRs parados', className: 'bg-orange-500/15 text-orange-500 border-orange-500/30' },
   contrato_sem_renovacao: { label: 'Renovação', className: 'bg-primary/15 text-primary border-primary/30' },
+  score_cliente_em_queda: { label: 'Engajamento em queda', className: 'bg-destructive/15 text-destructive border-destructive/30' },
 };
 
 function useAcoesSugeridas(userId: string | null | undefined) {
