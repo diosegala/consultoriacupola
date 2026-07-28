@@ -41,6 +41,7 @@ Deno.serve(async (req) => {
     contrato_sem_renovacao: 0,
     briefing_pre_reuniao: 0,
     compromisso_vencido: 0,
+    score_cliente_em_queda: 0,
     lembrete_gestao: 0,
     briefing_1x1: 0,
     resumo_diario: 0,
