@@ -499,6 +499,18 @@ Retorne a análise usando a função fornecida. Seja conciso nos textos.`;
       console.error("[analisar-reuniao] erro ao notificar sentimento (não crítico):", sentErr);
     }
 
+    // Indexa a transcrição para a Pesquisa de Reuniões (não crítico)
+    try {
+      const authHeader = req.headers.get("Authorization") ?? "";
+      await fetch(`${supabaseUrl}/functions/v1/indexar-reunioes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: authHeader },
+        body: JSON.stringify({ action: "index", reuniao_id }),
+      });
+    } catch (idxErr) {
+      console.error("[analisar-reuniao] erro ao indexar transcrição (não crítico):", idxErr);
+    }
+
     return new Response(
       JSON.stringify({ success: true, score: Math.round(scoreConsultor * 10) / 10, score_cliente: scoreCliente, compromissos: compromissosInseridos }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
