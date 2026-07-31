@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
-import { Search, Send, StopCircle, Plus, RefreshCw, FileText, Loader2 } from "lucide-react";
+import { Search, Send, StopCircle, Plus, RefreshCw, FileText, Loader2, History, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,7 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useClientes } from "@/hooks/useClientes";
 import { useConsultores } from "@/hooks/useConsultores";
-import { usePesquisaReunioes, PesquisaFiltros } from "@/hooks/usePesquisaReunioes";
+import { usePesquisaReunioes, PesquisaFiltros, PesquisaMsg } from "@/hooks/usePesquisaReunioes";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -49,8 +49,11 @@ export default function PesquisaReunioes() {
   const [input, setInput] = useState("");
   const [status, setStatus] = useState<{ total_com_transcricao: number; indexadas: number; pendentes: number } | null>(null);
   const [indexando, setIndexando] = useState(false);
+  const [conversas, setConversas] = useState<Array<{ id: string; titulo: string | null; updated_at: string }>>([]);
+  const [conversaAtiva, setConversaAtiva] = useState<string | null>(null);
+  const [carregandoConversa, setCarregandoConversa] = useState(false);
 
-  const { messages, isStreaming, error, send, stop, reset } = usePesquisaReunioes();
+  const { messages, isStreaming, error, send, stop, reset, conversaId } = usePesquisaReunioes();
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -59,6 +62,54 @@ export default function PesquisaReunioes() {
   }, [messages, isStreaming]);
 
   useEffect(() => { textareaRef.current?.focus(); }, [isStreaming]);
+
+  const carregarConversas = async () => {
+    const { data } = await supabase
+      .from("oraculo_conversas")
+      .select("id, titulo, updated_at, contexto_origem")
+      .order("updated_at", { ascending: false })
+      .limit(50);
+    setConversas(
+      ((data ?? []) as any[])
+        .filter((c) => (c.contexto_origem as any)?.tipo === "pesquisa_reunioes")
+        .map((c) => ({ id: c.id, titulo: c.titulo, updated_at: c.updated_at }))
+    );
+  };
+
+  useEffect(() => { carregarConversas(); }, []);
+
+  useEffect(() => {
+    if (conversaId) {
+      setConversaAtiva(conversaId);
+      if (!isStreaming) carregarConversas();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversaId, isStreaming]);
+
+  const abrirConversa = async (id: string) => {
+    setCarregandoConversa(true);
+    try {
+      const { data } = await supabase
+        .from("oraculo_mensagens")
+        .select("role, content")
+        .eq("conversa_id", id)
+        .order("created_at", { ascending: true });
+      const msgs: PesquisaMsg[] = ((data ?? []) as any[]).map((m) => ({ role: m.role, content: m.content }));
+      reset(msgs, id);
+      setConversaAtiva(id);
+    } finally {
+      setCarregandoConversa(false);
+    }
+  };
+
+  const excluirConversa = async (id: string) => {
+    const { error: err } = await supabase.from("oraculo_conversas").delete().eq("id", id);
+    if (err) { toast.error("Não foi possível excluir"); return; }
+    if (conversaAtiva === id) { reset([], null); setConversaAtiva(null); }
+    carregarConversas();
+  };
+
+  const novaPesquisa = () => { reset([], null); setConversaAtiva(null); };
 
   const carregarStatus = async () => {
     if (!podeIndexar) return;
@@ -71,17 +122,35 @@ export default function PesquisaReunioes() {
   const indexarLote = async () => {
     setIndexando(true);
     try {
-      let restante = true;
       let loops = 0;
-      while (restante && loops < 40) {
-        const { data, error: err } = await supabase.functions.invoke("indexar-reunioes", { body: { action: "index", limit: 10 } });
-        if (err) throw err;
-        const proc = (data as any)?.processadas ?? 0;
-        await carregarStatus();
+      let falhasSeguidas = 0;
+      const errosVistos = new Set<string>();
+      while (loops < 120) {
         loops++;
-        restante = proc > 0;
+        const { data, error: err } = await supabase.functions.invoke("indexar-reunioes", { body: { action: "index", limit: 5 } });
+        if (err) {
+          falhasSeguidas++;
+          if (falhasSeguidas >= 3) throw err;
+          continue;
+        }
+        const resp = (data ?? {}) as { processadas?: number; erros?: string[]; alvos?: number };
+        (resp.erros ?? []).forEach((e) => errosVistos.add(e));
+        await carregarStatus();
+        if (!resp.alvos) break; // nada pendente
+        if (!resp.processadas) {
+          falhasSeguidas++;
+          if (falhasSeguidas >= 3) break;
+        } else {
+          falhasSeguidas = 0;
+        }
       }
-      toast.success("Indexação concluída");
+      if (errosVistos.size) {
+        toast.warning(`Indexação finalizada com ${errosVistos.size} reunião(ões) com erro`, {
+          description: Array.from(errosVistos)[0]?.slice(0, 160),
+        });
+      } else {
+        toast.success("Indexação concluída");
+      }
     } catch (e: any) {
       toast.error(e?.message || "Erro ao indexar transcrições");
     } finally {
@@ -123,7 +192,7 @@ export default function PesquisaReunioes() {
             Pergunte em linguagem natural e receba respostas fundamentadas no que os clientes disseram nas reuniões.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => reset([], null)}>
+        <Button variant="outline" size="sm" onClick={novaPesquisa}>
           <Plus className="h-4 w-4 mr-1" /> Nova pesquisa
         </Button>
       </div>
@@ -214,6 +283,46 @@ export default function PesquisaReunioes() {
               </CardContent>
             </Card>
           )}
+
+          <Card>
+            <CardContent className="p-4 space-y-2">
+              <p className="text-sm font-semibold flex items-center gap-1.5">
+                <History className="h-4 w-4" /> Histórico
+                {carregandoConversa && <Loader2 className="h-3 w-3 animate-spin" />}
+              </p>
+              {conversas.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Suas pesquisas anteriores aparecerão aqui.</p>
+              ) : (
+                <ScrollArea className="max-h-64">
+                  <div className="space-y-1 pr-2">
+                    {conversas.map((c) => (
+                      <div
+                        key={c.id}
+                        className={cn(
+                          "group flex items-start gap-1 rounded-md border p-2 text-left transition-colors",
+                          conversaAtiva === c.id ? "border-primary/60 bg-muted/50" : "hover:border-primary/40"
+                        )}
+                      >
+                        <button className="flex-1 text-left" onClick={() => abrirConversa(c.id)}>
+                          <p className="text-xs line-clamp-2">{c.titulo || "Pesquisa sem título"}</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            {new Date(c.updated_at).toLocaleDateString("pt-BR")}
+                          </p>
+                        </button>
+                        <button
+                          className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
+                          onClick={() => excluirConversa(c.id)}
+                          aria-label="Excluir pesquisa"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         {/* Chat */}

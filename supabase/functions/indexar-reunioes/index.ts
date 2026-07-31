@@ -9,6 +9,8 @@ const EMB_MODEL = "openai/text-embedding-3-small";
 const EMB_DIMS = 1536;
 const CHUNK_SIZE = 1200;
 const OVERLAP = 150;
+const EMB_BATCH = 16;
+const CHAR_BUDGET = 250_000; // orçamento por invocação, evita timeout
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -36,20 +38,33 @@ async function hashText(text: string): Promise<string> {
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 32);
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 async function embedBatch(inputs: string[], key: string): Promise<number[][]> {
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: EMB_MODEL, input: inputs, dimensions: EMB_DIMS }),
-  });
-  if (!res.ok) {
-    const txt = await res.text();
-    throw new Error(`Embeddings ${res.status}: ${txt.slice(0, 300)}`);
+  let ultimoErro = "";
+  for (let tentativa = 0; tentativa < 4; tentativa++) {
+    try {
+      const res = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: EMB_MODEL, input: inputs, dimensions: EMB_DIMS }),
+      });
+      if (res.ok) {
+        const j = await res.json();
+        return (j.data as Array<{ index: number; embedding: number[] }>)
+          .sort((a, b) => a.index - b.index)
+          .map((d) => d.embedding);
+      }
+      const txt = await res.text();
+      ultimoErro = `Embeddings ${res.status}: ${txt.slice(0, 200)}`;
+      if (res.status !== 429 && res.status < 500) throw new Error(ultimoErro);
+    } catch (e) {
+      ultimoErro = e instanceof Error ? e.message : String(e);
+      if (!/429|5\d\d|network|timed?\s*out|fetch/i.test(ultimoErro)) throw e;
+    }
+    await sleep(800 * Math.pow(2, tentativa));
   }
-  const json = await res.json();
-  return (json.data as Array<{ index: number; embedding: number[] }>)
-    .sort((a, b) => a.index - b.index)
-    .map((d) => d.embedding);
+  throw new Error(ultimoErro || "Falha nos embeddings");
 }
 
 Deno.serve(async (req) => {
@@ -75,16 +90,32 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const action: string = body.action ?? "index";
     const reuniaoId: string | undefined = body.reuniao_id;
-    const limit: number = Math.min(Number(body.limit ?? 10), 25);
+    const limit: number = Math.min(Number(body.limit ?? 5), 15);
+
+    // IDs já indexados (paginado — o PostgREST limita a 1000 linhas por página)
+    async function idsIndexados(): Promise<Set<string>> {
+      const set = new Set<string>();
+      const page = 1000;
+      for (let from = 0; ; from += page) {
+        const { data, error } = await service
+          .from("reunioes_chunks").select("reuniao_id").range(from, from + page - 1);
+        if (error) throw new Error(error.message);
+        for (const r of data || []) set.add((r as any).reuniao_id);
+        if (!data || data.length < page) break;
+      }
+      return set;
+    }
 
     if (action === "status") {
       if (!isAdminOrDirector) return json({ error: "forbidden" }, 403);
       const { count: total } = await service
         .from("reunioes").select("id", { count: "exact", head: true }).not("transcricao", "is", null);
-      // contagem de reuniões distintas já indexadas
-      const { data: rows } = await service.from("reunioes_chunks").select("reuniao_id");
-      const distintas = new Set((rows || []).map((r: any) => r.reuniao_id)).size;
-      return json({ total_com_transcricao: total ?? 0, indexadas: distintas, pendentes: Math.max((total ?? 0) - distintas, 0) });
+      const indexadas = (await idsIndexados()).size;
+      return json({
+        total_com_transcricao: total ?? 0,
+        indexadas,
+        pendentes: Math.max((total ?? 0) - indexadas, 0),
+      });
     }
 
     if (!isAdminOrDirector && !reuniaoId) return json({ error: "forbidden" }, 403);
@@ -95,7 +126,6 @@ Deno.serve(async (req) => {
     // Seleciona reuniões alvo
     let alvos: any[] = [];
     if (reuniaoId) {
-      // valida acesso do usuário à reunião via RLS
       const { data: permitida } = await userClient.from("reunioes").select("id").eq("id", reuniaoId).maybeSingle();
       if (!permitida) return json({ error: "Reunião não encontrada" }, 404);
       const { data } = await service
@@ -105,15 +135,21 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (data?.transcricao) alvos = [data];
     } else {
-      const { data: jaIndexadas } = await service.from("reunioes_chunks").select("reuniao_id");
-      const indexSet = new Set((jaIndexadas || []).map((r: any) => r.reuniao_id));
+      const indexSet = await idsIndexados();
       const { data } = await service
         .from("reunioes")
         .select("id, cliente_id, consultor_id, data_reuniao, transcricao")
         .not("transcricao", "is", null)
         .order("data_reuniao", { ascending: false })
-        .limit(500);
-      alvos = (data || []).filter((r: any) => !indexSet.has(r.id) && (r.transcricao || "").length > 100).slice(0, limit);
+        .limit(1000);
+      const pendentes = (data || []).filter((r: any) => !indexSet.has(r.id) && (r.transcricao || "").length > 100);
+      let orcamento = CHAR_BUDGET;
+      for (const r of pendentes) {
+        if (alvos.length >= limit) break;
+        if (alvos.length > 0 && orcamento <= 0) break;
+        alvos.push(r);
+        orcamento -= (r.transcricao || "").length;
+      }
     }
 
     let processadas = 0;
@@ -124,14 +160,29 @@ Deno.serve(async (req) => {
       try {
         const transcricao: string = r.transcricao || "";
         const hash = await hashText(transcricao);
-        const { data: existente } = await service
-          .from("reunioes_chunks").select("hash_transcricao").eq("reuniao_id", r.id).limit(1).maybeSingle();
-        if (existente?.hash_transcricao === hash) continue;
 
-        await service.from("reunioes_chunks").delete().eq("reuniao_id", r.id);
+        const { data: existentes } = await service
+          .from("reunioes_chunks")
+          .select("chunk_index, hash_transcricao")
+          .eq("reuniao_id", r.id)
+          .order("chunk_index", { ascending: false })
+          .limit(1);
+        const atual = existentes?.[0];
         const pedacos = chunkText(transcricao);
-        for (let i = 0; i < pedacos.length; i += 50) {
-          const lote = pedacos.slice(i, i + 50);
+
+        let inicio = 0;
+        if (atual) {
+          if (atual.hash_transcricao === hash) {
+            // retoma de onde parou (indexação parcial por timeout)
+            inicio = (atual.chunk_index ?? -1) + 1;
+            if (inicio >= pedacos.length) { processadas++; continue; }
+          } else {
+            await service.from("reunioes_chunks").delete().eq("reuniao_id", r.id);
+          }
+        }
+
+        for (let i = inicio; i < pedacos.length; i += EMB_BATCH) {
+          const lote = pedacos.slice(i, i + EMB_BATCH);
           const vetores = await embedBatch(lote, LOVABLE_API_KEY);
           const rows = lote.map((conteudo, idx) => ({
             reuniao_id: r.id,
@@ -149,12 +200,13 @@ Deno.serve(async (req) => {
         }
         processadas++;
       } catch (e) {
-        console.error("[indexar-reunioes] erro reuniao", r.id, e);
-        erros.push(`${r.id}: ${e instanceof Error ? e.message : String(e)}`);
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error("[indexar-reunioes] erro reuniao", r.id, msg);
+        erros.push(`${r.id}: ${msg}`);
       }
     }
 
-    return json({ processadas, trechos, erros, restantes_no_lote: alvos.length - processadas });
+    return json({ processadas, trechos, erros, alvos: alvos.length });
   } catch (e) {
     console.error("[indexar-reunioes]", e);
     return json({ error: e instanceof Error ? e.message : "Erro desconhecido" }, 500);
