@@ -15,7 +15,8 @@ import {
   CalendarDays,
   Sparkles,
   Bot,
-  Brain
+  Brain,
+  Search
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -35,6 +36,7 @@ const adminMenuItems = [
   { to: '/agenda', icon: CalendarDays, label: 'Agenda' },
   { to: '/oraculo', icon: Sparkles, label: 'Oráculo' },
   { to: '/agentes', icon: Bot, label: 'Agentes IA' },
+  { to: '/pesquisa-reunioes', icon: Search, label: 'Pesquisa de Reuniões' },
   { to: '/inteligencia', icon: Brain, label: 'Inteligência' },
   { to: '/minhas-tarefas', icon: ListChecks, label: 'Minhas tarefas' },
   { to: '/integracoes', icon: Link2, label: 'Minhas Integrações' },
@@ -49,6 +51,7 @@ const consultorMenuItems = [
   { to: '/reunioes', icon: Video, label: 'Reuniões' },
   { to: '/oraculo', icon: Sparkles, label: 'Oráculo' },
   { to: '/agentes', icon: Bot, label: 'Agentes IA' },
+  { to: '/pesquisa-reunioes', icon: Search, label: 'Pesquisa de Reuniões' },
   { to: '/minhas-tarefas', icon: ListChecks, label: 'Minhas tarefas' },
   { to: '/integracoes', icon: Link2, label: 'Minhas Integrações' },
 ];

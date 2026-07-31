@@ -32,6 +32,7 @@ import OraculoAdmin from "./pages/OraculoAdmin";
 import MeuPainel from "./pages/MeuPainel";
 import Agentes from "./pages/Agentes";
 import Inteligencia from "./pages/Inteligencia";
+import PesquisaReunioes from "./pages/PesquisaReunioes";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 
 const queryClient = new QueryClient();
@@ -66,6 +67,7 @@ const App = () => (
               <Route path="/oraculo" element={<Oraculo />} />
               <Route path="/oraculo/base" element={<OraculoBase />} />
               <Route path="/oraculo/admin" element={<OraculoAdmin />} />
+              <Route path="/pesquisa-reunioes" element={<PesquisaReunioes />} />
               <Route path="/meu-painel" element={<MeuPainel />} />
               <Route path="/agentes" element={<Agentes />} />
               <Route path="/inteligencia" element={<Inteligencia />} />
