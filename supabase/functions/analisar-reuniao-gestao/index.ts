@@ -24,14 +24,17 @@ serve(async (req) => {
     // Autoriza tanto chamadas de usuário (admin/director) quanto internas
     // (cron/sync), quando não houver Authorization user JWT usamos service role.
     const authHeader = req.headers.get("Authorization");
-    let userId: string | null = null;
-    if (authHeader) {
-      const supabaseAuth = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-        global: { headers: { Authorization: authHeader } },
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
-      const { data: { user } } = await supabaseAuth.auth.getUser();
-      userId = user?.id ?? null;
     }
+    let userId: string | null = null;
+    const supabaseAuth = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user } } = await supabaseAuth.auth.getUser();
+    userId = user?.id ?? null;
 
     const { reuniao_gestao_id } = await req.json();
     if (!reuniao_gestao_id) {
