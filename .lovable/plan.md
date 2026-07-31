@@ -1,36 +1,38 @@
 ## Objetivo
 
-Transformar o score de engajamento do cliente (gerado hoje em cada análise de reunião, campo `score_cliente` / `analise_cliente`) em um sinal ativo de risco de rescisão, visível no painel do diretor.
+Uma página de pesquisa conversacional sobre o que os clientes dizem nas reuniões: você pergunta em linguagem natural e a IA responde citando trechos reais das transcrições, complementados pelos resumos, scores e análises já existentes.
 
-Situação atual verificada: 76 reuniões analisadas, 72 com score de cliente, média 7,74, apenas 2 abaixo de 6. Ou seja, um alerta baseado só em "score baixo" dispararia pouquíssimo — por isso o critério inclui também **queda de tendência**, que é o sinal precoce mais útil.
+## Nova página `/pesquisa-reunioes`
 
-## Regras do alerta (por cliente ativo)
+- Item na sidebar ("Pesquisa de Reuniões"), acessível a todos os roles.
+- Layout em duas colunas:
+  - **Filtros (opcionais)**: cliente, consultor, período (últimos 3/6/12 meses ou intervalo), tipo de reunião. Vazio = busca em tudo que o usuário pode ver.
+  - **Chat**: mesmo padrão visual do Oráculo (markdown, streaming, parar, nova conversa).
+- Cada resposta mostra abaixo as **fontes usadas**: cards com cliente, data e trecho citado, clicáveis para abrir a reunião.
+- Escopo por carteira: diretor/admin pesquisam tudo; consultor pesquisa apenas reuniões dos próprios clientes (validado no servidor, não só na UI).
 
-Avaliado sobre reuniões com análise concluída:
+## Como a busca funciona
 
-- **Crítico** — última reunião com score < 6,0, ou média das 3 últimas < 6,5.
-- **Atenção** — queda ≥ 1,5 ponto entre a média das 3 últimas e a média das 3 anteriores, mesmo com score absoluto bom (ex.: 9,0 → 7,2).
-- **Atenção** — 3 reuniões seguidas em queda contínua.
-- Reforço de contexto: cliente com contrato terminando em até 90 dias sobe um nível de severidade (risco de não renovação).
-- Mínimo de 2 reuniões analisadas para entrar na régua; janela de análise: últimos 180 dias.
+1. Indexação: cada transcrição é quebrada em trechos (~1200 caracteres com sobreposição) e recebe um embedding, guardado com `reuniao_id`, `cliente_id`, `consultor_id` e data.
+2. Na pergunta: gera-se o embedding da pergunta e buscam-se os trechos mais similares dentro do escopo permitido e dos filtros escolhidos.
+3. Contexto agregado: junto aos trechos, envia-se um resumo estruturado das reuniões envolvidas (resumo_ia, score do cliente, dimensões de engajamento, compromissos) para a IA conseguir responder perguntas quantitativas ("quais clientes reclamam de X?", "o engajamento caiu depois de Y?").
+4. A IA responde citando cliente e data de cada afirmação, e diz explicitamente quando não há evidência nas transcrições.
 
-## Onde aparece
+## Indexação das reuniões existentes e novas
 
-**1. Novo bloco "Risco de Churn — Engajamento" no Meu Painel** (dentro da seção de gestão, junto do Radar da Equipe)
-
-- Lista de cards ordenada por severidade: nome do cliente, consultora responsável, score atual, seta de tendência (↓ com a variação), nº de reuniões avaliadas e data da última.
-- Mini-sparkline da evolução dos últimos scores.
-- Ao clicar: abre detalhamento com os critérios que caíram (participação ativa, comprometimento com ações, etc.), os pontos de melhoria da última análise e atalhos para o cliente, para registrar interação e para gerar o Balanço do Período.
-- Contadores no topo: X clientes críticos / Y em atenção.
-
-**2. Notificação proativa** — novo tipo `score_cliente_em_queda` no cron `gerar-alertas-proativos`, enviada ao diretor (e à consultora responsável), com deduplicação: no máximo 1 alerta por cliente a cada 14 dias, e auto-resolução quando uma nova reunião subir o score acima do limite.
-
-**3. Coluna no Radar da Equipe** — cada consultora passa a exibir "clientes em risco de engajamento", conectando o indicador ao acompanhamento individual.
+- Backfill: rotina que indexa as transcrições já existentes em lotes, com botão "Reindexar transcrições" na área administrativa e barra de progresso (X de Y reuniões indexadas).
+- Novas reuniões: indexação automática logo após a análise da reunião, e no sync diário do Drive.
+- Reindexação incremental: só reprocessa reuniões cuja transcrição mudou ou que ainda não têm trechos.
 
 ## Detalhes técnicos
 
-- Sem nova tabela: o cálculo é derivado de `reunioes.score_cliente` + `analise_cliente`, cruzado com `clientes` (não arquivados, status ativo/aguardando_renovacao) e `contratos` ativos.
-- Novo hook `useRiscoEngajamento.ts` com a lógica de tendência (compartilhada em util puro para reuso na edge function).
-- Novo componente `src/components/painel/RiscoChurnSection.tsx`, renderizado em `MeuPainel.tsx`.
-- `gerar-alertas-proativos/index.ts`: novo bloco de geração + inclusão do tipo na lista de tipos considerados no resumo diário.
-- Consultoras parceiras já excluídas dos alertas de gestão (Sidenir e Cristiano) permanecem fora dos lembretes, mas seus clientes continuam contando no bloco de risco (é indicador de cliente, não de liderança) — ajusto se preferir excluí-los também.
+- Nova tabela `reunioes_chunks` (`reuniao_id`, `cliente_id`, `consultor_id`, `data_reuniao`, `chunk_index`, `conteudo`, `embedding vector(1536)`, `hash_transcricao`) com índice HNSW, GRANTs e RLS espelhando as policies de `reunioes` (admin/diretor tudo, consultor só a própria carteira).
+- Função SQL `buscar_trechos_reunioes(query_embedding, filtros, match_count)` em SECURITY INVOKER, para que o RLS aplique o escopo automaticamente.
+- Edge function `indexar-reunioes`: chunking + embeddings via `openai/text-embedding-3-small` (mesmo modelo já usado no Oráculo, mantendo compatibilidade), processamento em lotes com retomada.
+- Edge function `pesquisa-reunioes`: valida Authorization antes do body, gera embedding da pergunta, busca trechos com o cliente do usuário (RLS ativo), monta o contexto agregado e faz streaming SSE com Claude (mesmo padrão do `oraculo-chat`), registrando uso em `ai_usage_logs`.
+- Histórico das conversas reaproveita `oraculo_conversas`/`oraculo_mensagens` com um marcador de origem, evitando tabelas duplicadas.
+- Frontend: hook `usePesquisaReunioes` (streaming + fontes) e página nova reutilizando o padrão do `OraculoChatPanel`.
+
+## Custo e limites
+
+A indexação inicial gera embeddings de todas as transcrições uma única vez (custo baixo, por token); depois só as reuniões novas. As respostas usam apenas os trechos mais relevantes, mantendo cada pergunta barata.
