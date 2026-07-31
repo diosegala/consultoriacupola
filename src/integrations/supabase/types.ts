@@ -1936,6 +1936,67 @@ export type Database = {
           },
         ]
       }
+      reunioes_chunks: {
+        Row: {
+          chunk_index: number
+          cliente_id: string
+          consultor_id: string | null
+          conteudo: string
+          created_at: string
+          data_reuniao: string | null
+          embedding: string | null
+          hash_transcricao: string | null
+          id: string
+          reuniao_id: string
+        }
+        Insert: {
+          chunk_index?: number
+          cliente_id: string
+          consultor_id?: string | null
+          conteudo: string
+          created_at?: string
+          data_reuniao?: string | null
+          embedding?: string | null
+          hash_transcricao?: string | null
+          id?: string
+          reuniao_id: string
+        }
+        Update: {
+          chunk_index?: number
+          cliente_id?: string
+          consultor_id?: string | null
+          conteudo?: string
+          created_at?: string
+          data_reuniao?: string | null
+          embedding?: string | null
+          hash_transcricao?: string | null
+          id?: string
+          reuniao_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reunioes_chunks_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reunioes_chunks_consultor_id_fkey"
+            columns: ["consultor_id"]
+            isOneToOne: false
+            referencedRelation: "consultores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reunioes_chunks_reuniao_id_fkey"
+            columns: ["reuniao_id"]
+            isOneToOne: false
+            referencedRelation: "reunioes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reunioes_gestao: {
         Row: {
           analise_ia: Json | null
@@ -2274,6 +2335,26 @@ export type Database = {
           id: string
           similarity: number
           titulo: string
+        }[]
+      }
+      buscar_trechos_reunioes: {
+        Args: {
+          match_count?: number
+          p_cliente_id?: string
+          p_consultor_id?: string
+          p_data_fim?: string
+          p_data_inicio?: string
+          query_embedding: string
+        }
+        Returns: {
+          chunk_index: number
+          cliente_id: string
+          consultor_id: string
+          conteudo: string
+          data_reuniao: string
+          id: string
+          reuniao_id: string
+          similarity: number
         }[]
       }
       criar_cards_renovacao: { Args: never; Returns: number }
