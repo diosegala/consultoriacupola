@@ -81,7 +81,6 @@ Deno.serve(async (req) => {
       if (!isAdminOrDirector) return json({ error: "forbidden" }, 403);
       const { count: total } = await service
         .from("reunioes").select("id", { count: "exact", head: true }).not("transcricao", "is", null);
-      const { data: indexadas } = await service.rpc("exec_noop").select?.() ?? { data: null };
       // contagem de reuniões distintas já indexadas
       const { data: rows } = await service.from("reunioes_chunks").select("reuniao_id");
       const distintas = new Set((rows || []).map((r: any) => r.reuniao_id)).size;
