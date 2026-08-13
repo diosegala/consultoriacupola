@@ -53,9 +53,10 @@ export default function PesquisaReunioes() {
   const [conversaAtiva, setConversaAtiva] = useState<string | null>(null);
   const [carregandoConversa, setCarregandoConversa] = useState(false);
 
-  const { messages, isStreaming, error, send, stop, reset, conversaId } = usePesquisaReunioes();
+  const { messages, isStreaming, error, send, stop, reset, conversaId, pendente, limparPendente } = usePesquisaReunioes();
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const recuperandoRef = useRef(false);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -69,14 +70,69 @@ export default function PesquisaReunioes() {
       .select("id, titulo, updated_at, contexto_origem")
       .order("updated_at", { ascending: false })
       .limit(50);
-    setConversas(
-      ((data ?? []) as any[])
+    const lista = ((data ?? []) as any[])
         .filter((c) => (c.contexto_origem as any)?.tipo === "pesquisa_reunioes")
-        .map((c) => ({ id: c.id, titulo: c.titulo, updated_at: c.updated_at }))
-    );
+      .map((c) => ({ id: c.id, titulo: c.titulo, updated_at: c.updated_at }));
+    setConversas(lista);
+    return lista;
+  };
+
+  // Recupera a resposta gerada no servidor quando a conexão do navegador foi interrompida
+  // (troca de aba, recarregamento ou saída da página durante a geração).
+  const recuperarPendente = async () => {
+    if (!pendente || isStreaming || recuperandoRef.current) return;
+    recuperandoRef.current = true;
+    try {
+      const lista = await carregarConversas();
+      const alvoId =
+        conversaId ??
+        lista.find((c) => (c.titulo ?? "").trim() === pendente.slice(0, 80).trim())?.id ??
+        lista[0]?.id;
+      if (!alvoId) return;
+      const { data } = await supabase
+        .from("oraculo_mensagens")
+        .select("role, content")
+        .eq("conversa_id", alvoId)
+        .order("created_at", { ascending: true });
+      const msgs: PesquisaMsg[] = ((data ?? []) as any[]).map((m) => ({ role: m.role, content: m.content }));
+      const ultima = msgs[msgs.length - 1];
+      if (ultima?.role === "assistant" && ultima.content) {
+        reset(msgs, alvoId);
+        setConversaAtiva(alvoId);
+        limparPendente();
+        toast.success("Resposta recuperada do histórico");
+      }
+    } finally {
+      recuperandoRef.current = false;
+    }
   };
 
   useEffect(() => { carregarConversas(); }, []);
+
+  // Ao voltar para a aba/janela, revalida histórico e tenta recuperar resposta pendente.
+  useEffect(() => {
+    const onFocus = () => {
+      if (document.visibilityState !== "visible" || isStreaming) return;
+      carregarConversas();
+      recuperarPendente();
+    };
+    onFocus();
+    document.addEventListener("visibilitychange", onFocus);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", onFocus);
+      window.removeEventListener("focus", onFocus);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendente, isStreaming, conversaId]);
+
+  // Enquanto houver pergunta pendente sem resposta, faz polling curto.
+  useEffect(() => {
+    if (!pendente || isStreaming) return;
+    const t = setInterval(() => { recuperarPendente(); }, 5000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendente, isStreaming, conversaId]);
 
   useEffect(() => {
     if (conversaId) {
