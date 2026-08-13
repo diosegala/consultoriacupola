@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface FonteTrecho {
@@ -23,18 +23,63 @@ export interface PesquisaFiltros {
   data_fim?: string | null;
 }
 
+const STORAGE_KEY = "pesquisa-reunioes:estado";
+
+interface EstadoPersistido {
+  messages: PesquisaMsg[];
+  conversaId: string | null;
+  pendente: string | null;
+  pendenteEm: number | null;
+}
+
+function lerEstado(): EstadoPersistido {
+  if (typeof window === "undefined") return { messages: [], conversaId: null, pendente: null, pendenteEm: null };
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { messages: [], conversaId: null, pendente: null, pendenteEm: null };
+    const parsed = JSON.parse(raw);
+    return {
+      messages: Array.isArray(parsed?.messages) ? parsed.messages : [],
+      conversaId: parsed?.conversaId ?? null,
+      pendente: parsed?.pendente ?? null,
+      pendenteEm: parsed?.pendenteEm ?? null,
+    };
+  } catch {
+    return { messages: [], conversaId: null, pendente: null, pendenteEm: null };
+  }
+}
+
+function gravarEstado(estado: EstadoPersistido) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(estado));
+  } catch { /* ignora quota */ }
+}
+
 export function usePesquisaReunioes(initialMessages: PesquisaMsg[] = [], initialConversaId: string | null = null) {
-  const [messages, setMessages] = useState<PesquisaMsg[]>(initialMessages);
-  const [conversaId, setConversaId] = useState<string | null>(initialConversaId);
+  const persistido = useRef<EstadoPersistido>(lerEstado()).current;
+  const [messages, setMessages] = useState<PesquisaMsg[]>(
+    initialMessages.length ? initialMessages : persistido.messages
+  );
+  const [conversaId, setConversaId] = useState<string | null>(initialConversaId ?? persistido.conversaId);
+  const [pendente, setPendente] = useState<string | null>(persistido.pendente);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  // Mantém a sessão viva ao trocar de aba, recarregar ou sair da página.
+  useEffect(() => {
+    gravarEstado({ messages, conversaId, pendente, pendenteEm: pendente ? Date.now() : null });
+  }, [messages, conversaId, pendente]);
+
   const reset = useCallback((msgs: PesquisaMsg[] = [], convId: string | null = null) => {
     setMessages(msgs);
     setConversaId(convId);
+    setPendente(null);
     setError(null);
   }, []);
+
+  const limparPendente = useCallback(() => setPendente(null), []);
 
   const send = useCallback(async (text: string, filtros: PesquisaFiltros = {}) => {
     const trimmed = text.trim();
@@ -43,6 +88,7 @@ export function usePesquisaReunioes(initialMessages: PesquisaMsg[] = [], initial
 
     const next: PesquisaMsg[] = [...messages, { role: "user", content: trimmed }];
     setMessages([...next, { role: "assistant", content: "" }]);
+    setPendente(trimmed);
     setIsStreaming(true);
 
     try {
@@ -63,6 +109,7 @@ export function usePesquisaReunioes(initialMessages: PesquisaMsg[] = [], initial
           filtros,
         }),
         signal: controller.signal,
+        keepalive: false,
       });
 
       if (!resp.ok) {
@@ -115,13 +162,14 @@ export function usePesquisaReunioes(initialMessages: PesquisaMsg[] = [], initial
           } catch { /* ignora */ }
         }
       }
+      if (assistant.trim()) setPendente(null);
     } catch (e: any) {
-      if (e?.name !== "AbortError") setError(e?.message || "Erro ao pesquisar");
-      setMessages((prev) => {
-        const copy = [...prev];
-        if (copy.length && copy[copy.length - 1].role === "assistant" && !copy[copy.length - 1].content) copy.pop();
-        return copy;
-      });
+      if (e?.name !== "AbortError") {
+        setError(
+          "A conexão com a análise foi interrompida. A resposta continua sendo gerada no servidor e será recuperada automaticamente."
+        );
+      }
+      // Mantém a mensagem do usuário para permitir recuperação da resposta no histórico.
     } finally {
       setIsStreaming(false);
       abortRef.current = null;
@@ -133,5 +181,5 @@ export function usePesquisaReunioes(initialMessages: PesquisaMsg[] = [], initial
     setIsStreaming(false);
   }, []);
 
-  return { messages, conversaId, isStreaming, error, send, stop, reset };
+  return { messages, conversaId, isStreaming, error, pendente, limparPendente, send, stop, reset };
 }
