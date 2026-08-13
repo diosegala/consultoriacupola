@@ -444,6 +444,11 @@ export default function PesquisaReunioes() {
                 </div>
               ))}
 
+              {pendente && !isStreaming && (
+                <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1.5">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Recuperando a resposta gerada no servidor...
+                </p>
+              )}
               {error && <p className="text-xs text-destructive text-center">{error}</p>}
             </div>
           </ScrollArea>
