@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
@@ -29,6 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [userRole, setUserRole] = useState<AppRole | null>(null);
   const [forcePasswordChange, setForcePasswordChange] = useState(false);
   const [roleLoading, setRoleLoading] = useState(true);
+  const currentUserIdRef = useRef<string | null>(null);
 
   const fetchUserRole = async (userId: string) => {
     setRoleLoading(true);
@@ -55,20 +56,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        // Ignore token refresh / window-focus revalidation events so we don't
-        // toggle roleLoading and remount the whole app (which would wipe
-        // in-page state like Agentes selection).
-        if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-          setSession(session);
-          setUser(session?.user ?? null);
-          return;
-        }
+        const nextUser = session?.user ?? null;
         setSession(session);
-        setUser(session?.user ?? null);
+        setUser(nextUser);
         setLoading(false);
-        if (session?.user) {
+
+        // Só reprocessa o papel quando o usuário realmente muda. Eventos de
+        // revalidação (TOKEN_REFRESHED, USER_UPDATED, SIGNED_IN do mesmo
+        // usuário ao voltar para a aba, INITIAL_SESSION) não devem remontar
+        // a aplicação nem exibir o esqueleto de carregamento.
+        if (nextUser?.id === currentUserIdRef.current) return;
+        currentUserIdRef.current = nextUser?.id ?? null;
+
+        if (nextUser) {
           setRoleLoading(true);
-          setTimeout(() => fetchUserRole(session.user.id), 0);
+          setTimeout(() => fetchUserRole(nextUser.id), 0);
         } else {
           setUserRole(null);
           setForcePasswordChange(false);
@@ -78,12 +80,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
 
     supabase.auth.getSession().then(({ data: { session } }) => {
+      const nextUser = session?.user ?? null;
       setSession(session);
-      setUser(session?.user ?? null);
+      setUser(nextUser);
       setLoading(false);
-      if (session?.user) {
-        fetchUserRole(session.user.id);
+      if (nextUser) {
+        if (currentUserIdRef.current !== nextUser.id) {
+          currentUserIdRef.current = nextUser.id;
+          fetchUserRole(nextUser.id);
+        }
       } else {
+        currentUserIdRef.current = null;
         setRoleLoading(false);
       }
     });
