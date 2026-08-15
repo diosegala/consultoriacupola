@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sidebar } from './Sidebar';
@@ -11,8 +12,12 @@ const RESTRICTED_FOR_CONSULTOR = ['/', '/contratos', '/consultores', '/configura
 export function AppLayout() {
   const { user, loading, roleLoading, userRole, forcePasswordChange } = useAuth();
   const location = useLocation();
+  const jaResolvido = useRef(false);
+  if (!loading && !(user && roleLoading)) jaResolvido.current = true;
 
-  if (loading || (user && roleLoading)) {
+  // Só mostra o esqueleto no carregamento inicial; revalidações posteriores
+  // acontecem em segundo plano sem desmontar a tela.
+  if (!jaResolvido.current && (loading || (user && roleLoading))) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="space-y-4 w-full max-w-md p-8">
