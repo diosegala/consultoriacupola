@@ -29,7 +29,13 @@ export function useUpdateAgentePrompt() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, prompt, documento_modelo, provedor, template_sheets_id }: { id: string; prompt: string; documento_modelo?: string | null; provedor?: string; template_sheets_id?: string | null }) => {
-      const updateData: Record<string, any> = { prompt, documento_modelo: documento_modelo ?? null, updated_at: new Date().toISOString() };
+      const updateData: {
+        prompt: string;
+        documento_modelo: string | null;
+        updated_at: string;
+        provedor?: string;
+        template_sheets_id?: string | null;
+      } = { prompt, documento_modelo: documento_modelo ?? null, updated_at: new Date().toISOString() };
       if (provedor !== undefined) updateData.provedor = provedor;
       if (template_sheets_id !== undefined) updateData.template_sheets_id = template_sheets_id;
       const { error } = await supabase
