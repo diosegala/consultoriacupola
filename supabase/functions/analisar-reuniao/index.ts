@@ -438,7 +438,15 @@ Retorne a análise usando a função fornecida. Seja conciso nos textos.`;
 
     // ===== 4. NOTIFICAR DIRETORES SOBRE SENTIMENTO NEGATIVO =====
     try {
-      const alertas = (analiseCliente?.alertas_sentimento ?? []) as Array<any>;
+      const todosAlertas = (analiseCliente?.alertas_sentimento ?? []) as Array<any>;
+      // Só notificamos quando o desconforto é direcionado à consultoria.
+      // Sinais sobre o dia a dia da imobiliária ficam salvos na análise, mas não viram alerta.
+      const alertas = todosAlertas.filter((a) => {
+        if (a?.alvo && a.alvo !== "consultoria") return false;
+        const conf = typeof a?.confianca === "number" ? a.confianca : 1;
+        if (a?.severidade === "alta") return conf >= 0.5;
+        return conf >= 0.7;
+      });
       if (alertas.length > 0) {
           // Contexto DISC da consultora (pode informar a leitura do sinal)
           let discDica = "";
@@ -468,14 +476,13 @@ Retorne a análise usando a função fornecida. Seja conciso nos textos.`;
           if (discDica) descricao += `\n\n${discDica}`;
 
         for (const uid of diretoresUserIds) {
-          // dedup: já há notificação não lida para a mesma reunião?
+          // dedup: nunca recriar alerta para a mesma reunião (mesmo já resolvido)
           const { data: exists } = await supabase
             .from("notificacoes")
             .select("id")
             .eq("user_id", uid)
             .eq("tipo", "sentimento_negativo_cliente")
             .eq("entidade_id", reuniao_id)
-            .eq("lida", false)
             .maybeSingle();
           if (exists) continue;
 
