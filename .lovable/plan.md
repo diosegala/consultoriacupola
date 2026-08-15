@@ -1,38 +1,32 @@
-## Objetivo
+# Corrigir recarregamento da página ao trocar de aba
 
-Uma página de pesquisa conversacional sobre o que os clientes dizem nas reuniões: você pergunta em linguagem natural e a IA responde citando trechos reais das transcrições, complementados pelos resumos, scores e análises já existentes.
+## O que está acontecendo
 
-## Nova página `/pesquisa-reunioes`
+Ao voltar para a aba do navegador, o app parece "recarregar" e demora. São duas causas somadas:
 
-- Item na sidebar ("Pesquisa de Reuniões"), acessível a todos os roles.
-- Layout em duas colunas:
-  - **Filtros (opcionais)**: cliente, consultor, período (últimos 3/6/12 meses ou intervalo), tipo de reunião. Vazio = busca em tudo que o usuário pode ver.
-  - **Chat**: mesmo padrão visual do Oráculo (markdown, streaming, parar, nova conversa).
-- Cada resposta mostra abaixo as **fontes usadas**: cards com cliente, data e trecho citado, clicáveis para abrir a reunião.
-- Escopo por carteira: diretor/admin pesquisam tudo; consultor pesquisa apenas reuniões dos próprios clientes (validado no servidor, não só na UI).
+1. **O app volta para a tela de carregamento (esqueleto).** Quando a aba recupera o foco, o Supabase reemite um evento de sessão. O `AuthContext` trata esse evento como um novo login: ele liga o `roleLoading` e refaz a consulta do papel do usuário. Enquanto isso, o layout principal (`AppLayout`) troca a página inteira por um esqueleto de carregamento — daí a sensação de reload e a perda do estado da tela.
 
-## Como a busca funciona
+2. **Todas as consultas são refeitas ao mesmo tempo.** O React Query está sem configuração (`new QueryClient()`), então usa os padrões: revalidar tudo no foco da janela e considerar todo dado obsoleto imediatamente. Em páginas pesadas (Meu Painel, Clientes, Contratos) isso dispara dezenas de requisições simultâneas ao voltar para a aba — o que explica a lentidão.
 
-1. Indexação: cada transcrição é quebrada em trechos (~1200 caracteres com sobreposição) e recebe um embedding, guardado com `reuniao_id`, `cliente_id`, `consultor_id` e data.
-2. Na pergunta: gera-se o embedding da pergunta e buscam-se os trechos mais similares dentro do escopo permitido e dos filtros escolhidos.
-3. Contexto agregado: junto aos trechos, envia-se um resumo estruturado das reuniões envolvidas (resumo_ia, score do cliente, dimensões de engajamento, compromissos) para a IA conseguir responder perguntas quantitativas ("quais clientes reclamam de X?", "o engajamento caiu depois de Y?").
-4. A IA responde citando cliente e data de cada afirmação, e diz explicitamente quando não há evidência nas transcrições.
+## Correções propostas
 
-## Indexação das reuniões existentes e novas
+### 1. AuthContext deixa de reprocessar sessão repetida
+- Guardar o `user.id` atual e, no `onAuthStateChange`, só refazer a busca do papel quando o usuário realmente mudar (login diferente ou logout).
+- Eventos de revalidação (`TOKEN_REFRESHED`, `USER_UPDATED`, `SIGNED_IN` do mesmo usuário, `INITIAL_SESSION`) apenas atualizam sessão/usuário, sem tocar em `loading`/`roleLoading`.
+- Resultado: nada de esqueleto ao voltar para a aba; o estado da página permanece.
 
-- Backfill: rotina que indexa as transcrições já existentes em lotes, com botão "Reindexar transcrições" na área administrativa e barra de progresso (X de Y reuniões indexadas).
-- Novas reuniões: indexação automática logo após a análise da reunião, e no sync diário do Drive.
-- Reindexação incremental: só reprocessa reuniões cuja transcrição mudou ou que ainda não têm trechos.
+### 2. AppLayout só mostra esqueleto no carregamento inicial
+- Exibir o esqueleto apenas enquanto ainda não há usuário/papel resolvido pela primeira vez. Depois disso, revalidações acontecem em segundo plano sem desmontar a tela.
 
-## Detalhes técnicos
+### 3. Configurar o React Query com padrões saudáveis
+Em `src/App.tsx`:
+- `refetchOnWindowFocus: false`
+- `staleTime: 60s` (dados continuam válidos por 1 minuto)
+- `gcTime: 5 min`, `retry: 1`, `refetchOnReconnect: true`
+Assim, voltar para a aba não dispara uma enxurrada de requisições; a atualização acontece nas ações do usuário e após 1 minuto de inatividade.
 
-- Nova tabela `reunioes_chunks` (`reuniao_id`, `cliente_id`, `consultor_id`, `data_reuniao`, `chunk_index`, `conteudo`, `embedding vector(1536)`, `hash_transcricao`) com índice HNSW, GRANTs e RLS espelhando as policies de `reunioes` (admin/diretor tudo, consultor só a própria carteira).
-- Função SQL `buscar_trechos_reunioes(query_embedding, filtros, match_count)` em SECURITY INVOKER, para que o RLS aplique o escopo automaticamente.
-- Edge function `indexar-reunioes`: chunking + embeddings via `openai/text-embedding-3-small` (mesmo modelo já usado no Oráculo, mantendo compatibilidade), processamento em lotes com retomada.
-- Edge function `pesquisa-reunioes`: valida Authorization antes do body, gera embedding da pergunta, busca trechos com o cliente do usuário (RLS ativo), monta o contexto agregado e faz streaming SSE com Claude (mesmo padrão do `oraculo-chat`), registrando uso em `ai_usage_logs`.
-- Histórico das conversas reaproveita `oraculo_conversas`/`oraculo_mensagens` com um marcador de origem, evitando tabelas duplicadas.
-- Frontend: hook `usePesquisaReunioes` (streaming + fontes) e página nova reutilizando o padrão do `OraculoChatPanel`.
+## Verificação
+Abrir uma página pesada (ex.: Meu Painel), trocar de aba, voltar e confirmar via navegador que: não aparece o esqueleto, o estado da tela permanece e não há rajada de requisições novas na aba de rede.
 
-## Custo e limites
-
-A indexação inicial gera embeddings de todas as transcrições uma única vez (custo baixo, por token); depois só as reuniões novas. As respostas usam apenas os trechos mais relevantes, mantendo cada pergunta barata.
+## Fora de escopo
+Nenhuma mudança em regras de negócio, RLS ou edge functions.
