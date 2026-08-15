@@ -1,19 +1,1 @@
 project_id = "gujsesjqersadunthqwm"
-
-[functions.import-clientes]
-verify_jwt = false
-
-[functions.pipedrive-webhook]
-verify_jwt = false
-
-[functions.google-drive-sync-diario]
-verify_jwt = false
-
-[functions.questionario-get]
-verify_jwt = false
-
-[functions.questionario-save]
-verify_jwt = false
-
-[functions.oraculo-cron-daily]
-verify_jwt = false
