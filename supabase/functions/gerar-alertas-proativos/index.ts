@@ -611,13 +611,7 @@ Deno.serve(async (req) => {
           const dias = ultDate ? daysBetween(hoje, new Date(ultDate + "T00:00:00")) : 999;
           if (dias < D14) continue;
 
-          const { data: exists } = await admin
-            .from("notificacoes").select("id")
-            .eq("user_id", diretorUserId)
-            .eq("tipo", "lembrete_gestao")
-            .eq("entidade_id", c.id)
-            .eq("lida", false).maybeSingle();
-          if (exists) continue;
+          if (await jaNotificado(diretorUserId, "lembrete_gestao", c.id, { escopo: "individual" })) continue;
 
           await admin.from("notificacoes").insert({
             user_id: diretorUserId,
@@ -648,14 +642,7 @@ Deno.serve(async (req) => {
           const dias = ultDate ? daysBetween(hoje, new Date(ultDate + "T00:00:00")) : 999;
           if (dias < D10) continue;
 
-          const { data: exists } = await admin
-            .from("notificacoes").select("id")
-            .eq("user_id", diretorUserId)
-            .eq("tipo", "lembrete_gestao")
-            .eq("entidade_id", c.id)
-            .contains("metadata", { escopo: "weekly" })
-            .eq("lida", false).maybeSingle();
-          if (exists) continue;
+          if (await jaNotificado(diretorUserId, "lembrete_gestao", c.id, { escopo: "weekly" })) continue;
 
           await admin.from("notificacoes").insert({
             user_id: diretorUserId,
@@ -683,13 +670,8 @@ Deno.serve(async (req) => {
         const ultEqDate = ultEq?.data_reuniao ?? null;
         const diasEq = ultEqDate ? daysBetween(hoje, new Date(ultEqDate + "T00:00:00")) : 999;
         if (diasEq >= D21) {
-          const { data: exists } = await admin
-            .from("notificacoes").select("id")
-            .eq("user_id", diretorUserId)
-            .eq("tipo", "lembrete_gestao")
-            .eq("entidade_id", diretorConsultorId)
-            .eq("lida", false).maybeSingle();
-          if (!exists) {
+          const jaEquipe = await jaNotificado(diretorUserId, "lembrete_gestao", diretorConsultorId, { escopo: "equipe" });
+          if (!jaEquipe) {
             await admin.from("notificacoes").insert({
               user_id: diretorUserId,
               tipo: "lembrete_gestao",
@@ -720,13 +702,7 @@ Deno.serve(async (req) => {
           .lte("data_reuniao", em2ISO);
 
         for (const pr of proximos ?? []) {
-          const { data: exists } = await admin
-            .from("notificacoes").select("id")
-            .eq("user_id", diretorUserId)
-            .eq("tipo", "briefing_1x1")
-            .eq("entidade_id", (pr as any).id)
-            .eq("lida", false).maybeSingle();
-          if (exists) continue;
+          if (await jaNotificado(diretorUserId, "briefing_1x1", (pr as any).id)) continue;
 
           const primeiro = ((pr as any).participantes ?? [])[0] ?? "consultora";
           // Tenta identificar a consultora pelo primeiro nome
