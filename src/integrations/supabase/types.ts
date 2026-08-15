@@ -973,6 +973,11 @@ export type Database = {
       notificacoes: {
         Row: {
           created_at: string
+          decidido_em: string | null
+          decidido_por: string | null
+          decisao: string | null
+          decisao_motivo: string | null
+          decisao_texto: string | null
           descricao: string | null
           entidade_id: string | null
           entidade_tipo: string | null
@@ -987,6 +992,11 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          decidido_em?: string | null
+          decidido_por?: string | null
+          decisao?: string | null
+          decisao_motivo?: string | null
+          decisao_texto?: string | null
           descricao?: string | null
           entidade_id?: string | null
           entidade_tipo?: string | null
@@ -1001,6 +1011,11 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          decidido_em?: string | null
+          decidido_por?: string | null
+          decisao?: string | null
+          decisao_motivo?: string | null
+          decisao_texto?: string | null
           descricao?: string | null
           entidade_id?: string | null
           entidade_tipo?: string | null

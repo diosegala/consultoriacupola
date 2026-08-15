@@ -15,6 +15,12 @@ export interface Notificacao {
   lida: boolean;
   lida_em: string | null;
   created_at: string;
+  metadata?: Record<string, any> | null;
+  decisao: 'aprovado' | 'editado' | 'rejeitado' | null;
+  decisao_texto: string | null;
+  decisao_motivo: string | null;
+  decidido_por: string | null;
+  decidido_em: string | null;
 }
 
 export function useNotificacoes() {
@@ -83,6 +89,39 @@ export function useMarcarTodasLidas() {
         .update({ lida: true, lida_em: new Date().toISOString() })
         .eq('user_id', user.id)
         .eq('lida', false);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notificacoes', user?.id] });
+    },
+  });
+}
+
+export interface DecidirNotificacaoInput {
+  id: string;
+  decisao: 'aprovado' | 'editado' | 'rejeitado';
+  decisao_texto?: string;
+  decisao_motivo?: string;
+}
+
+export function useDecidirNotificacao() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async ({ id, decisao, decisao_texto, decisao_motivo }: DecidirNotificacaoInput) => {
+      const agora = new Date().toISOString();
+      const { error } = await supabase
+        .from('notificacoes')
+        .update({
+          decisao,
+          decisao_texto: decisao_texto ?? null,
+          decisao_motivo: decisao_motivo ?? null,
+          decidido_por: user?.id ?? null,
+          decidido_em: agora,
+          lida: true,
+          lida_em: agora,
+        })
+        .eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
