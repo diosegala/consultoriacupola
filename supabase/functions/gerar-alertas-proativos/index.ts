@@ -322,11 +322,12 @@ Deno.serve(async (req) => {
 
     const { data: proximas } = await admin
       .from("atendimentos")
-      .select("cliente_id, proxima_reuniao, clientes!inner(id, nome, consultor_id, status)")
+      .select("cliente_id, proxima_reuniao, clientes!inner(id, nome, consultor_id, status, arquivado_em)")
       .not("proxima_reuniao", "is", null)
       .gte("proxima_reuniao", amanhaISO)
       .lte("proxima_reuniao", depoisAmanhaISO)
-      .eq("clientes.status", "ativo");
+      .eq("clientes.status", "ativo")
+      .is("clientes.arquivado_em", null);
 
     for (const at of proximas ?? []) {
       const cli: any = (at as any).clientes;
@@ -334,16 +335,7 @@ Deno.serve(async (req) => {
       const userId = userByConsultor.get(cli.consultor_id);
       if (!userId) continue;
 
-      // dedup por cliente/tipo/reuniao (usa data como entidade auxiliar em metadata)
-      const { data: exists } = await admin
-        .from("notificacoes")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("tipo", "briefing_pre_reuniao")
-        .eq("entidade_id", cli.id)
-        .eq("lida", false)
-        .maybeSingle();
-      if (exists) continue;
+      if (await jaNotificado(userId, "briefing_pre_reuniao", cli.id)) continue;
 
       // Compromissos em aberto do cliente
       const { data: comps } = await admin
@@ -416,11 +408,12 @@ Deno.serve(async (req) => {
 
     const { data: vencidos } = await admin
       .from("compromissos")
-      .select("id, cliente_id, descricao, prazo, clientes!inner(id, nome, consultor_id, status)")
+      .select("id, cliente_id, descricao, prazo, clientes!inner(id, nome, consultor_id, status, arquivado_em)")
       .eq("status", "pendente")
       .eq("responsavel", "cliente")
       .lt("prazo", limiteVencISO)
-      .eq("clientes.status", "ativo");
+      .eq("clientes.status", "ativo")
+      .is("clientes.arquivado_em", null);
 
     for (const comp of vencidos ?? []) {
       const cli: any = (comp as any).clientes;
@@ -428,15 +421,7 @@ Deno.serve(async (req) => {
       const userId = userByConsultor.get(cli.consultor_id);
       if (!userId) continue;
 
-      const { data: exists } = await admin
-        .from("notificacoes")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("tipo", "compromisso_vencido")
-        .eq("entidade_id", (comp as any).id)
-        .eq("lida", false)
-        .maybeSingle();
-      if (exists) continue;
+      if (await jaNotificado(userId, "compromisso_vencido", (comp as any).id)) continue;
 
       await admin.from("notificacoes").insert({
         user_id: userId,
@@ -553,15 +538,7 @@ Deno.serve(async (req) => {
         if (userConsultora) destinatarios.add(userConsultora);
 
         for (const destino of destinatarios) {
-          const { data: jaEnviado } = await admin
-            .from("notificacoes")
-            .select("id")
-            .eq("user_id", destino)
-            .eq("tipo", "score_cliente_em_queda")
-            .eq("entidade_id", (cli as any).id)
-            .gte("created_at", dedupDesde.toISOString())
-            .maybeSingle();
-          if (jaEnviado) continue;
+          if (await jaNotificado(destino, "score_cliente_em_queda", (cli as any).id)) continue;
 
           await admin.from("notificacoes").insert({
             user_id: destino,
