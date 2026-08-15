@@ -262,7 +262,9 @@ Avalie nos seguintes critérios (nota de 0 a 10 cada):
 4. Clareza nas demandas - Comunica necessidades, problemas e expectativas de forma clara?
 5. Engajamento estratégico - Demonstra visão de longo prazo e interesse em resultados sustentáveis?
 
-Além das notas, identifique ALERTAS DE SENTIMENTO NEGATIVO: sinais explícitos ou fortes de insatisfação, frustração, questionamento de valor da consultoria, cancelamento iminente, comparação negativa com concorrentes, ou reclamações recorrentes. Ignore ruído leve. Para cada alerta: trecho (frase curta parafraseada da transcrição), severidade ("alta"|"media"), motivo (breve explicação). Se não houver sinais claros, retorne array vazio.
+Além das notas, identifique ALERTAS DE SENTIMENTO NEGATIVO **direcionados à consultoria**. Só conta como alerta relevante quando o desconforto do cliente for sobre o trabalho da consultoria: questionamento do valor/ROI da consultoria, insatisfação com a consultora ou com a metodologia, cobrança por resultados prometidos e não entregues, menção a pausar/cancelar/renegociar o contrato, ou comparação negativa com outra consultoria.
+NÃO são alertas (classifique como "negocio_do_cliente" e nunca como "consultoria"): reclamações sobre o mercado imobiliário, equipe interna, corretores, clientes finais, sistemas/ferramentas da imobiliária, cansaço ou momento pessoal, dificuldades operacionais do dia a dia. Esses sinais são contexto, não risco de rescisão.
+Para cada alerta informe: trecho (frase curta parafraseada), severidade ("alta"|"media"), motivo (breve explicação), alvo ("consultoria" ou "negocio_do_cliente") e confianca (0 a 1, o quanto você tem certeza da classificação). Ignore ruído leve. Se não houver sinais claros, retorne array vazio.
 
 Retorne a análise usando a função fornecida. Seja conciso nos textos.`;
 
@@ -287,15 +289,17 @@ Retorne a análise usando a função fornecida. Seja conciso nos textos.`;
                 pontos_melhoria: { type: "array", items: { type: "string" }, description: "Lista de 3-5 pontos de melhoria do cliente (frases curtas)" },
                 alertas_sentimento: {
                   type: "array",
-                  description: "Sinais fortes de insatisfação/risco. Vazio se não houver.",
+                  description: "Sinais fortes de insatisfação/risco, classificados por alvo. Vazio se não houver.",
                   items: {
                     type: "object",
                     properties: {
                       trecho: { type: "string" },
                       severidade: { type: "string", enum: ["alta","media"] },
                       motivo: { type: "string" },
+                      alvo: { type: "string", enum: ["consultoria","negocio_do_cliente"], description: "A quem o desconforto é direcionado" },
+                      confianca: { type: "number", description: "0 a 1 — confiança na classificação do alvo" },
                     },
-                    required: ["trecho","severidade","motivo"],
+                    required: ["trecho","severidade","motivo","alvo","confianca"],
                   },
                 },
               },
