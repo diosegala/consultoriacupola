@@ -22,6 +22,21 @@ const CHECKLIST_STALE_DIAS = 14;
 const OKR_STALE_DIAS = 30;
 const CONTRATO_JANELA_DIAS = 45;
 
+// Janela de silêncio por tipo de alerta (em dias). Depois de criar um alerta
+// para uma entidade, não recriamos outro do mesmo tipo dentro da janela —
+// mesmo que o usuário já tenha marcado como resolvido (lida = true).
+const SILENCIO_DIAS: Record<string, number> = {
+  sem_contato: 14,
+  checklist_parado: 14,
+  okr_sem_progresso: 14,
+  contrato_sem_renovacao: 21,
+  briefing_pre_reuniao: 5,
+  compromisso_vencido: 14,
+  score_cliente_em_queda: 14,
+  lembrete_gestao: 7,
+  briefing_1x1: 7,
+};
+
 function daysBetween(a: Date, b: Date): number {
   return Math.floor((a.getTime() - b.getTime()) / (1000 * 60 * 60 * 24));
 }
@@ -33,6 +48,31 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
+
+  // Retorna true quando já existe notificação (lida ou não) do mesmo tipo para
+  // a mesma entidade dentro da janela de silêncio. `extraMatch` permite
+  // distinguir escopos dentro do mesmo tipo (ex.: lembrete_gestao weekly x 1:1).
+  async function jaNotificado(
+    userId: string,
+    tipo: string,
+    entidadeId: string | null,
+    extraMatch?: Record<string, unknown>,
+  ): Promise<boolean> {
+    const dias = SILENCIO_DIAS[tipo] ?? 14;
+    const desde = new Date();
+    desde.setDate(desde.getDate() - dias);
+    let q = admin
+      .from("notificacoes")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("tipo", tipo)
+      .gte("created_at", desde.toISOString())
+      .limit(1);
+    if (entidadeId) q = q.eq("entidade_id", entidadeId);
+    if (extraMatch) q = q.contains("metadata", extraMatch);
+    const { data } = await q.maybeSingle();
+    return !!data;
+  }
 
   const summary = {
     sem_contato: 0,
