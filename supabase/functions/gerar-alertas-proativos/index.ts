@@ -101,8 +101,9 @@ Deno.serve(async (req) => {
     // --------- 1. Clientes sem contato ---------
     const { data: atendimentos } = await admin
       .from("atendimentos")
-      .select("cliente_id, periodicidade, ultima_reuniao, clientes!inner(id, nome, consultor_id, status)")
-      .eq("clientes.status", "ativo");
+      .select("cliente_id, periodicidade, ultima_reuniao, clientes!inner(id, nome, consultor_id, status, arquivado_em)")
+      .eq("clientes.status", "ativo")
+      .is("clientes.arquivado_em", null);
 
     for (const at of atendimentos ?? []) {
       const cli: any = (at as any).clientes;
@@ -128,16 +129,8 @@ Deno.serve(async (req) => {
       const dias = daysBetween(hoje, new Date(ultimaData + "T00:00:00"));
       if (dias < limite) continue;
 
-      // Dedup: já existe notificação não lida para este cliente/tipo?
-      const { data: exists } = await admin
-        .from("notificacoes")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("tipo", "sem_contato")
-        .eq("entidade_id", cli.id)
-        .eq("lida", false)
-        .maybeSingle();
-      if (exists) continue;
+      // Dedup por janela de silêncio (inclui alertas já resolvidos)
+      if (await jaNotificado(userId, "sem_contato", cli.id)) continue;
 
       // Buscar último item de checklist concluído como gancho
       const { data: gancho } = await admin
@@ -200,8 +193,13 @@ Deno.serve(async (req) => {
 
     const { data: projetosStale } = await admin
       .from("projetos")
-      .select("id, cliente_id, consultor_id, updated_at, clientes(nome), projeto_checklist(id, concluido)")
-      .lt("updated_at", staleChecklistISO);
+      .select(
+        "id, cliente_id, consultor_id, updated_at, arquivado_em, clientes!inner(nome, status, arquivado_em), projeto_checklist(id, concluido)",
+      )
+      .lt("updated_at", staleChecklistISO)
+      .is("arquivado_em", null)
+      .neq("clientes.status", "encerrado")
+      .is("clientes.arquivado_em", null);
 
     for (const p of projetosStale ?? []) {
       const items = ((p as any).projeto_checklist ?? []) as Array<{ concluido: boolean }>;
@@ -210,15 +208,7 @@ Deno.serve(async (req) => {
       const userId = userByConsultor.get((p as any).consultor_id);
       if (!userId) continue;
 
-      const { data: exists } = await admin
-        .from("notificacoes")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("tipo", "checklist_parado")
-        .eq("entidade_id", (p as any).id)
-        .eq("lida", false)
-        .maybeSingle();
-      if (exists) continue;
+      if (await jaNotificado(userId, "checklist_parado", (p as any).id)) continue;
 
       const dias = daysBetween(hoje, new Date((p as any).updated_at));
       const cliNome = (p as any).clientes?.nome ?? "projeto";
@@ -244,9 +234,10 @@ Deno.serve(async (req) => {
 
     const { data: okrs } = await admin
       .from("atendimentos")
-      .select("cliente_id, trimestre_okrs, updated_at, clientes!inner(id, nome, consultor_id, status)")
+      .select("cliente_id, trimestre_okrs, updated_at, clientes!inner(id, nome, consultor_id, status, arquivado_em)")
       .not("trimestre_okrs", "is", null)
-      .eq("clientes.status", "ativo");
+      .eq("clientes.status", "ativo")
+      .is("clientes.arquivado_em", null);
 
     for (const at of okrs ?? []) {
       const cli: any = (at as any).clientes;
@@ -261,15 +252,7 @@ Deno.serve(async (req) => {
         .gte("data_reuniao", staleOkrISO);
       if ((count ?? 0) > 0) continue;
 
-      const { data: exists } = await admin
-        .from("notificacoes")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("tipo", "okr_sem_progresso")
-        .eq("entidade_id", cli.id)
-        .eq("lida", false)
-        .maybeSingle();
-      if (exists) continue;
+      if (await jaNotificado(userId, "okr_sem_progresso", cli.id)) continue;
 
       await admin.from("notificacoes").insert({
         user_id: userId,
@@ -291,9 +274,11 @@ Deno.serve(async (req) => {
 
     const { data: contratos } = await admin
       .from("contratos")
-      .select("id, data_fim, cliente_id, clientes!inner(id, nome, consultor_id), projetos(tipo)")
+      .select("id, data_fim, cliente_id, clientes!inner(id, nome, consultor_id, status, arquivado_em), projetos(tipo)")
       .eq("ativo", true)
       .is("encerrado_em", null)
+      .neq("clientes.status", "encerrado")
+      .is("clientes.arquivado_em", null)
       .gte("data_fim", hojeISO)
       .lte("data_fim", limiteISO);
 
@@ -306,15 +291,7 @@ Deno.serve(async (req) => {
       const jaTemRenov = ((c as any).projetos ?? []).some((p: any) => p.tipo === "renovacao");
       if (jaTemRenov) continue;
 
-      const { data: exists } = await admin
-        .from("notificacoes")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("tipo", "contrato_sem_renovacao")
-        .eq("entidade_id", (c as any).id)
-        .eq("lida", false)
-        .maybeSingle();
-      if (exists) continue;
+      if (await jaNotificado(userId, "contrato_sem_renovacao", (c as any).id)) continue;
 
       const dias = daysBetween(new Date((c as any).data_fim + "T00:00:00"), hoje);
       await admin.from("notificacoes").insert({
