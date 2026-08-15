@@ -380,12 +380,22 @@ export function GestaoEquipeSection({ userId }: { userId: string | null }) {
             <div className="space-y-3">
               {alertas!.map((n: any) => {
                 const md = n.metadata ?? {};
+                const alvos = Array.isArray(md.alertas)
+                  ? Array.from(new Set(md.alertas.map((a: any) => a?.alvo).filter(Boolean)))
+                  : [];
                 return (
                   <div key={n.id} className="p-3 rounded-md border border-destructive/30 bg-destructive/5 space-y-2">
                     <div className="flex items-start gap-2">
                       <MessageSquareWarning className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm text-foreground">{n.titulo}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm text-foreground">{n.titulo}</p>
+                          {alvos.includes('consultoria') && (
+                            <Badge variant="outline" className="text-[10px] bg-destructive/15 text-destructive border-destructive/30">
+                              Sobre a consultoria
+                            </Badge>
+                          )}
+                        </div>
                         {n.descricao && <p className="text-[11px] text-muted-foreground mt-0.5">{n.descricao}</p>}
                       </div>
                     </div>

@@ -22,6 +22,21 @@ const CHECKLIST_STALE_DIAS = 14;
 const OKR_STALE_DIAS = 30;
 const CONTRATO_JANELA_DIAS = 45;
 
+// Janela de silêncio por tipo de alerta (em dias). Depois de criar um alerta
+// para uma entidade, não recriamos outro do mesmo tipo dentro da janela —
+// mesmo que o usuário já tenha marcado como resolvido (lida = true).
+const SILENCIO_DIAS: Record<string, number> = {
+  sem_contato: 14,
+  checklist_parado: 14,
+  okr_sem_progresso: 14,
+  contrato_sem_renovacao: 21,
+  briefing_pre_reuniao: 5,
+  compromisso_vencido: 14,
+  score_cliente_em_queda: 14,
+  lembrete_gestao: 7,
+  briefing_1x1: 7,
+};
+
 function daysBetween(a: Date, b: Date): number {
   return Math.floor((a.getTime() - b.getTime()) / (1000 * 60 * 60 * 24));
 }
@@ -33,6 +48,31 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
+
+  // Retorna true quando já existe notificação (lida ou não) do mesmo tipo para
+  // a mesma entidade dentro da janela de silêncio. `extraMatch` permite
+  // distinguir escopos dentro do mesmo tipo (ex.: lembrete_gestao weekly x 1:1).
+  async function jaNotificado(
+    userId: string,
+    tipo: string,
+    entidadeId: string | null,
+    extraMatch?: Record<string, unknown>,
+  ): Promise<boolean> {
+    const dias = SILENCIO_DIAS[tipo] ?? 14;
+    const desde = new Date();
+    desde.setDate(desde.getDate() - dias);
+    let q = admin
+      .from("notificacoes")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("tipo", tipo)
+      .gte("created_at", desde.toISOString())
+      .limit(1);
+    if (entidadeId) q = q.eq("entidade_id", entidadeId);
+    if (extraMatch) q = q.contains("metadata", extraMatch);
+    const { data } = await q.maybeSingle();
+    return !!data;
+  }
 
   const summary = {
     sem_contato: 0,
@@ -61,8 +101,9 @@ Deno.serve(async (req) => {
     // --------- 1. Clientes sem contato ---------
     const { data: atendimentos } = await admin
       .from("atendimentos")
-      .select("cliente_id, periodicidade, ultima_reuniao, clientes!inner(id, nome, consultor_id, status)")
-      .eq("clientes.status", "ativo");
+      .select("cliente_id, periodicidade, ultima_reuniao, clientes!inner(id, nome, consultor_id, status, arquivado_em)")
+      .eq("clientes.status", "ativo")
+      .is("clientes.arquivado_em", null);
 
     for (const at of atendimentos ?? []) {
       const cli: any = (at as any).clientes;
@@ -88,16 +129,8 @@ Deno.serve(async (req) => {
       const dias = daysBetween(hoje, new Date(ultimaData + "T00:00:00"));
       if (dias < limite) continue;
 
-      // Dedup: já existe notificação não lida para este cliente/tipo?
-      const { data: exists } = await admin
-        .from("notificacoes")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("tipo", "sem_contato")
-        .eq("entidade_id", cli.id)
-        .eq("lida", false)
-        .maybeSingle();
-      if (exists) continue;
+      // Dedup por janela de silêncio (inclui alertas já resolvidos)
+      if (await jaNotificado(userId, "sem_contato", cli.id)) continue;
 
       // Buscar último item de checklist concluído como gancho
       const { data: gancho } = await admin
@@ -160,8 +193,13 @@ Deno.serve(async (req) => {
 
     const { data: projetosStale } = await admin
       .from("projetos")
-      .select("id, cliente_id, consultor_id, updated_at, clientes(nome), projeto_checklist(id, concluido)")
-      .lt("updated_at", staleChecklistISO);
+      .select(
+        "id, cliente_id, consultor_id, updated_at, arquivado_em, clientes!inner(nome, status, arquivado_em), projeto_checklist(id, concluido)",
+      )
+      .lt("updated_at", staleChecklistISO)
+      .is("arquivado_em", null)
+      .neq("clientes.status", "encerrado")
+      .is("clientes.arquivado_em", null);
 
     for (const p of projetosStale ?? []) {
       const items = ((p as any).projeto_checklist ?? []) as Array<{ concluido: boolean }>;
@@ -170,15 +208,7 @@ Deno.serve(async (req) => {
       const userId = userByConsultor.get((p as any).consultor_id);
       if (!userId) continue;
 
-      const { data: exists } = await admin
-        .from("notificacoes")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("tipo", "checklist_parado")
-        .eq("entidade_id", (p as any).id)
-        .eq("lida", false)
-        .maybeSingle();
-      if (exists) continue;
+      if (await jaNotificado(userId, "checklist_parado", (p as any).id)) continue;
 
       const dias = daysBetween(hoje, new Date((p as any).updated_at));
       const cliNome = (p as any).clientes?.nome ?? "projeto";
@@ -204,9 +234,10 @@ Deno.serve(async (req) => {
 
     const { data: okrs } = await admin
       .from("atendimentos")
-      .select("cliente_id, trimestre_okrs, updated_at, clientes!inner(id, nome, consultor_id, status)")
+      .select("cliente_id, trimestre_okrs, updated_at, clientes!inner(id, nome, consultor_id, status, arquivado_em)")
       .not("trimestre_okrs", "is", null)
-      .eq("clientes.status", "ativo");
+      .eq("clientes.status", "ativo")
+      .is("clientes.arquivado_em", null);
 
     for (const at of okrs ?? []) {
       const cli: any = (at as any).clientes;
@@ -221,15 +252,7 @@ Deno.serve(async (req) => {
         .gte("data_reuniao", staleOkrISO);
       if ((count ?? 0) > 0) continue;
 
-      const { data: exists } = await admin
-        .from("notificacoes")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("tipo", "okr_sem_progresso")
-        .eq("entidade_id", cli.id)
-        .eq("lida", false)
-        .maybeSingle();
-      if (exists) continue;
+      if (await jaNotificado(userId, "okr_sem_progresso", cli.id)) continue;
 
       await admin.from("notificacoes").insert({
         user_id: userId,
@@ -251,9 +274,11 @@ Deno.serve(async (req) => {
 
     const { data: contratos } = await admin
       .from("contratos")
-      .select("id, data_fim, cliente_id, clientes!inner(id, nome, consultor_id), projetos(tipo)")
+      .select("id, data_fim, cliente_id, clientes!inner(id, nome, consultor_id, status, arquivado_em), projetos(tipo)")
       .eq("ativo", true)
       .is("encerrado_em", null)
+      .neq("clientes.status", "encerrado")
+      .is("clientes.arquivado_em", null)
       .gte("data_fim", hojeISO)
       .lte("data_fim", limiteISO);
 
@@ -266,15 +291,7 @@ Deno.serve(async (req) => {
       const jaTemRenov = ((c as any).projetos ?? []).some((p: any) => p.tipo === "renovacao");
       if (jaTemRenov) continue;
 
-      const { data: exists } = await admin
-        .from("notificacoes")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("tipo", "contrato_sem_renovacao")
-        .eq("entidade_id", (c as any).id)
-        .eq("lida", false)
-        .maybeSingle();
-      if (exists) continue;
+      if (await jaNotificado(userId, "contrato_sem_renovacao", (c as any).id)) continue;
 
       const dias = daysBetween(new Date((c as any).data_fim + "T00:00:00"), hoje);
       await admin.from("notificacoes").insert({
@@ -305,11 +322,12 @@ Deno.serve(async (req) => {
 
     const { data: proximas } = await admin
       .from("atendimentos")
-      .select("cliente_id, proxima_reuniao, clientes!inner(id, nome, consultor_id, status)")
+      .select("cliente_id, proxima_reuniao, clientes!inner(id, nome, consultor_id, status, arquivado_em)")
       .not("proxima_reuniao", "is", null)
       .gte("proxima_reuniao", amanhaISO)
       .lte("proxima_reuniao", depoisAmanhaISO)
-      .eq("clientes.status", "ativo");
+      .eq("clientes.status", "ativo")
+      .is("clientes.arquivado_em", null);
 
     for (const at of proximas ?? []) {
       const cli: any = (at as any).clientes;
@@ -317,16 +335,7 @@ Deno.serve(async (req) => {
       const userId = userByConsultor.get(cli.consultor_id);
       if (!userId) continue;
 
-      // dedup por cliente/tipo/reuniao (usa data como entidade auxiliar em metadata)
-      const { data: exists } = await admin
-        .from("notificacoes")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("tipo", "briefing_pre_reuniao")
-        .eq("entidade_id", cli.id)
-        .eq("lida", false)
-        .maybeSingle();
-      if (exists) continue;
+      if (await jaNotificado(userId, "briefing_pre_reuniao", cli.id)) continue;
 
       // Compromissos em aberto do cliente
       const { data: comps } = await admin
@@ -399,11 +408,12 @@ Deno.serve(async (req) => {
 
     const { data: vencidos } = await admin
       .from("compromissos")
-      .select("id, cliente_id, descricao, prazo, clientes!inner(id, nome, consultor_id, status)")
+      .select("id, cliente_id, descricao, prazo, clientes!inner(id, nome, consultor_id, status, arquivado_em)")
       .eq("status", "pendente")
       .eq("responsavel", "cliente")
       .lt("prazo", limiteVencISO)
-      .eq("clientes.status", "ativo");
+      .eq("clientes.status", "ativo")
+      .is("clientes.arquivado_em", null);
 
     for (const comp of vencidos ?? []) {
       const cli: any = (comp as any).clientes;
@@ -411,15 +421,7 @@ Deno.serve(async (req) => {
       const userId = userByConsultor.get(cli.consultor_id);
       if (!userId) continue;
 
-      const { data: exists } = await admin
-        .from("notificacoes")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("tipo", "compromisso_vencido")
-        .eq("entidade_id", (comp as any).id)
-        .eq("lida", false)
-        .maybeSingle();
-      if (exists) continue;
+      if (await jaNotificado(userId, "compromisso_vencido", (comp as any).id)) continue;
 
       await admin.from("notificacoes").insert({
         user_id: userId,
@@ -536,15 +538,7 @@ Deno.serve(async (req) => {
         if (userConsultora) destinatarios.add(userConsultora);
 
         for (const destino of destinatarios) {
-          const { data: jaEnviado } = await admin
-            .from("notificacoes")
-            .select("id")
-            .eq("user_id", destino)
-            .eq("tipo", "score_cliente_em_queda")
-            .eq("entidade_id", (cli as any).id)
-            .gte("created_at", dedupDesde.toISOString())
-            .maybeSingle();
-          if (jaEnviado) continue;
+          if (await jaNotificado(destino, "score_cliente_em_queda", (cli as any).id)) continue;
 
           await admin.from("notificacoes").insert({
             user_id: destino,
@@ -617,13 +611,7 @@ Deno.serve(async (req) => {
           const dias = ultDate ? daysBetween(hoje, new Date(ultDate + "T00:00:00")) : 999;
           if (dias < D14) continue;
 
-          const { data: exists } = await admin
-            .from("notificacoes").select("id")
-            .eq("user_id", diretorUserId)
-            .eq("tipo", "lembrete_gestao")
-            .eq("entidade_id", c.id)
-            .eq("lida", false).maybeSingle();
-          if (exists) continue;
+          if (await jaNotificado(diretorUserId, "lembrete_gestao", c.id, { escopo: "individual" })) continue;
 
           await admin.from("notificacoes").insert({
             user_id: diretorUserId,
@@ -654,14 +642,7 @@ Deno.serve(async (req) => {
           const dias = ultDate ? daysBetween(hoje, new Date(ultDate + "T00:00:00")) : 999;
           if (dias < D10) continue;
 
-          const { data: exists } = await admin
-            .from("notificacoes").select("id")
-            .eq("user_id", diretorUserId)
-            .eq("tipo", "lembrete_gestao")
-            .eq("entidade_id", c.id)
-            .contains("metadata", { escopo: "weekly" })
-            .eq("lida", false).maybeSingle();
-          if (exists) continue;
+          if (await jaNotificado(diretorUserId, "lembrete_gestao", c.id, { escopo: "weekly" })) continue;
 
           await admin.from("notificacoes").insert({
             user_id: diretorUserId,
@@ -689,13 +670,8 @@ Deno.serve(async (req) => {
         const ultEqDate = ultEq?.data_reuniao ?? null;
         const diasEq = ultEqDate ? daysBetween(hoje, new Date(ultEqDate + "T00:00:00")) : 999;
         if (diasEq >= D21) {
-          const { data: exists } = await admin
-            .from("notificacoes").select("id")
-            .eq("user_id", diretorUserId)
-            .eq("tipo", "lembrete_gestao")
-            .eq("entidade_id", diretorConsultorId)
-            .eq("lida", false).maybeSingle();
-          if (!exists) {
+          const jaEquipe = await jaNotificado(diretorUserId, "lembrete_gestao", diretorConsultorId, { escopo: "equipe" });
+          if (!jaEquipe) {
             await admin.from("notificacoes").insert({
               user_id: diretorUserId,
               tipo: "lembrete_gestao",
@@ -726,13 +702,7 @@ Deno.serve(async (req) => {
           .lte("data_reuniao", em2ISO);
 
         for (const pr of proximos ?? []) {
-          const { data: exists } = await admin
-            .from("notificacoes").select("id")
-            .eq("user_id", diretorUserId)
-            .eq("tipo", "briefing_1x1")
-            .eq("entidade_id", (pr as any).id)
-            .eq("lida", false).maybeSingle();
-          if (exists) continue;
+          if (await jaNotificado(diretorUserId, "briefing_1x1", (pr as any).id)) continue;
 
           const primeiro = ((pr as any).participantes ?? [])[0] ?? "consultora";
           // Tenta identificar a consultora pelo primeiro nome
