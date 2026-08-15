@@ -99,7 +99,9 @@ function useAlertasPortfolio(consultorId: string | null | undefined) {
       const { data: clientes, error: e1 } = await supabase
         .from('clientes')
         .select('id, nome, atendimentos(proxima_reuniao)')
-        .eq('consultor_id', consultorId!);
+        .eq('consultor_id', consultorId!)
+        .neq('status', 'encerrado')
+        .is('arquivado_em', null);
       if (e1) throw e1;
 
       const reunioesAtrasadas = (clientes ?? [])
@@ -114,9 +116,12 @@ function useAlertasPortfolio(consultorId: string | null | undefined) {
 
       const { data: contratos, error: e2 } = await supabase
         .from('contratos')
-        .select('id, data_fim, cliente_id, clientes!inner(id, nome, consultor_id)')
+        .select('id, data_fim, cliente_id, clientes!inner(id, nome, consultor_id, status, arquivado_em)')
         .eq('ativo', true)
+        .is('encerrado_em', null)
         .eq('clientes.consultor_id', consultorId!)
+        .neq('clientes.status', 'encerrado')
+        .is('clientes.arquivado_em', null)
         .gte('data_fim', hoje)
         .lte('data_fim', limite60)
         .order('data_fim', { ascending: true });
