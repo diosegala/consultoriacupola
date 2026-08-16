@@ -34,6 +34,7 @@ import { useProjetosEtapas, useUpdateEtapaStatusCliente } from '@/hooks/useProje
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { DiscProfileCard } from '@/components/disc/DiscProfileCard';
+import { PoliticaRiscoChurnCard } from '@/components/configuracoes/PoliticaRiscoChurnCard';
 import { useMyConsultorId } from '@/hooks/useDisc';
 
 export default function Configuracoes() {
@@ -414,8 +415,15 @@ export default function Configuracoes() {
           <TabsTrigger value="tipos">Tipos de Consultoria</TabsTrigger>
           <TabsTrigger value="crms">CRMs</TabsTrigger>
           {isAdmin && <TabsTrigger value="etapas">Etapas do Kanban</TabsTrigger>}
+          {(isAdmin || isDirector) && <TabsTrigger value="politicas">Políticas</TabsTrigger>}
           {isAdmin && <TabsTrigger value="oraculo">Oráculo</TabsTrigger>}
         </TabsList>
+
+        {(isAdmin || isDirector) && (
+          <TabsContent value="politicas" className="mt-6">
+            <PoliticaRiscoChurnCard />
+          </TabsContent>
+        )}
 
         {/* Minha Conta */}
         <TabsContent value="conta" className="mt-6">
