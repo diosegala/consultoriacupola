@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 export interface Notificacao {
   id: string;
@@ -97,10 +98,6 @@ export function useMarcarTodasLidas() {
       queryClient.invalidateQueries({ queryKey: ['notificacoes', user?.id] });
       queryClient.invalidateQueries({ queryKey: ['meu-painel', 'acoes-sugeridas'] });
       queryClient.invalidateQueries({ queryKey: ['painel-diretor'] });
-      toast.success('Decisão registrada');
-    },
-    onError: () => {
-      toast.error('Não foi possível registrar a decisão');
     },
   });
 }
@@ -134,6 +131,12 @@ export function useDecidirNotificacao() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notificacoes', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['meu-painel', 'acoes-sugeridas'] });
+      queryClient.invalidateQueries({ queryKey: ['painel-diretor'] });
+      toast.success('Decisão registrada');
+    },
+    onError: () => {
+      toast.error('Não foi possível registrar a decisão');
     },
   });
 }
