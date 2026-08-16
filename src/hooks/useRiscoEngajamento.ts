@@ -3,9 +3,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { format, subDays, differenceInCalendarDays, parseISO } from 'date-fns';
 import {
   avaliarRiscoEngajamento,
-  RISCO_JANELA_DIAS,
+  PARAMETROS_RISCO_CHURN_DEFAULT,
+  normalizarParametrosRiscoChurn,
   type AvaliacaoRisco,
 } from '@/lib/riscoEngajamento';
+import { usePoliticaDecisao } from '@/hooks/usePoliticasDecisao';
 
 export interface ClienteEmRisco extends AvaliacaoRisco {
   cliente_id: string;
@@ -26,10 +28,16 @@ const CRITERIO_LABELS: Record<string, string> = {
 };
 
 export function useClientesEmRisco() {
+  const { data: politica, isLoading: politicaLoading } = usePoliticaDecisao('risco_churn');
+  const parametros = politica
+    ? normalizarParametrosRiscoChurn(politica.parametros)
+    : PARAMETROS_RISCO_CHURN_DEFAULT;
+
   return useQuery({
-    queryKey: ['risco-engajamento', 'clientes'],
+    queryKey: ['risco-engajamento', 'clientes', parametros],
+    enabled: !politicaLoading,
     queryFn: async (): Promise<ClienteEmRisco[]> => {
-      const desde = format(subDays(new Date(), RISCO_JANELA_DIAS), 'yyyy-MM-dd');
+      const desde = format(subDays(new Date(), parametros.janela_dias), 'yyyy-MM-dd');
       const hojeISO = format(new Date(), 'yyyy-MM-dd');
 
       const [cliRes, reunRes, contRes] = await Promise.all([
@@ -82,6 +90,7 @@ export function useClientesEmRisco() {
         const venceEm = venceEmPorCliente.get(cli.id) ?? null;
         const avaliacao = avaliarRiscoEngajamento(
           rs.map((r) => ({ data_reuniao: r.data_reuniao, score_cliente: Number(r.score_cliente) })),
+          parametros,
           { contratoVenceEmDias: venceEm },
         );
         if (!avaliacao) continue;
