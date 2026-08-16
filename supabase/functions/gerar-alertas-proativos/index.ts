@@ -440,10 +440,26 @@ Deno.serve(async (req) => {
     // Sinal precoce de risco de rescisão: dispara para a consultora responsável
     // e para diretores/admins.
     try {
-      const SCORE_CRITICO = 6.0;
-      const MEDIA_CRITICA = 6.5;
-      const QUEDA_MINIMA = 1.5;
-      const JANELA_DIAS = 180;
+      // Limiares vêm da tabela politicas_decisao (tipo = 'risco_churn').
+      const { data: politicaRisco } = await admin
+        .from("politicas_decisao")
+        .select("parametros")
+        .eq("tipo", "risco_churn")
+        .eq("ativo", true)
+        .maybeSingle();
+
+      const paramsRisco = (politicaRisco?.parametros ?? {}) as Record<string, unknown>;
+      const numParam = (k: string, fallback: number) => {
+        const n = Number(paramsRisco[k]);
+        return Number.isFinite(n) ? n : fallback;
+      };
+
+      const SCORE_CRITICO = numParam("score_critico", 6.0);
+      const MEDIA_CRITICA = numParam("media_critica", 6.5);
+      const QUEDA_MINIMA = numParam("queda_minima", 1.5);
+      const MIN_REUNIOES = numParam("min_reunioes", 2);
+      const JANELA_DIAS = numParam("janela_dias", 180);
+      const CONTRATO_VENCE_EM_DIAS = numParam("contrato_vence_em_dias", 90);
       const DEDUP_DIAS = 14;
 
       const desdeRisco = new Date(hoje);
@@ -495,7 +511,7 @@ Deno.serve(async (req) => {
 
       for (const cli of clientesRisco ?? []) {
         const scores = reunioesPorCliente.get((cli as any).id) ?? []; // já em ordem desc
-        if (scores.length < 2) continue;
+        if (scores.length < MIN_REUNIOES) continue;
 
         const scoreAtual = scores[0];
         const recentes = scores.slice(0, 3);
@@ -526,7 +542,7 @@ Deno.serve(async (req) => {
         if (!severidade) continue;
 
         const venceEm = venceEmPorCliente.get((cli as any).id) ?? null;
-        if (venceEm != null && venceEm >= 0 && venceEm <= 90) {
+        if (venceEm != null && venceEm >= 0 && venceEm <= CONTRATO_VENCE_EM_DIAS) {
           severidade = "critico";
           motivos.push(`contrato vence em ${venceEm} dia(s)`);
         }

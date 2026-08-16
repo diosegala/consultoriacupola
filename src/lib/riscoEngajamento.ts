@@ -1,12 +1,55 @@
 // Lógica pura de detecção de risco de churn a partir do score de engajamento
-// do cliente (reunioes.score_cliente). Compartilhada entre o painel do diretor
-// e a edge function de alertas proativos (que replica estas constantes).
+// do cliente (reunioes.score_cliente). Os limiares vêm da tabela
+// `politicas_decisao` (tipo = 'risco_churn'); as constantes abaixo servem
+// apenas como fallback/valores default.
 
-export const RISCO_SCORE_CRITICO = 6.0;
-export const RISCO_MEDIA_CRITICA = 6.5;
-export const RISCO_QUEDA_MINIMA = 1.5;
-export const RISCO_MIN_REUNIOES = 2;
-export const RISCO_JANELA_DIAS = 180;
+export interface ParametrosRiscoChurn {
+  score_critico: number;
+  media_critica: number;
+  queda_minima: number;
+  min_reunioes: number;
+  janela_dias: number;
+  contrato_vence_em_dias: number;
+}
+
+export const PARAMETROS_RISCO_CHURN_DEFAULT: ParametrosRiscoChurn = {
+  score_critico: 6.0,
+  media_critica: 6.5,
+  queda_minima: 1.5,
+  min_reunioes: 2,
+  janela_dias: 180,
+  contrato_vence_em_dias: 90,
+};
+
+/** @deprecated use PARAMETROS_RISCO_CHURN_DEFAULT */
+export const RISCO_SCORE_CRITICO = PARAMETROS_RISCO_CHURN_DEFAULT.score_critico;
+/** @deprecated use PARAMETROS_RISCO_CHURN_DEFAULT */
+export const RISCO_MEDIA_CRITICA = PARAMETROS_RISCO_CHURN_DEFAULT.media_critica;
+/** @deprecated use PARAMETROS_RISCO_CHURN_DEFAULT */
+export const RISCO_QUEDA_MINIMA = PARAMETROS_RISCO_CHURN_DEFAULT.queda_minima;
+/** @deprecated use PARAMETROS_RISCO_CHURN_DEFAULT */
+export const RISCO_MIN_REUNIOES = PARAMETROS_RISCO_CHURN_DEFAULT.min_reunioes;
+/** @deprecated use PARAMETROS_RISCO_CHURN_DEFAULT */
+export const RISCO_JANELA_DIAS = PARAMETROS_RISCO_CHURN_DEFAULT.janela_dias;
+
+export function normalizarParametrosRiscoChurn(raw: unknown): ParametrosRiscoChurn {
+  const p = (raw ?? {}) as Partial<Record<keyof ParametrosRiscoChurn, unknown>>;
+  const num = (v: unknown, fallback: number) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : fallback;
+  };
+  return {
+    score_critico: num(p.score_critico, PARAMETROS_RISCO_CHURN_DEFAULT.score_critico),
+    media_critica: num(p.media_critica, PARAMETROS_RISCO_CHURN_DEFAULT.media_critica),
+    queda_minima: num(p.queda_minima, PARAMETROS_RISCO_CHURN_DEFAULT.queda_minima),
+    min_reunioes: num(p.min_reunioes, PARAMETROS_RISCO_CHURN_DEFAULT.min_reunioes),
+    janela_dias: num(p.janela_dias, PARAMETROS_RISCO_CHURN_DEFAULT.janela_dias),
+    contrato_vence_em_dias: num(
+      p.contrato_vence_em_dias,
+      PARAMETROS_RISCO_CHURN_DEFAULT.contrato_vence_em_dias,
+    ),
+  };
+}
 
 export type SeveridadeRisco = 'critico' | 'atencao';
 
@@ -32,18 +75,21 @@ function media(arr: number[]): number {
 }
 
 /**
- * Recebe as reuniões com score do cliente (qualquer ordem) e devolve a
- * avaliação de risco, ou null quando não há sinal de alerta.
+ * Recebe as reuniões com score do cliente (qualquer ordem) e os parâmetros de
+ * política vigentes, e devolve a avaliação de risco ou null quando não há
+ * sinal de alerta.
  */
 export function avaliarRiscoEngajamento(
   reunioes: ReuniaoScore[],
+  parametros: ParametrosRiscoChurn = PARAMETROS_RISCO_CHURN_DEFAULT,
   opts: { contratoVenceEmDias?: number | null } = {},
 ): AvaliacaoRisco | null {
+  const p = parametros;
   const desc = [...reunioes]
     .filter((r) => r.score_cliente != null && !Number.isNaN(Number(r.score_cliente)))
     .sort((a, b) => b.data_reuniao.localeCompare(a.data_reuniao));
 
-  if (desc.length < RISCO_MIN_REUNIOES) return null;
+  if (desc.length < p.min_reunioes) return null;
 
   const scores = desc.map((r) => Number(r.score_cliente));
   const scoreAtual = scores[0];
@@ -56,15 +102,15 @@ export function avaliarRiscoEngajamento(
   const motivos: string[] = [];
   let severidade: SeveridadeRisco | null = null;
 
-  if (scoreAtual < RISCO_SCORE_CRITICO) {
+  if (scoreAtual < p.score_critico) {
     severidade = 'critico';
-    motivos.push(`Última reunião com score ${scoreAtual.toFixed(1)} (abaixo de ${RISCO_SCORE_CRITICO.toFixed(1)})`);
+    motivos.push(`Última reunião com score ${scoreAtual.toFixed(1)} (abaixo de ${p.score_critico.toFixed(1)})`);
   }
-  if (recentes.length >= 2 && mediaRecente < RISCO_MEDIA_CRITICA) {
+  if (recentes.length >= 2 && mediaRecente < p.media_critica) {
     severidade = 'critico';
     motivos.push(`Média das últimas ${recentes.length} reuniões em ${mediaRecente.toFixed(1)}`);
   }
-  if (variacao != null && variacao <= -RISCO_QUEDA_MINIMA) {
+  if (variacao != null && variacao <= -p.queda_minima) {
     severidade = severidade ?? 'atencao';
     motivos.push(
       `Queda de ${Math.abs(variacao).toFixed(1)} ponto(s): ${mediaAnterior!.toFixed(1)} → ${mediaRecente.toFixed(1)}`,
@@ -78,7 +124,7 @@ export function avaliarRiscoEngajamento(
   if (!severidade) return null;
 
   const venceEm = opts.contratoVenceEmDias;
-  if (venceEm != null && venceEm >= 0 && venceEm <= 90) {
+  if (venceEm != null && venceEm >= 0 && venceEm <= p.contrato_vence_em_dias) {
     motivos.push(`Contrato vence em ${venceEm} dia(s) — risco direto de não renovação`);
     severidade = 'critico';
   }

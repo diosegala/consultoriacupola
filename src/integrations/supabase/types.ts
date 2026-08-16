@@ -1452,6 +1452,39 @@ export type Database = {
           },
         ]
       }
+      politicas_decisao: {
+        Row: {
+          ativo: boolean
+          atualizado_em: string
+          atualizado_por: string | null
+          created_at: string
+          id: string
+          parametros: Json
+          tipo: string
+          versao: number
+        }
+        Insert: {
+          ativo?: boolean
+          atualizado_em?: string
+          atualizado_por?: string | null
+          created_at?: string
+          id?: string
+          parametros: Json
+          tipo: string
+          versao?: number
+        }
+        Update: {
+          ativo?: boolean
+          atualizado_em?: string
+          atualizado_por?: string | null
+          created_at?: string
+          id?: string
+          parametros?: Json
+          tipo?: string
+          versao?: number
+        }
+        Relationships: []
+      }
       projeto_checklist: {
         Row: {
           assigned_to: string | null
