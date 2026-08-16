@@ -95,6 +95,12 @@ export function useMarcarTodasLidas() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notificacoes', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['meu-painel', 'acoes-sugeridas'] });
+      queryClient.invalidateQueries({ queryKey: ['painel-diretor'] });
+      toast.success('Decisão registrada');
+    },
+    onError: () => {
+      toast.error('Não foi possível registrar a decisão');
     },
   });
 }
