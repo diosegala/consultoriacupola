@@ -1,20 +1,18 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Check, CheckCheck, Pencil, X } from 'lucide-react';
+import { Bell, Check, CheckCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   useNotificacoes,
   useMarcarNotificacaoLida,
   useMarcarTodasLidas,
-  useDecidirNotificacao,
   type Notificacao,
 } from '@/hooks/useNotificacoes';
+import { NotificacaoDecisao } from '@/components/notificacoes/NotificacaoDecisao';
 import { cn } from '@/lib/utils';
 
 const tipoLabel: Record<string, string> = {
