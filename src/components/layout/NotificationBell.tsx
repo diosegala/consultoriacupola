@@ -12,7 +12,7 @@ import {
   useMarcarTodasLidas,
   type Notificacao,
 } from '@/hooks/useNotificacoes';
-import { NotificacaoDecisao } from '@/components/notificacoes/NotificacaoDecisao';
+import { NotificacaoDecisao, TIPOS_DECIDIVEIS } from '@/components/notificacoes/NotificacaoDecisao';
 import { cn } from '@/lib/utils';
 
 const tipoLabel: Record<string, string> = {
@@ -26,7 +26,6 @@ const tipoLabel: Record<string, string> = {
   score_cliente_em_queda: 'Engajamento',
 };
 
-const TIPOS_DECIDIVEIS = ['sem_contato', 'score_cliente_em_queda'];
 
 export function NotificationBell() {
   const navigate = useNavigate();

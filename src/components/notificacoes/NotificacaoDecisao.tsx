@@ -120,3 +120,13 @@ export function NotificacaoDecisao({
     </div>
   );
 }
+
+export const TIPOS_DECIDIVEIS = [
+  'sem_contato',
+  'score_cliente_em_queda',
+  'checklist_parado',
+  'okr_sem_progresso',
+  'contrato_sem_renovacao',
+  'sentimento_negativo_cliente',
+  'lembrete_gestao',
+];
