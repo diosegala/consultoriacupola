@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { NotificacaoDecisao } from '@/components/notificacoes/NotificacaoDecisao';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Users,
@@ -421,6 +422,7 @@ export function GestaoEquipeSection({ userId }: { userId: string | null }) {
                         </Button>
                       )}
                     </div>
+                    <NotificacaoDecisao n={n} />
                   </div>
                 );
               })}
@@ -471,6 +473,7 @@ export function GestaoEquipeSection({ userId }: { userId: string | null }) {
                 <div key={l.id} className="p-3 rounded-md border border-border/50 bg-card/40">
                   <p className="text-sm text-foreground">{l.titulo}</p>
                   {l.descricao && <p className="text-[11px] text-muted-foreground mt-0.5">{l.descricao}</p>}
+                  <NotificacaoDecisao n={l} />
                 </div>
               ))}
             </div>
