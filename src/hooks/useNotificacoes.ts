@@ -35,7 +35,7 @@ export function useNotificacoes() {
         .from('notificacoes')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(30);
+        .limit(50);
       if (error) throw error;
       return (data ?? []) as Notificacao[];
     },
@@ -74,6 +74,8 @@ export function useMarcarNotificacaoLida() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notificacoes', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['meu-painel', 'acoes-sugeridas'] });
+      queryClient.invalidateQueries({ queryKey: ['painel-diretor'] });
     },
   });
 }
