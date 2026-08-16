@@ -1,20 +1,18 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Check, CheckCheck, Pencil, X } from 'lucide-react';
+import { Bell, Check, CheckCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   useNotificacoes,
   useMarcarNotificacaoLida,
   useMarcarTodasLidas,
-  useDecidirNotificacao,
   type Notificacao,
 } from '@/hooks/useNotificacoes';
+import { NotificacaoDecisao, TIPOS_DECIDIVEIS } from '@/components/notificacoes/NotificacaoDecisao';
 import { cn } from '@/lib/utils';
 
 const tipoLabel: Record<string, string> = {
@@ -28,110 +26,6 @@ const tipoLabel: Record<string, string> = {
   score_cliente_em_queda: 'Engajamento',
 };
 
-const TIPOS_DECIDIVEIS = ['sem_contato', 'score_cliente_em_queda'];
-
-const decisaoLabel: Record<string, string> = {
-  aprovado: 'Aprovado',
-  editado: 'Editado',
-  rejeitado: 'Rejeitado',
-};
-
-function NotificacaoDecisao({ n }: { n: Notificacao }) {
-  const decidir = useDecidirNotificacao();
-  const [modo, setModo] = useState<'idle' | 'editar' | 'rejeitar'>('idle');
-  const sugestao = (n.metadata as any)?.mensagem_sugerida ?? n.descricao ?? '';
-  const [texto, setTexto] = useState<string>(sugestao);
-  const [motivo, setMotivo] = useState('');
-
-  if (n.decisao) {
-    return (
-      <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 mt-2">
-        {decisaoLabel[n.decisao] ?? n.decisao}
-      </Badge>
-    );
-  }
-
-  if (modo === 'editar') {
-    return (
-      <div className="mt-2 space-y-2">
-        <Textarea
-          value={texto}
-          onChange={(e) => setTexto(e.target.value)}
-          rows={4}
-          className="text-xs"
-          placeholder="Mensagem revisada"
-        />
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            className="h-7 text-xs"
-            disabled={!texto.trim() || decidir.isPending}
-            onClick={() =>
-              decidir.mutate({ id: n.id, decisao: 'editado', decisao_texto: texto.trim() })
-            }
-          >
-            Salvar
-          </Button>
-          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setModo('idle')}>
-            Cancelar
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (modo === 'rejeitar') {
-    return (
-      <div className="mt-2 space-y-2">
-        <Textarea
-          value={motivo}
-          onChange={(e) => setMotivo(e.target.value)}
-          rows={2}
-          className="text-xs"
-          placeholder="Motivo (ex: não é prioridade agora)"
-        />
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            className="h-7 text-xs"
-            disabled={!motivo.trim() || decidir.isPending}
-            onClick={() =>
-              decidir.mutate({ id: n.id, decisao: 'rejeitado', decisao_motivo: motivo.trim() })
-            }
-          >
-            Confirmar
-          </Button>
-          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setModo('idle')}>
-            Cancelar
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex gap-1.5 mt-2">
-      <Button
-        size="sm"
-        variant="outline"
-        className="h-7 text-xs"
-        disabled={decidir.isPending}
-        onClick={() => decidir.mutate({ id: n.id, decisao: 'aprovado' })}
-      >
-        <Check className="h-3.5 w-3.5 mr-1" />
-        Aprovar
-      </Button>
-      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setModo('editar')}>
-        <Pencil className="h-3.5 w-3.5 mr-1" />
-        Editar
-      </Button>
-      <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setModo('rejeitar')}>
-        <X className="h-3.5 w-3.5 mr-1" />
-        Rejeitar
-      </Button>
-    </div>
-  );
-}
 
 export function NotificationBell() {
   const navigate = useNavigate();
@@ -178,7 +72,7 @@ export function NotificationBell() {
             </Button>
           )}
         </div>
-        <ScrollArea className="max-h-[460px]">
+        <ScrollArea className="h-[420px]">
           {notificacoes.length === 0 ? (
             <div className="p-6 text-center text-sm text-muted-foreground">
               Nenhuma notificação por aqui.

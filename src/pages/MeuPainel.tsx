@@ -34,6 +34,7 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { GestaoEquipeSection } from '@/components/painel/GestaoEquipeSection';
+import { NotificacaoDecisao } from '@/components/notificacoes/NotificacaoDecisao';
 
 const TIPOS_PROATIVOS = ['sem_contato', 'checklist_parado', 'okr_sem_progresso', 'contrato_sem_renovacao', 'score_cliente_em_queda'] as const;
 type TipoProativo = (typeof TIPOS_PROATIVOS)[number];
@@ -53,7 +54,7 @@ function useAcoesSugeridas(userId: string | null | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('notificacoes')
-        .select('id, tipo, titulo, descricao, link, entidade_id, entidade_tipo, metadata, created_at')
+        .select('id, tipo, titulo, descricao, link, entidade_id, entidade_tipo, metadata, created_at, decisao, decisao_texto')
         .eq('user_id', userId!)
         .eq('lida', false)
         .in('tipo', TIPOS_PROATIVOS as unknown as string[])
@@ -344,10 +345,8 @@ export default function MeuPainel() {
                           </Link>
                         </Button>
                       )}
-                      <Button size="sm" variant="ghost" onClick={() => marcarComoLida(n.id)}>
-                        Marcar como resolvida
-                      </Button>
                     </div>
+                    <NotificacaoDecisao n={n} className="pt-1" />
                   </div>
                 );
               })}
