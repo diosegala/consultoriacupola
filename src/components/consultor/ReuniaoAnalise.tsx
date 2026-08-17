@@ -4,14 +4,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { ReuniaoComDetalhes } from '@/hooks/useReunioes';
+import { useReuniaoDetalhe } from '@/hooks/useReunioes';
+import { Skeleton } from '@/components/ui/skeleton';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CheckCircle, AlertTriangle, CheckSquare, User } from 'lucide-react';
 import { useCompromissosPorReuniao } from '@/hooks/useCompromissos';
 
 interface ReuniaoAnaliseProps {
-  reuniao: ReuniaoComDetalhes | null;
+  reuniaoId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -36,11 +37,31 @@ function getProgressColor(score: number): string {
   return '[&>div]:bg-destructive';
 }
 
-export function ReuniaoAnalise({ reuniao, open, onOpenChange }: ReuniaoAnaliseProps) {
-  if (!reuniao) return null;
+export function ReuniaoAnalise({ reuniaoId, open, onOpenChange }: ReuniaoAnaliseProps) {
+  const { data: reuniao, isLoading } = useReuniaoDetalhe(open ? reuniaoId ?? undefined : undefined);
+  const { data: compromissos } = useCompromissosPorReuniao(reuniao?.id ?? '');
 
-  const analise = reuniao.analise_ia as Record<string, any> | null;
-  const { data: compromissos } = useCompromissosPorReuniao(reuniao.id);
+  if (!reuniaoId) return null;
+
+  const analise = (reuniao?.analise_ia ?? null) as Record<string, any> | null;
+
+  if (isLoading || !reuniao) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="bg-card border-border max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Análise da Reunião</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-4">
+            <Skeleton className="h-12 w-40" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-5/6" />
+            <Skeleton className="h-32 w-full" />
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
