@@ -108,7 +108,6 @@ export function ReunioesList({
             {showConsultorColumn && (
               <TableHead className="text-muted-foreground">Consultor</TableHead>
             )}
-            <TableHead className="text-muted-foreground text-center">Duração</TableHead>
             <TableHead className="text-muted-foreground text-center">Score</TableHead>
             <TableHead className="text-muted-foreground">Origem</TableHead>
             <TableHead className="text-muted-foreground">Status</TableHead>
@@ -141,9 +140,6 @@ export function ReunioesList({
                   {reuniao.consultores?.nome || '-'}
                 </TableCell>
               )}
-              <TableCell className="text-center text-muted-foreground">
-                {reuniao.duracao_minutos ? `${reuniao.duracao_minutos}min` : '-'}
-              </TableCell>
               <TableCell className="text-center">
                 {reuniao.score_ia != null ? (
                   <Badge className={getScoreColor(reuniao.score_ia)}>
