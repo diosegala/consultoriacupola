@@ -130,7 +130,10 @@ export default function Auth() {
                       return;
                     }
                     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                      redirectTo: `${window.location.origin}/reset-password`,
+                      // Links enviados a partir do preview não podem voltar para o
+                      // domínio privado do Lovable, pois o destinatário pode não ter
+                      // acesso ao projeto. A recuperação sempre acontece no app público.
+                      redirectTo: 'https://consultoriacupola.lovable.app/reset-password',
                 });
                 if (error) {
                   toast({ title: 'Erro', description: error.message, variant: 'destructive' });
