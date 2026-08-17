@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ReuniaoComDetalhes } from '@/hooks/useReunioes';
+import { ReuniaoDetalhe } from '@/hooks/useReunioes';
 
 interface ConsultorInfo {
   nome: string;
@@ -50,7 +50,7 @@ function loadImageAsBase64(url: string): Promise<string> {
 
 export async function gerarRelatorioPDF(
   consultor: ConsultorInfo,
-  reunioes: ReuniaoComDetalhes[],
+  reunioes: ReuniaoDetalhe[],
   scoreMedio: number | null,
 ) {
   const analisadas = reunioes.filter(r => r.status_analise === 'concluido' && r.analise_ia);

@@ -1,28 +1,45 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-export interface Reuniao {
+/** Avoids supabase-js parsing select strings at the type level (huge tsc cost). */
+const sel = (s: string): string => s;
+
+/** Columns needed by the listing tables — never includes transcricao/analises. */
+const LIST_COLS =
+  'id, consultor_id, cliente_id, data_reuniao, duracao_minutos, score_ia, score_cliente, status_analise, google_meet_link, created_at, updated_at, clientes(nome), consultores(nome)';
+
+export const REUNIOES_PAGE_SIZE = 50;
+
+/** Lightweight row used by all listings. */
+export interface ReuniaoResumo {
   id: string;
   consultor_id: string;
   cliente_id: string;
   data_reuniao: string;
   duracao_minutos: number | null;
-  transcricao: string | null;
-  resumo_ia: string | null;
   score_ia: number | null;
-  analise_ia: Record<string, any> | null;
   score_cliente: number | null;
-  analise_cliente: Record<string, any> | null;
   google_meet_link: string | null;
   status_analise: string;
   created_at: string;
   updated_at: string;
+  clientes?: { nome: string } | null;
+  consultores?: { nome: string } | null;
+  origem?: 'drive' | 'manual';
 }
 
-export interface ReuniaoComDetalhes extends Reuniao {
-  clientes?: { nome: string };
-  consultores?: { nome: string };
+/** Backwards-compatible alias used across the app for list rows. */
+export type ReuniaoComDetalhes = ReuniaoResumo;
+
+/** Full row, only fetched when opening a single meeting. */
+export interface ReuniaoDetalhe extends ReuniaoResumo {
+  transcricao: string | null;
+  resumo_ia: string | null;
+  analise_ia: Record<string, any> | null;
+  analise_cliente: Record<string, any> | null;
 }
+
+export type Reuniao = ReuniaoDetalhe;
 
 export interface ReuniaoInsert {
   consultor_id: string;
@@ -33,6 +50,27 @@ export interface ReuniaoInsert {
   google_meet_link?: string | null;
 }
 
+/** IDs of meetings imported from Google Drive (used to derive origem). */
+export function useReunioesDriveIds() {
+  return useQuery({
+    queryKey: ['reunioes', 'drive-ids'],
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('reunioes_importadas_log' as any)
+        .select(sel('reuniao_id'))
+        .not('reuniao_id', 'is', null);
+      if (error) throw error;
+      return new Set(((data || []) as any[]).map((l) => l.reuniao_id as string));
+    },
+  });
+}
+
+function withOrigem(rows: ReuniaoResumo[], driveIds: Set<string> | undefined): ReuniaoResumo[] {
+  if (!driveIds) return rows;
+  return rows.map((r) => ({ ...r, origem: driveIds.has(r.id) ? 'drive' : 'manual' } as ReuniaoResumo));
+}
+
 export function useReunioesByConsultor(consultorId: string | undefined) {
   return useQuery({
     queryKey: ['reunioes', 'consultor', consultorId],
@@ -40,89 +78,133 @@ export function useReunioesByConsultor(consultorId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('reunioes')
-        .select('*, clientes(nome), consultores(nome)')
+        .select(sel(LIST_COLS))
         .eq('consultor_id', consultorId!)
-        .order('data_reuniao', { ascending: false });
+        .order('data_reuniao', { ascending: false })
+        .returns<ReuniaoResumo[]>();
 
       if (error) throw error;
-      return data as unknown as ReuniaoComDetalhes[];
+      return data || [];
     },
   });
 }
 
 export function useReunioesByCliente(clienteId: string | undefined) {
+  const { data: driveIds } = useReunioesDriveIds();
   return useQuery({
-    queryKey: ['reunioes', 'cliente', clienteId],
+    queryKey: ['reunioes', 'cliente', clienteId, !!driveIds],
     enabled: !!clienteId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('reunioes')
-        .select('*, clientes(nome), consultores(nome)')
+        .select(sel(LIST_COLS))
         .eq('cliente_id', clienteId!)
-        .order('data_reuniao', { ascending: false });
+        .order('data_reuniao', { ascending: false })
+        .returns<ReuniaoResumo[]>();
       if (error) throw error;
-      const reunioes = (data || []) as unknown as ReuniaoComDetalhes[];
-      const ids = reunioes.map((r) => r.id);
-      if (ids.length) {
-        const { data: logs } = await supabase
-          .from('reunioes_importadas_log' as any)
-          .select('reuniao_id, data_importacao, nome_arquivo')
-          .in('reuniao_id', ids);
-        const map = new Map(((logs || []) as any[]).map((l) => [l.reuniao_id, l]));
-        reunioes.forEach((r: any) => {
-          const log = map.get(r.id);
-          r.origem = log ? 'drive' : 'manual';
-          r.origem_log = log || null;
-        });
-      }
-      return reunioes;
+      return withOrigem(data || [], driveIds);
     },
   });
 }
 
-export function useReuniao(id: string | undefined) {
+/** Full meeting (transcription + analyses) — only when a detail view is open. */
+export function useReuniaoDetalhe(id: string | undefined) {
   return useQuery({
-    queryKey: ['reunioes', id],
+    queryKey: ['reunioes', 'detalhe', id],
     enabled: !!id,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('reunioes')
-        .select('*, clientes(nome), consultores(nome)')
+        .select(sel(`${LIST_COLS}, transcricao, resumo_ia, analise_ia, analise_cliente`))
         .eq('id', id!)
-        .single();
-
+        .maybeSingle()
+        .returns<ReuniaoDetalhe>();
       if (error) throw error;
-      return data as unknown as ReuniaoComDetalhes;
+      return data;
     },
   });
 }
 
+export const useReuniao = useReuniaoDetalhe;
+
+/** Server-side counters for the KPI cards. */
+export function useReunioesStats(consultorId?: string | null) {
+  return useQuery({
+    queryKey: ['reunioes', 'stats', consultorId ?? 'all'],
+    queryFn: async () => {
+      const base = () => {
+        const q = supabase.from('reunioes').select(sel('id'), { count: 'exact', head: true });
+        return consultorId ? q.eq('consultor_id', consultorId) : q;
+      };
+      const [total, analisadas, pendentes] = await Promise.all([
+        base(),
+        base().eq('status_analise', 'concluido'),
+        base().in('status_analise', ['pendente', 'erro']).not('transcricao', 'is', null),
+      ]);
+      if (total.error) throw total.error;
+      return {
+        total: total.count ?? 0,
+        analisadas: analisadas.count ?? 0,
+        pendentes: pendentes.count ?? 0,
+      };
+    },
+  });
+}
+
+/** IDs of meetings waiting for analysis (used by the batch queue). */
+export function useReunioesPendentesIds(consultorId?: string | null) {
+  return useQuery({
+    queryKey: ['reunioes', 'pendentes-ids', consultorId ?? 'all'],
+    queryFn: async () => {
+      const q = supabase
+        .from('reunioes')
+        .select(sel('id'))
+        .in('status_analise', ['pendente', 'erro'])
+        .not('transcricao', 'is', null)
+        .order('data_reuniao', { ascending: false })
+        .limit(500);
+      const { data, error } = await (consultorId ? q.eq('consultor_id', consultorId) : q).returns<{ id: string }[]>();
+      if (error) throw error;
+      return (data || []).map((r) => r.id);
+    },
+  });
+}
+
+/** Paginated listing (50 per page) with optional origem filter. */
 export function useAllReunioes(opts: { origem?: 'all' | 'drive' | 'manual' } = {}) {
   const { origem = 'all' } = opts;
-  return useQuery({
-    queryKey: ['reunioes', 'all', origem],
-    queryFn: async () => {
-      const { data, error } = await supabase
+  const { data: driveIds, isLoading: loadingIds } = useReunioesDriveIds();
+  const needsIds = origem !== 'all';
+
+  return useInfiniteQuery({
+    queryKey: ['reunioes', 'all', origem, driveIds ? driveIds.size : null],
+    enabled: !needsIds || !loadingIds,
+    initialPageParam: 0,
+    getNextPageParam: (lastPage: ReuniaoResumo[], allPages) =>
+      lastPage.length < REUNIOES_PAGE_SIZE ? undefined : allPages.length,
+    queryFn: async ({ pageParam }) => {
+      const page = pageParam as number;
+      const from = page * REUNIOES_PAGE_SIZE;
+      const to = from + REUNIOES_PAGE_SIZE - 1;
+      const ids = driveIds ? Array.from(driveIds) : [];
+
+      let q = supabase
         .from('reunioes')
-        .select('*, clientes(nome), consultores(nome)')
-        .order('data_reuniao', { ascending: false });
-      if (error) throw error;
-      const reunioes = (data || []) as unknown as ReuniaoComDetalhes[];
-      const ids = reunioes.map((r) => r.id);
-      if (ids.length) {
-        const { data: logs } = await supabase
-          .from('reunioes_importadas_log' as any)
-          .select('reuniao_id, data_importacao, nome_arquivo')
-          .in('reuniao_id', ids);
-        const map = new Map(((logs || []) as any[]).map((l) => [l.reuniao_id, l]));
-        reunioes.forEach((r: any) => {
-          const log = map.get(r.id);
-          r.origem = log ? 'drive' : 'manual';
-          r.origem_log = log || null;
-        });
+        .select(sel(LIST_COLS))
+        .order('data_reuniao', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, to);
+
+      if (origem === 'drive') {
+        if (!ids.length) return [] as ReuniaoResumo[];
+        q = q.in('id', ids);
+      } else if (origem === 'manual' && ids.length) {
+        q = q.not('id', 'in', `(${ids.join(',')})`);
       }
-      if (origem === 'all') return reunioes;
-      return reunioes.filter((r: any) => r.origem === origem);
+
+      const { data, error } = await q.returns<ReuniaoResumo[]>();
+      if (error) throw error;
+      return withOrigem(data || [], driveIds);
     },
   });
 }
@@ -135,13 +217,13 @@ export function useCreateReuniao() {
       const { data, error } = await supabase
         .from('reunioes')
         .insert(reuniao as any)
-        .select()
+        .select(sel('id'))
         .single();
 
       if (error) throw error;
-      return data as unknown as Reuniao;
+      return data as unknown as { id: string };
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reunioes'] });
     },
   });
@@ -187,7 +269,7 @@ export function useScoreConsultor(consultorId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('reunioes')
-        .select('score_ia')
+        .select(sel('score_ia'))
         .eq('consultor_id', consultorId!)
         .eq('status_analise', 'concluido')
         .not('score_ia', 'is', null);
@@ -196,7 +278,7 @@ export function useScoreConsultor(consultorId: string | undefined) {
 
       if (!data || data.length === 0) return null;
 
-      const scores = data.map((r: any) => Number(r.score_ia));
+      const scores = (data as any[]).map((r) => Number(r.score_ia));
       const media = scores.reduce((a: number, b: number) => a + b, 0) / scores.length;
       return {
         score_medio: Math.round(media * 10) / 10,

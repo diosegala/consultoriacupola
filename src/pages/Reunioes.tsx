@@ -1,36 +1,60 @@
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, Sparkles, Video } from 'lucide-react';
-import { useAllReunioes, useReunioesByConsultor, useAnalisarReuniao, ReuniaoComDetalhes } from '@/hooks/useReunioes';
+import {
+  useAllReunioes,
+  useReunioesByConsultor,
+  useAnalisarReuniao,
+  useReunioesStats,
+  useReunioesPendentesIds,
+} from '@/hooks/useReunioes';
 import { useMyConsultorId } from '@/hooks/useConsultorUser';
 import { ReunioesList } from '@/components/consultor/ReunioesList';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+
+/** Runs tasks with limited concurrency so the queue doesn't block the UI. */
+async function runQueue<T>(items: T[], limit: number, worker: (item: T) => Promise<void>) {
+  let index = 0;
+  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (index < items.length) {
+      const current = items[index++];
+      await worker(current);
+    }
+  });
+  await Promise.all(runners);
+}
 
 export default function Reunioes() {
   const { isAdmin, loading } = useAuth();
   const { toast } = useToast();
   const [origem, setOrigem] = useState<'all' | 'drive' | 'manual'>('drive');
   const { data: myConsultorId } = useMyConsultorId();
+
   const allQuery = useAllReunioes({ origem });
   const consultorQuery = useReunioesByConsultor(isAdmin ? undefined : myConsultorId ?? undefined);
-  const reunioesRaw = isAdmin ? allQuery.data : consultorQuery.data;
-  const isLoading = isAdmin ? allQuery.isLoading : consultorQuery.isLoading;
+
+  const scopedConsultorId = isAdmin ? null : myConsultorId ?? null;
+  const { data: stats } = useReunioesStats(scopedConsultorId);
+  const { data: pendentesIds } = useReunioesPendentesIds(scopedConsultorId);
+
   const reunioes = useMemo(() => {
-    if (isAdmin || !reunioesRaw) return reunioesRaw;
-    // consultor view: ignore origem tabs (no log filter); just return all his reunioes
-    return reunioesRaw;
-  }, [isAdmin, reunioesRaw]);
+    if (isAdmin) return allQuery.data?.pages.flat() ?? [];
+    return consultorQuery.data ?? [];
+  }, [isAdmin, allQuery.data, consultorQuery.data]);
+
+  const isLoading = isAdmin ? allQuery.isLoading : consultorQuery.isLoading;
+
   const analisar = useAnalisarReuniao();
   const [analisandoLote, setAnalisandoLote] = useState(false);
+  const [progresso, setProgresso] = useState({ done: 0, total: 0 });
 
   if (loading) return <div className="p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
 
-  const pendentes = (reunioes || []).filter(
-    (r: ReuniaoComDetalhes) => r.transcricao && (r.status_analise === 'pendente' || r.status_analise === 'erro'),
-  );
+  const pendentes = pendentesIds ?? [];
 
   const handleAnalisarTodas = async () => {
     if (!pendentes.length) {
@@ -38,26 +62,26 @@ export default function Reunioes() {
       return;
     }
     setAnalisandoLote(true);
+    setProgresso({ done: 0, total: pendentes.length });
     let ok = 0;
     let fail = 0;
-    for (const r of pendentes) {
+    await runQueue(pendentes, 3, async (id) => {
       try {
-        await analisar.mutateAsync(r.id);
+        await analisar.mutateAsync(id);
         ok++;
       } catch (err: any) {
         fail++;
-        console.error('Falha ao analisar', r.id, err);
+        console.error('Falha ao analisar', id, err);
+      } finally {
+        setProgresso((p) => ({ ...p, done: p.done + 1 }));
       }
-    }
+    });
     setAnalisandoLote(false);
     toast({
       title: 'Análise em lote concluída',
       description: `${ok} analisadas, ${fail} com erro.`,
     });
   };
-
-  const total = reunioes?.length || 0;
-  const analisadas = (reunioes || []).filter((r) => r.status_analise === 'concluido').length;
 
   return (
     <div className="p-6 space-y-6">
@@ -73,29 +97,39 @@ export default function Reunioes() {
           </p>
         </div>
         {isAdmin && (
-          <Button
-            onClick={handleAnalisarTodas}
-            disabled={analisandoLote || !pendentes.length}
-            className="bg-primary text-primary-foreground"
-          >
-            {analisandoLote ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
-            Analisar pendentes ({pendentes.length})
-          </Button>
+          <div className="flex flex-col items-end gap-2">
+            <Button
+              onClick={handleAnalisarTodas}
+              disabled={analisandoLote || !pendentes.length}
+              className="bg-primary text-primary-foreground"
+            >
+              {analisandoLote ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
+              Analisar pendentes ({pendentes.length})
+            </Button>
+            {analisandoLote && (
+              <div className="w-56 space-y-1">
+                <Progress value={(progresso.done / Math.max(progresso.total, 1)) * 100} className="h-2" />
+                <p className="text-xs text-muted-foreground text-right">
+                  {progresso.done} / {progresso.total} processadas
+                </p>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Card className="bg-card border-border">
           <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground font-normal">Total</CardTitle></CardHeader>
-          <CardContent><p className="text-2xl font-bold text-foreground">{total}</p></CardContent>
+          <CardContent><p className="text-2xl font-bold text-foreground">{stats?.total ?? '—'}</p></CardContent>
         </Card>
         <Card className="bg-card border-border">
           <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground font-normal">Analisadas</CardTitle></CardHeader>
-          <CardContent><p className="text-2xl font-bold text-success">{analisadas}</p></CardContent>
+          <CardContent><p className="text-2xl font-bold text-success">{stats?.analisadas ?? '—'}</p></CardContent>
         </Card>
         <Card className="bg-card border-border">
           <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground font-normal">Pendentes</CardTitle></CardHeader>
-          <CardContent><p className="text-2xl font-bold text-warning">{pendentes.length}</p></CardContent>
+          <CardContent><p className="text-2xl font-bold text-warning">{stats?.pendentes ?? '—'}</p></CardContent>
         </Card>
       </div>
 
@@ -118,6 +152,9 @@ export default function Reunioes() {
             isLoading={isLoading}
             showConsultorColumn={isAdmin}
             linkCliente
+            hasMore={isAdmin && !!allQuery.hasNextPage}
+            isLoadingMore={allQuery.isFetchingNextPage}
+            onLoadMore={() => allQuery.fetchNextPage()}
           />
         </CardContent>
       </Card>

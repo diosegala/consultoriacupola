@@ -20,6 +20,10 @@ interface ReunioesListProps {
   showConsultorColumn?: boolean;
   /** Make cliente name a link to /clientes/:id. */
   linkCliente?: boolean;
+  /** Pagination: show "Carregar mais" button. */
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 function getScoreColor(score: number): string {
@@ -47,9 +51,12 @@ export function ReunioesList({
   hideClienteColumn = false,
   showConsultorColumn = false,
   linkCliente = false,
+  hasMore = false,
+  isLoadingMore = false,
+  onLoadMore,
 }: ReunioesListProps) {
   const { toast } = useToast();
-  const [selectedReuniao, setSelectedReuniao] = useState<ReuniaoComDetalhes | null>(null);
+  const [selectedReuniaoId, setSelectedReuniaoId] = useState<string | null>(null);
   const analisarReuniao = useAnalisarReuniao();
   const deleteReuniao = useDeleteReuniao();
   const { data: role } = useCurrentUserRole();
@@ -159,7 +166,7 @@ export function ReunioesList({
               <TableCell className="text-right">
                 <div className="flex gap-1 justify-end">
                   {reuniao.status_analise === 'concluido' && (
-                    <Button variant="ghost" size="icon" onClick={() => setSelectedReuniao(reuniao)}>
+                    <Button variant="ghost" size="icon" onClick={() => setSelectedReuniaoId(reuniao.id)}>
                       <Eye className="h-4 w-4" />
                     </Button>
                   )}
@@ -193,10 +200,19 @@ export function ReunioesList({
         </TableBody>
       </Table>
 
+      {hasMore && (
+        <div className="flex justify-center py-4">
+          <Button variant="outline" onClick={onLoadMore} disabled={isLoadingMore}>
+            {isLoadingMore && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Carregar mais
+          </Button>
+        </div>
+      )}
+
       <ReuniaoAnalise
-        reuniao={selectedReuniao}
-        open={!!selectedReuniao}
-        onOpenChange={(open) => !open && setSelectedReuniao(null)}
+        reuniaoId={selectedReuniaoId}
+        open={!!selectedReuniaoId}
+        onOpenChange={(open) => !open && setSelectedReuniaoId(null)}
       />
     </>
   );
