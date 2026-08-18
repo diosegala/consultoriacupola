@@ -156,16 +156,30 @@ export function useReunioesPendentesIds(consultorId?: string | null) {
   return useQuery({
     queryKey: ['reunioes', 'pendentes-ids', consultorId ?? 'all'],
     queryFn: async () => {
-      const q = supabase
-        .from('reunioes')
-        .select(sel('id'))
-        .in('status_analise', ['pendente', 'erro'])
-        .not('transcricao', 'is', null)
-        .order('data_reuniao', { ascending: false })
-        .limit(500);
-      const { data, error } = await (consultorId ? q.eq('consultor_id', consultorId) : q).returns<{ id: string }[]>();
-      if (error) throw error;
-      return (data || []).map((r) => r.id);
+      const ids: string[] = [];
+      const pageSize = 1000;
+      let from = 0;
+      let done = false;
+
+      while (!done) {
+        const to = from + pageSize - 1;
+        let q = supabase
+          .from('reunioes')
+          .select(sel('id'))
+          .in('status_analise', ['pendente', 'erro'])
+          .not('transcricao', 'is', null)
+          .order('data_reuniao', { ascending: false })
+          .range(from, to);
+        if (consultorId) q = q.eq('consultor_id', consultorId);
+        const { data, error } = await q.returns<{ id: string }[]>();
+        if (error) throw error;
+        const page = data || [];
+        ids.push(...page.map((r) => r.id));
+        done = page.length < pageSize;
+        from += pageSize;
+      }
+
+      return ids;
     },
   });
 }
