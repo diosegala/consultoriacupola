@@ -201,15 +201,17 @@ serve(async (req) => {
       consultorIdContexto = cli.consultor_id;
     }
 
-    // Histórico de documentos (últimos 5) — busca por projeto E por cliente
-    const histQ = supabase
+    // Histórico de documentos (últimos 10) — busca por projeto OU por cliente
+    const histFilters = [
+      projeto_id ? `projeto_id.eq.${projeto_id}` : null,
+      clienteId ? `cliente_id.eq.${clienteId}` : null,
+    ].filter(Boolean).join(",");
+    const { data: docsHistorico } = await supabase
       .from("projeto_documentos")
       .select("tipo, conteudo, created_at")
+      .or(histFilters)
       .order("created_at", { ascending: false })
-      .limit(5);
-    const { data: docsHistorico } = projeto_id
-      ? await histQ.eq("projeto_id", projeto_id)
-      : await histQ.eq("cliente_id", clienteId!);
+      .limit(10);
 
     const relevanciaPorTipo: Record<string, string[]> = {
       okrs: ["diagnostico", "okrs"],
