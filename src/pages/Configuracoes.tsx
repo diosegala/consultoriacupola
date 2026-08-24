@@ -684,6 +684,7 @@ export default function Configuracoes() {
         {/* Agentes IA (admin only) */}
         {isAdmin && (
           <TabsContent value="agentes" className="mt-6 space-y-4">
+            <DiretrizesAgentesCard />
             {loadingPrompts ? (
               <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin" /></div>
             ) : (
