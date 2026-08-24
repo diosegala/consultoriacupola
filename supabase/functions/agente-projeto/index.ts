@@ -122,6 +122,7 @@ serve(async (req) => {
       titulo_doc,
       periodo_inicio,
       periodo_fim,
+      continuar_documento_id,
     }: {
       tipo: string;
       projeto_id?: string | null;
@@ -136,7 +137,9 @@ serve(async (req) => {
       titulo_doc?: string;
       periodo_inicio?: string | null;
       periodo_fim?: string | null;
+      continuar_documento_id?: string | null;
     } = await req.json();
+
 
     if (!tipo || (!projeto_id && !cliente_id_in)) {
       return new Response(JSON.stringify({ error: "tipo e (projeto_id OU cliente_id) são obrigatórios" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
