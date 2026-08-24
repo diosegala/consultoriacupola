@@ -159,9 +159,6 @@ Deno.serve(async (req) => {
     }
 
 
-    return new Response(JSON.stringify({ success: true, reuniao_id: reuniao.id }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
   } catch (e: any) {
     console.error(e);
     return new Response(JSON.stringify({ error: e.message }), {
