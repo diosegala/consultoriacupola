@@ -862,25 +862,43 @@ ${checklistPeriodo.filter((c) => c.concluido).map((c: any) => `- [x] ${c.titulo}
       }
     }
 
-    const insertPayload: Record<string, unknown> = {
-      tipo,
-      conteudo,
-      created_by: userId,
-      gdoc_url,
-    };
-    if (projeto_id) insertPayload.projeto_id = projeto_id;
-    else insertPayload.cliente_id = clienteId;
-    if (dadosEstruturados) insertPayload.dados_estruturados = dadosEstruturados;
+    let docInserted: any = null;
 
-    const { data: docInserted, error: insertError } = await serviceClient
-      .from("projeto_documentos")
-      .insert(insertPayload)
-      .select()
-      .single();
+    if (continuar_documento_id) {
+      const updatePayload: Record<string, unknown> = { conteudo, truncado };
+      if (gdoc_url) updatePayload.gdoc_url = gdoc_url;
+      if (dadosEstruturados) updatePayload.dados_estruturados = dadosEstruturados;
+      const { data: docUpdated, error: updateError } = await serviceClient
+        .from("projeto_documentos")
+        .update(updatePayload)
+        .eq("id", continuar_documento_id)
+        .select()
+        .single();
+      if (updateError) console.error("Update error:", updateError);
+      docInserted = docUpdated;
+    } else {
+      const insertPayload: Record<string, unknown> = {
+        tipo,
+        conteudo,
+        created_by: userId,
+        gdoc_url,
+        truncado,
+      };
+      if (projeto_id) insertPayload.projeto_id = projeto_id;
+      else insertPayload.cliente_id = clienteId;
+      if (dadosEstruturados) insertPayload.dados_estruturados = dadosEstruturados;
 
-    if (insertError) console.error("Insert error:", insertError);
+      const { data: doc, error: insertError } = await serviceClient
+        .from("projeto_documentos")
+        .insert(insertPayload)
+        .select()
+        .single();
 
-    return new Response(JSON.stringify({ conteudo, gdoc_url, documento: docInserted }), {
+      if (insertError) console.error("Insert error:", insertError);
+      docInserted = doc;
+    }
+
+    return new Response(JSON.stringify({ conteudo, gdoc_url, truncado, documento: docInserted }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
