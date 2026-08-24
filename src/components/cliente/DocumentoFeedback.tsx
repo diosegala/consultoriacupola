@@ -14,7 +14,7 @@ import {
 } from '@/hooks/useAgenteFeedback';
 
 export function DocumentoFeedback({ doc }: { doc: ProjetoDocumento }) {
-  const { isAdmin } = useAuth() as { isAdmin?: boolean };
+  const { isAdmin } = useAuth();
   const { data: feedbacks } = useFeedbacksDocumento(doc.id);
   const salvar = useSalvarFeedback();
   const marcarExemplo = useMarcarComoExemplo();
