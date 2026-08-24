@@ -135,12 +135,39 @@ Deno.serve(async (req) => {
 
         for (const d of docs) {
           if (importedSet.has(d.id)) continue;
-          const clienteId = matchCliente(d.name, clientes || [], aliases || []);
-          // Clean up any previous sem_match/erro entry for this file before re-logging.
-          const staleId = staleLogByFile.get(d.id);
-          if (staleId) {
-            await admin.from("reunioes_importadas_log").delete().eq("id", staleId);
+
+          // Limpa entradas antigas (sem_match/erro), respeitando reservas recentes
+          // de outra execução em andamento (status 'importando' há menos de 1h).
+          const stale = staleLogByFile.get(d.id);
+          if (stale) {
+            const emAndamento =
+              stale.status === "importando" &&
+              Date.now() - new Date(stale.data_importacao ?? 0).getTime() < 60 * 60 * 1000;
+            if (emAndamento) { pulados++; continue; }
+            await admin.from("reunioes_importadas_log").delete().eq("id", stale.id);
           }
+
+          // TRAVA: reserva o arquivo antes de qualquer importação. A constraint UNIQUE
+          // em google_file_id garante que apenas uma execução siga adiante.
+          const { data: reserva, error: reservaErr } = await admin
+            .from("reunioes_importadas_log")
+            .insert({
+              google_file_id: d.id,
+              consultor_id: row.consultor_id,
+              nome_arquivo: d.name,
+              status: "importando",
+            })
+            .select("id").single();
+          if (reservaErr || !reserva) {
+            // 23505 = já reservado/importado por outra execução concorrente
+            pulados++; continue;
+          }
+          const logId = reserva.id;
+          const marcarLog = (patch: Record<string, unknown>) =>
+            admin.from("reunioes_importadas_log").update(patch).eq("id", logId);
+
+          const clienteId = matchCliente(d.name, clientes || [], aliases || []);
+
           if (!clienteId) {
             // Antes de descartar como sem_match: se o dono da pasta é diretor/admin
             // e o arquivo menciona consultoras da equipe → reunião de gestão.
@@ -187,10 +214,7 @@ Deno.serve(async (req) => {
                     })
                     .select().single();
                   if (rgErr) throw rgErr;
-                  await admin.from("reunioes_importadas_log").insert({
-                    google_file_id: d.id, consultor_id: row.consultor_id,
-                    nome_arquivo: d.name, status: "importado",
-                  });
+                  await marcarLog({ status: "importado" });
                   gestao++;
                   // Dispara análise assíncrona (não bloqueia sync)
                   const fnUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/analisar-reuniao-gestao`;
@@ -204,20 +228,15 @@ Deno.serve(async (req) => {
                   }).catch((err) => console.error("[gestao] disparo analise", err));
                   continue;
                 } catch (e: any) {
-                  await admin.from("reunioes_importadas_log").insert({
-                    google_file_id: d.id, consultor_id: row.consultor_id,
-                    nome_arquivo: d.name, status: "erro", erro: `gestao: ${e.message}`,
-                  });
+                  await marcarLog({ status: "erro", erro: `gestao: ${e.message}` });
                   erros++; continue;
                 }
               }
             }
-            await admin.from("reunioes_importadas_log").insert({
-              google_file_id: d.id, consultor_id: row.consultor_id,
-              nome_arquivo: d.name, status: "sem_match",
-            });
+            await marcarLog({ status: "sem_match" });
             pulados++; continue;
           }
+
           try {
             const exp = await fetch(
               `https://www.googleapis.com/drive/v3/files/${d.id}/export?mimeType=text/plain`,
@@ -232,22 +251,36 @@ Deno.serve(async (req) => {
               data_reuniao: dataReuniao,
               transcricao,
               status_analise: "pendente",
-            }).select().single();
-            if (rErr) throw rErr;
-            await admin.from("reunioes_importadas_log").insert({
-              google_file_id: d.id, consultor_id: row.consultor_id,
-              cliente_id: clienteId, reuniao_id: reuniao.id,
-              nome_arquivo: d.name, status: "importado",
+            }).select("id").single();
+
+            if (rErr) {
+              // Índice único de deduplicação: a mesma transcrição já existe.
+              if ((rErr as any).code === "23505") {
+                const { data: existente } = await admin
+                  .from("reunioes").select("id")
+                  .eq("cliente_id", clienteId)
+                  .eq("data_reuniao", dataReuniao)
+                  .limit(1).maybeSingle();
+                await marcarLog({
+                  status: "importado", cliente_id: clienteId,
+                  reuniao_id: existente?.id ?? null,
+                  erro: "duplicada: reunião já existente",
+                });
+                pulados++; continue;
+              }
+              throw rErr;
+            }
+
+            await marcarLog({
+              status: "importado", cliente_id: clienteId, reuniao_id: reuniao.id,
             });
             importados++;
           } catch (e: any) {
-            await admin.from("reunioes_importadas_log").insert({
-              google_file_id: d.id, consultor_id: row.consultor_id,
-              nome_arquivo: d.name, status: "erro", erro: e.message,
-            });
+            await marcarLog({ status: "erro", erro: e.message });
             erros++;
           }
         }
+
 
         await admin.from("consultor_google_tokens")
           .update({ ultima_sincronizacao: new Date().toISOString() })
