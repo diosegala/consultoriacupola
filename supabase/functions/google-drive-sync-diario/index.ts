@@ -120,16 +120,18 @@ Deno.serve(async (req) => {
 
         const ids = docs.map((d: any) => d.id);
         const { data: jaImp } = await admin
-          .from("reunioes_importadas_log").select("id, google_file_id, status")
+          .from("reunioes_importadas_log")
+          .select("id, google_file_id, status, data_importacao")
           .in("google_file_id", ids.length ? ids : ["__none__"]);
         // Only files actually imported (status='importado') should be skipped.
         // sem_match / erro logs are re-evaluated so newly-created aliases take effect.
         const importedSet = new Set(
           (jaImp || []).filter((j: any) => j.status === "importado").map((j: any) => j.google_file_id)
         );
-        const staleLogByFile = new Map(
-          (jaImp || []).filter((j: any) => j.status !== "importado").map((j: any) => [j.google_file_id, j.id])
+        const staleLogByFile = new Map<string, any>(
+          (jaImp || []).filter((j: any) => j.status !== "importado").map((j: any) => [j.google_file_id, j])
         );
+
 
         let importados = 0; let pulados = 0; let erros = 0; let gestao = 0;
 
