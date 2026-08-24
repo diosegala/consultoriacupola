@@ -98,7 +98,9 @@ export function useGerarDocumento() {
       trimestre?: string;
       canais_atendimento?: string[];
       titulo_doc?: string;
+      continuar_documento_id?: string;
     }) => {
+
       const { data, error } = await supabase.functions.invoke('agente-projeto', {
         body: params,
       });
