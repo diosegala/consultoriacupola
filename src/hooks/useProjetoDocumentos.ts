@@ -13,7 +13,11 @@ export interface ProjetoDocumento {
   dados_estruturados: any | null;
   created_by: string | null;
   created_at: string;
+  truncado?: boolean;
+  aprovado_como_exemplo?: boolean;
+  conteudo_revisado?: string | null;
 }
+
 
 export function useProjetoDocumentos(projetoId: string | undefined) {
   return useQuery({
