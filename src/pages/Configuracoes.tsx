@@ -35,6 +35,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { DiscProfileCard } from '@/components/disc/DiscProfileCard';
 import { PoliticaRiscoChurnCard } from '@/components/configuracoes/PoliticaRiscoChurnCard';
+import { DiretrizesAgentesCard } from '@/components/configuracoes/DiretrizesAgentesCard';
 import { useMyConsultorId } from '@/hooks/useDisc';
 
 export default function Configuracoes() {
@@ -684,6 +685,7 @@ export default function Configuracoes() {
         {/* Agentes IA (admin only) */}
         {isAdmin && (
           <TabsContent value="agentes" className="mt-6 space-y-4">
+            <DiretrizesAgentesCard />
             {loadingPrompts ? (
               <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin" /></div>
             ) : (

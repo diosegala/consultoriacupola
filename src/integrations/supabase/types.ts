@@ -14,6 +14,105 @@ export type Database = {
   }
   public: {
     Tables: {
+      agente_diretrizes: {
+        Row: {
+          aprovado_em: string | null
+          aprovado_por: string | null
+          conteudo: string
+          created_at: string
+          feedbacks_considerados: number
+          id: string
+          origem: string
+          status: string
+          tipo_agente: string
+          updated_at: string
+          versao: number
+        }
+        Insert: {
+          aprovado_em?: string | null
+          aprovado_por?: string | null
+          conteudo: string
+          created_at?: string
+          feedbacks_considerados?: number
+          id?: string
+          origem?: string
+          status?: string
+          tipo_agente: string
+          updated_at?: string
+          versao?: number
+        }
+        Update: {
+          aprovado_em?: string | null
+          aprovado_por?: string | null
+          conteudo?: string
+          created_at?: string
+          feedbacks_considerados?: number
+          id?: string
+          origem?: string
+          status?: string
+          tipo_agente?: string
+          updated_at?: string
+          versao?: number
+        }
+        Relationships: []
+      }
+      agente_feedbacks: {
+        Row: {
+          cliente_id: string | null
+          comentario: string | null
+          consolidado_em: string | null
+          created_at: string
+          documento_id: string | null
+          id: string
+          marcadores: string[]
+          nota: number
+          tipo_agente: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cliente_id?: string | null
+          comentario?: string | null
+          consolidado_em?: string | null
+          created_at?: string
+          documento_id?: string | null
+          id?: string
+          marcadores?: string[]
+          nota: number
+          tipo_agente: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          cliente_id?: string | null
+          comentario?: string | null
+          consolidado_em?: string | null
+          created_at?: string
+          documento_id?: string | null
+          id?: string
+          marcadores?: string[]
+          nota?: number
+          tipo_agente?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agente_feedbacks_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agente_feedbacks_documento_id_fkey"
+            columns: ["documento_id"]
+            isOneToOne: false
+            referencedRelation: "projeto_documentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agente_prompts: {
         Row: {
           documento_modelo: string | null
@@ -1606,8 +1705,10 @@ export type Database = {
       }
       projeto_documentos: {
         Row: {
+          aprovado_como_exemplo: boolean
           cliente_id: string | null
           conteudo: string
+          conteudo_revisado: string | null
           created_at: string
           created_by: string | null
           dados_estruturados: Json | null
@@ -1616,10 +1717,13 @@ export type Database = {
           projeto_id: string | null
           sheet_url: string | null
           tipo: string
+          truncado: boolean
         }
         Insert: {
+          aprovado_como_exemplo?: boolean
           cliente_id?: string | null
           conteudo: string
+          conteudo_revisado?: string | null
           created_at?: string
           created_by?: string | null
           dados_estruturados?: Json | null
@@ -1628,10 +1732,13 @@ export type Database = {
           projeto_id?: string | null
           sheet_url?: string | null
           tipo: string
+          truncado?: boolean
         }
         Update: {
+          aprovado_como_exemplo?: boolean
           cliente_id?: string | null
           conteudo?: string
+          conteudo_revisado?: string | null
           created_at?: string
           created_by?: string | null
           dados_estruturados?: Json | null
@@ -1640,6 +1747,7 @@ export type Database = {
           projeto_id?: string | null
           sheet_url?: string | null
           tipo?: string
+          truncado?: boolean
         }
         Relationships: [
           {

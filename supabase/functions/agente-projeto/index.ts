@@ -122,6 +122,7 @@ serve(async (req) => {
       titulo_doc,
       periodo_inicio,
       periodo_fim,
+      continuar_documento_id,
     }: {
       tipo: string;
       projeto_id?: string | null;
@@ -136,7 +137,9 @@ serve(async (req) => {
       titulo_doc?: string;
       periodo_inicio?: string | null;
       periodo_fim?: string | null;
+      continuar_documento_id?: string | null;
     } = await req.json();
+
 
     if (!tipo || (!projeto_id && !cliente_id_in)) {
       return new Response(JSON.stringify({ error: "tipo e (projeto_id OU cliente_id) são obrigatórios" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -516,11 +519,97 @@ ${checklistPeriodo.filter((c) => c.concluido).map((c: any) => `- [x] ${c.titulo}
       }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const promptCompleto = `${promptBase}${historicoSection}\n\n---\n\nINFORMAÇÕES DO CLIENTE:\n\n${contexto}${questionarioSection}${sumariosSection}${transcricoesSectionLimitada}${anotacoesSection}${trimestreSection}${canaisSection}${balancoSection ? "\n\n" + balancoSection : ""}${contextoUsuarioSection}${documentoModeloSection}`;
+    // ===== Aprendizado: diretrizes ativas + exemplo aprovado =====
+    let diretrizesSection = "";
+    let exemploSection = "";
+    if (!isPreAnalise) {
+      try {
+        const { data: diretrizes } = await serviceClient
+          .from("agente_diretrizes")
+          .select("conteudo")
+          .eq("tipo_agente", tipo)
+          .eq("status", "ativa")
+          .order("created_at", { ascending: false })
+          .limit(5);
+        if (diretrizes?.length) {
+          diretrizesSection = `\n\n=== DIRETRIZES APRENDIDAS (feedback da equipe — siga rigorosamente) ===\n${diretrizes
+            .map((d: any, i: number) => `${i + 1}. ${d.conteudo}`)
+            .join("\n")}\n===============================`;
+        }
+      } catch (e) {
+        console.warn("[agente-projeto] falha ao carregar diretrizes:", e);
+      }
+
+      try {
+        const { data: exemplos } = await serviceClient
+          .from("projeto_documentos")
+          .select("conteudo, conteudo_revisado, created_at")
+          .eq("tipo", tipo)
+          .eq("aprovado_como_exemplo", true)
+          .order("created_at", { ascending: false })
+          .limit(1);
+        const exemplo = exemplos?.[0];
+        const textoExemplo = exemplo?.conteudo_revisado || exemplo?.conteudo;
+        if (textoExemplo) {
+          exemploSection = `\n\n=== EXEMPLO DE DOCUMENTO APROVADO (outro cliente) ===\nUse APENAS como referência de estrutura, profundidade e tom. NUNCA reaproveite dados, nomes ou conclusões deste exemplo.\n${limitarTexto(textoExemplo, 8_000)}\n===============================`;
+        }
+      } catch (e) {
+        console.warn("[agente-projeto] falha ao carregar exemplo aprovado:", e);
+      }
+    }
+
+    const FIM_MARCADOR = "<!-- FIM_DOCUMENTO -->";
+    const orcamentoSection = isPreAnalise
+      ? ""
+      : `\n\n=== REGRAS DE EXTENSÃO E CONCLUSÃO (obrigatórias) ===
+- Alvo de extensão: documento completo equivalente a 8-12 páginas (aproximadamente 4.000 a 6.000 palavras).
+- Escreva TODAS as seções previstas, na ordem. É preferível que cada seção seja um pouco mais enxuta do que deixar seções finais faltando.
+- Nunca aprofunde tanto as primeiras seções a ponto de não conseguir concluir as últimas.
+- Nunca encerre no meio de uma frase, tabela ou lista.
+- Ao terminar o documento inteiro, escreva na última linha, sozinho, exatamente: ${FIM_MARCADOR}
+===============================`;
+
+    const systemPromptFinal = `${promptBase}${historicoSection}${diretrizesSection}${exemploSection}${orcamentoSection}`;
+    const userPromptFinal = `INFORMAÇÕES DO CLIENTE:\n\n${contexto}${questionarioSection}${sumariosSection}${transcricoesSectionLimitada}${anotacoesSection}${trimestreSection}${canaisSection}${balancoSection ? "\n\n" + balancoSection : ""}${contextoUsuarioSection}${documentoModeloSection}`;
+
+    const MAX_OUTPUT_TOKENS = 16_000;
+    const MAX_CONTINUACOES = 3;
+
+    function terminaBem(texto: string) {
+      const fim = texto.trimEnd().slice(-2).trim();
+      return [".", "!", "?", ":", ")", "»", "”", "|"].some((c) => fim.endsWith(c));
+    }
+
+    function documentoCompleto(texto: string, stopReason?: string) {
+      if (isPreAnalise) return true;
+      if (texto.includes(FIM_MARCADOR)) return true;
+      if (stopReason === "max_tokens" || stopReason === "length") return false;
+      return terminaBem(texto);
+    }
+
+    const INSTRUCAO_CONTINUACAO = `Continue exatamente de onde parou, sem repetir nada do que já foi escrito e sem reintroduzir o documento. Mantenha a mesma formatação markdown e o mesmo tom. Complete todas as seções que ainda faltam e, ao terminar o documento inteiro, escreva na última linha, sozinho, exatamente: ${FIM_MARCADOR}`;
+
+    // Modo "continuar geração": retoma um documento salvo incompleto
+    let conteudoInicial = "";
+    if (continuar_documento_id) {
+      const { data: docExistente } = await serviceClient
+        .from("projeto_documentos")
+        .select("conteudo")
+        .eq("id", continuar_documento_id)
+        .maybeSingle();
+      conteudoInicial = (docExistente?.conteudo ?? "").trim();
+      if (!conteudoInicial) {
+        return new Response(JSON.stringify({ error: "Documento a continuar não encontrado ou vazio." }), {
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
 
     let conteudo = "";
+    let truncado = false;
     let lastStatus = 500;
     let lastErrorMessage = "Erro na API de IA";
+
 
     if (provedor === "openai") {
       const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
@@ -528,33 +617,55 @@ ${checklistPeriodo.filter((c) => c.concluido).map((c: any) => `- [x] ${c.titulo}
         return new Response(JSON.stringify({ error: "OPENAI_API_KEY não configurada. Adicione a chave nas configurações." }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: "gpt-4o",
-          messages: [
-            { role: "system", content: `${promptBase}${historicoSection}` },
-            { role: "user", content: `${contexto}${questionarioSection}${sumariosSection}${transcricoesSectionLimitada}${anotacoesSection}${trimestreSection}${canaisSection}${balancoSection ? "\n\n" + balancoSection : ""}${contextoUsuarioSection}${documentoModeloSection}` },
-          ],
-          temperature: 0.4,
-          max_tokens: 8000,
-        }),
-      });
+      const baseMessages: Array<{ role: string; content: string }> = [
+        { role: "system", content: systemPromptFinal },
+        { role: "user", content: userPromptFinal },
+      ];
 
-      if (openaiResponse.ok) {
-        const openaiData = await openaiResponse.json();
-        conteudo = openaiData.choices?.[0]?.message?.content ?? "";
+      const chamarOpenAI = async (messages: Array<{ role: string; content: string }>) => {
+        const res = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${OPENAI_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: "gpt-4o",
+            messages,
+            temperature: 0.4,
+            max_tokens: Math.min(MAX_OUTPUT_TOKENS, 16_000),
+          }),
+        });
+        if (res.ok) return { ok: true as const, json: await res.json() };
+        return { ok: false as const, status: res.status, text: await res.text() };
+      };
+
+      const primeira = conteudoInicial
+        ? { ok: true as const, json: { choices: [{ message: { content: conteudoInicial }, finish_reason: "length" }] } as any }
+        : await chamarOpenAI(baseMessages);
+      if (primeira.ok) {
+        conteudo = primeira.json.choices?.[0]?.message?.content ?? "";
+        let finishReason: string | undefined = primeira.json.choices?.[0]?.finish_reason;
+
+        for (let cont = 0; cont < MAX_CONTINUACOES && conteudo && !documentoCompleto(conteudo, finishReason); cont++) {
+          const contRes = await chamarOpenAI([
+            ...baseMessages,
+            { role: "assistant", content: conteudo },
+            { role: "user", content: INSTRUCAO_CONTINUACAO },
+          ]);
+          if (!contRes.ok) break;
+          const trecho = contRes.json.choices?.[0]?.message?.content ?? "";
+          if (!trecho.trim()) break;
+          conteudo += (conteudo.endsWith("\n") ? "" : "\n") + trecho;
+          finishReason = contRes.json.choices?.[0]?.finish_reason;
+        }
+        truncado = !documentoCompleto(conteudo, finishReason);
       } else {
-        const errText = await openaiResponse.text();
-        console.error("OpenAI API error:", openaiResponse.status, errText);
-        lastStatus = openaiResponse.status;
-        lastErrorMessage = openaiResponse.status === 429
+        console.error("OpenAI API error:", primeira.status, primeira.text);
+        lastStatus = primeira.status;
+        lastErrorMessage = primeira.status === 429
           ? "Limite de requisições da OpenAI atingido. Tente novamente em alguns minutos."
-          : `Erro da OpenAI (${openaiResponse.status}).`;
+          : `Erro da OpenAI (${primeira.status}).`;
       }
     } else if (provedor === "anthropic") {
       const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
@@ -562,14 +673,8 @@ ${checklistPeriodo.filter((c) => c.concluido).map((c: any) => `- [x] ${c.titulo}
         return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY não configurada. Adicione a chave nas configurações para usar Claude." }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       const anthropicModel = "claude-sonnet-4-5";
-      const systemPrompt = `${promptBase}${historicoSection}`;
-      const userPrompt = `${contexto}${questionarioSection}${sumariosSection}${transcricoesSectionLimitada}${anotacoesSection}${trimestreSection}${canaisSection}${balancoSection ? "\n\n" + balancoSection : ""}${contextoUsuarioSection}${documentoModeloSection}`;
 
-      const messages: Array<{ role: string; content: string }> = [
-        { role: "user", content: userPrompt },
-      ];
-
-      const chamarAnthropic = async () => {
+      const chamarAnthropic = async (messages: Array<{ role: string; content: string }>) => {
         for (let tentativa = 1; tentativa <= 3; tentativa++) {
           const res = await fetch("https://api.anthropic.com/v1/messages", {
             method: "POST",
@@ -580,9 +685,9 @@ ${checklistPeriodo.filter((c) => c.concluido).map((c: any) => `- [x] ${c.titulo}
             },
             body: JSON.stringify({
               model: anthropicModel,
-              max_tokens: 8000,
+              max_tokens: MAX_OUTPUT_TOKENS,
               temperature: 0.4,
-              system: systemPrompt,
+              system: systemPromptFinal,
               messages,
             }),
           });
@@ -598,7 +703,13 @@ ${checklistPeriodo.filter((c) => c.concluido).map((c: any) => `- [x] ${c.titulo}
         return { ok: false as const, status: 429, text: "rate limited" };
       };
 
-      let anthropicResult = await chamarAnthropic();
+      const baseMessages: Array<{ role: string; content: string }> = [
+        { role: "user", content: userPromptFinal },
+      ];
+
+      const anthropicResult = conteudoInicial
+        ? { ok: true as const, json: { content: [{ text: conteudoInicial }], stop_reason: "max_tokens", usage: {} } as any }
+        : await chamarAnthropic(baseMessages);
       let totalIn = 0;
       let totalOut = 0;
 
@@ -608,23 +719,25 @@ ${checklistPeriodo.filter((c) => c.concluido).map((c: any) => `- [x] ${c.titulo}
         totalIn += Number(anthropicData?.usage?.input_tokens ?? 0);
         totalOut += Number(anthropicData?.usage?.output_tokens ?? 0);
 
-        // Continuações se stop_reason === max_tokens (até 2)
+        // Continuações encadeadas: sempre reconstrói a conversa a partir das mensagens
+        // originais + todo o texto acumulado, evitando mensagens assistant consecutivas.
         let stopReason: string | undefined = anthropicData?.stop_reason;
-        for (let cont = 0; cont < 2 && stopReason === "max_tokens" && conteudo; cont++) {
-          messages.push({ role: "assistant", content: conteudo });
-          messages.push({ role: "user", content: "Continue exatamente de onde parou, sem repetir o que já foi escrito. Mantenha a formatação e o tom." });
-          const contRes = await chamarAnthropic();
+        for (let cont = 0; cont < MAX_CONTINUACOES && conteudo && !documentoCompleto(conteudo, stopReason); cont++) {
+          const contRes = await chamarAnthropic([
+            ...baseMessages,
+            { role: "assistant", content: conteudo },
+            { role: "user", content: INSTRUCAO_CONTINUACAO },
+          ]);
           if (!contRes.ok) break;
           const trecho = contRes.json.content?.[0]?.text ?? "";
-          if (!trecho) break;
-          conteudo += trecho;
+          if (!trecho.trim()) break;
+          conteudo += (conteudo.endsWith("\n") ? "" : "\n") + trecho;
           totalIn += Number(contRes.json?.usage?.input_tokens ?? 0);
           totalOut += Number(contRes.json?.usage?.output_tokens ?? 0);
           stopReason = contRes.json?.stop_reason;
-          // ajusta última mensagem assistant para o texto acumulado (para próxima iteração)
-          messages[messages.length - 2] = { role: "assistant", content: conteudo };
-          messages.pop();
         }
+        truncado = !documentoCompleto(conteudo, stopReason);
+        if (truncado) console.warn(`[agente-projeto] documento ${tipo} ainda parece incompleto após ${MAX_CONTINUACOES} continuações`);
 
         // Registra uso (best-effort) — preço Claude Sonnet 4.5: $3/MTok in, $15/MTok out
         try {
@@ -662,6 +775,12 @@ ${checklistPeriodo.filter((c) => c.concluido).map((c: any) => `- [x] ${c.titulo}
         } catch (_) { /* ignore */ }
       }
     }
+
+    // Remove o marcador de fim antes de persistir/exibir
+    if (conteudo.includes(FIM_MARCADOR)) {
+      conteudo = conteudo.split(FIM_MARCADOR).join("").trimEnd();
+    }
+
 
     if (!conteudo) {
       return new Response(JSON.stringify({ error: lastErrorMessage }), {
@@ -743,25 +862,43 @@ ${checklistPeriodo.filter((c) => c.concluido).map((c: any) => `- [x] ${c.titulo}
       }
     }
 
-    const insertPayload: Record<string, unknown> = {
-      tipo,
-      conteudo,
-      created_by: userId,
-      gdoc_url,
-    };
-    if (projeto_id) insertPayload.projeto_id = projeto_id;
-    else insertPayload.cliente_id = clienteId;
-    if (dadosEstruturados) insertPayload.dados_estruturados = dadosEstruturados;
+    let docInserted: any = null;
 
-    const { data: docInserted, error: insertError } = await serviceClient
-      .from("projeto_documentos")
-      .insert(insertPayload)
-      .select()
-      .single();
+    if (continuar_documento_id) {
+      const updatePayload: Record<string, unknown> = { conteudo, truncado };
+      if (gdoc_url) updatePayload.gdoc_url = gdoc_url;
+      if (dadosEstruturados) updatePayload.dados_estruturados = dadosEstruturados;
+      const { data: docUpdated, error: updateError } = await serviceClient
+        .from("projeto_documentos")
+        .update(updatePayload)
+        .eq("id", continuar_documento_id)
+        .select()
+        .single();
+      if (updateError) console.error("Update error:", updateError);
+      docInserted = docUpdated;
+    } else {
+      const insertPayload: Record<string, unknown> = {
+        tipo,
+        conteudo,
+        created_by: userId,
+        gdoc_url,
+        truncado,
+      };
+      if (projeto_id) insertPayload.projeto_id = projeto_id;
+      else insertPayload.cliente_id = clienteId;
+      if (dadosEstruturados) insertPayload.dados_estruturados = dadosEstruturados;
 
-    if (insertError) console.error("Insert error:", insertError);
+      const { data: doc, error: insertError } = await serviceClient
+        .from("projeto_documentos")
+        .insert(insertPayload)
+        .select()
+        .single();
 
-    return new Response(JSON.stringify({ conteudo, gdoc_url, documento: docInserted }), {
+      if (insertError) console.error("Insert error:", insertError);
+      docInserted = doc;
+    }
+
+    return new Response(JSON.stringify({ conteudo, gdoc_url, truncado, documento: docInserted }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

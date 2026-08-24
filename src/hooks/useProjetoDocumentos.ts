@@ -13,7 +13,11 @@ export interface ProjetoDocumento {
   dados_estruturados: any | null;
   created_by: string | null;
   created_at: string;
+  truncado?: boolean;
+  aprovado_como_exemplo?: boolean;
+  conteudo_revisado?: string | null;
 }
+
 
 export function useProjetoDocumentos(projetoId: string | undefined) {
   return useQuery({
@@ -94,7 +98,9 @@ export function useGerarDocumento() {
       trimestre?: string;
       canais_atendimento?: string[];
       titulo_doc?: string;
+      continuar_documento_id?: string;
     }) => {
+
       const { data, error } = await supabase.functions.invoke('agente-projeto', {
         body: params,
       });
@@ -121,7 +127,7 @@ export function useGerarDocumento() {
       }
 
       if (data?.error) throw new Error(data.error);
-      return data as { conteudo: string; gdoc_url: string | null };
+      return data as { conteudo: string; gdoc_url: string | null; truncado?: boolean; documento?: ProjetoDocumento };
     },
     onSuccess: (_, vars) => {
       if (vars.projeto_id) {
