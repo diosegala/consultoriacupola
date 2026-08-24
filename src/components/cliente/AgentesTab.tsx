@@ -1813,10 +1813,12 @@ function PanelAgente({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {existingDoc && <DocumentoFeedback doc={existingDoc} />}
         {disabled && disabledTooltip ? (
           <p className="text-xs text-muted-foreground italic">{disabledTooltip}</p>
         ) : null}
         <div className={disabled ? 'pointer-events-none' : ''}>{children}</div>
+
 
         {numAnteriores > 0 && (
           <div className="border-t border-border pt-3">
