@@ -127,7 +127,7 @@ export function useGerarDocumento() {
       }
 
       if (data?.error) throw new Error(data.error);
-      return data as { conteudo: string; gdoc_url: string | null };
+      return data as { conteudo: string; gdoc_url: string | null; truncado?: boolean; documento?: ProjetoDocumento };
     },
     onSuccess: (_, vars) => {
       if (vars.projeto_id) {
