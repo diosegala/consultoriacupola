@@ -640,7 +640,9 @@ ${checklistPeriodo.filter((c) => c.concluido).map((c: any) => `- [x] ${c.titulo}
         return { ok: false as const, status: res.status, text: await res.text() };
       };
 
-      const primeira = await chamarOpenAI(baseMessages);
+      const primeira = conteudoInicial
+        ? { ok: true as const, json: { choices: [{ message: { content: conteudoInicial }, finish_reason: "length" }] } as any }
+        : await chamarOpenAI(baseMessages);
       if (primeira.ok) {
         conteudo = primeira.json.choices?.[0]?.message?.content ?? "";
         let finishReason: string | undefined = primeira.json.choices?.[0]?.finish_reason;
