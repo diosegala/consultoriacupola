@@ -707,7 +707,9 @@ ${checklistPeriodo.filter((c) => c.concluido).map((c: any) => `- [x] ${c.titulo}
         { role: "user", content: userPromptFinal },
       ];
 
-      const anthropicResult = await chamarAnthropic(baseMessages);
+      const anthropicResult = conteudoInicial
+        ? { ok: true as const, json: { content: [{ text: conteudoInicial }], stop_reason: "max_tokens", usage: {} } as any }
+        : await chamarAnthropic(baseMessages);
       let totalIn = 0;
       let totalOut = 0;
 
