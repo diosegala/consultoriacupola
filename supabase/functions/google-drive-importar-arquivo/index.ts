@@ -77,50 +77,88 @@ Deno.serve(async (req) => {
 
     // Check not already imported
     const { data: existing } = await admin
-      .from("reunioes_importadas_log").select("reuniao_id").eq("google_file_id", file_id).maybeSingle();
-    if (existing?.reuniao_id) {
+      .from("reunioes_importadas_log").select("reuniao_id, status").eq("google_file_id", file_id).maybeSingle();
+    if (existing) {
       return new Response(JSON.stringify({ error: "Arquivo já importado", reuniao_id: existing.reuniao_id }), {
         status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const tk = await getValidToken(admin, cu.consultor_id);
-
-    // Export Google Doc as text/plain
-    const exportRes = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${file_id}/export?mimeType=text/plain`,
-      { headers: { Authorization: `Bearer ${tk.access_token}` } }
-    );
-    if (!exportRes.ok) {
-      const err = await exportRes.text();
-      throw new Error(`Falha ao baixar transcrição: ${err}`);
-    }
-    const transcricao = await exportRes.text();
-
-    // Create reuniao
-    const dataReuniao = data_reuniao || new Date().toISOString().slice(0, 10);
-    const { data: reuniao, error: rErr } = await admin
-      .from("reunioes").insert({
+    // TRAVA: reserva o arquivo antes de importar. A constraint UNIQUE em
+    // google_file_id impede que duas execuções simultâneas criem a mesma reunião.
+    const { data: reserva, error: reservaErr } = await admin
+      .from("reunioes_importadas_log").insert({
+        google_file_id: file_id,
         consultor_id: cu.consultor_id,
         cliente_id,
-        data_reuniao: dataReuniao,
-        transcricao,
-        status_analise: "pendente",
-      }).select().single();
-    if (rErr) throw rErr;
+        nome_arquivo: file_name || null,
+        status: "importando",
+      }).select("id").single();
+    if (reservaErr || !reserva) {
+      return new Response(JSON.stringify({ error: "Arquivo já está sendo importado" }), {
+        status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const logId = reserva.id;
+    const marcarLog = (patch: Record<string, unknown>) =>
+      admin.from("reunioes_importadas_log").update(patch).eq("id", logId);
 
-    await admin.from("reunioes_importadas_log").insert({
-      google_file_id: file_id,
-      consultor_id: cu.consultor_id,
-      cliente_id,
-      reuniao_id: reuniao.id,
-      nome_arquivo: file_name || null,
-      status: "importado",
-    });
+    try {
+      const tk = await getValidToken(admin, cu.consultor_id);
 
-    return new Response(JSON.stringify({ success: true, reuniao_id: reuniao.id }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+      // Export Google Doc as text/plain
+      const exportRes = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${file_id}/export?mimeType=text/plain`,
+        { headers: { Authorization: `Bearer ${tk.access_token}` } }
+      );
+      if (!exportRes.ok) {
+        const err = await exportRes.text();
+        throw new Error(`Falha ao baixar transcrição: ${err}`);
+      }
+      const transcricao = await exportRes.text();
+
+      // Create reuniao
+      const dataReuniao = data_reuniao || new Date().toISOString().slice(0, 10);
+      const { data: reuniao, error: rErr } = await admin
+        .from("reunioes").insert({
+          consultor_id: cu.consultor_id,
+          cliente_id,
+          data_reuniao: dataReuniao,
+          transcricao,
+          status_analise: "pendente",
+        }).select("id").single();
+
+      if (rErr) {
+        // Índice único de deduplicação: mesma transcrição já cadastrada.
+        if ((rErr as any).code === "23505") {
+          const { data: dup } = await admin
+            .from("reunioes").select("id")
+            .eq("cliente_id", cliente_id)
+            .eq("data_reuniao", dataReuniao)
+            .limit(1).maybeSingle();
+          await marcarLog({
+            status: "importado", reuniao_id: dup?.id ?? null,
+            erro: "duplicada: reunião já existente",
+          });
+          return new Response(
+            JSON.stringify({ error: "Esta reunião já está cadastrada", reuniao_id: dup?.id ?? null }),
+            { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+        throw rErr;
+      }
+
+      await marcarLog({ status: "importado", reuniao_id: reuniao.id });
+
+      return new Response(JSON.stringify({ success: true, reuniao_id: reuniao.id }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    } catch (e: any) {
+      await marcarLog({ status: "erro", erro: e.message });
+      throw e;
+    }
+
+
   } catch (e: any) {
     console.error(e);
     return new Response(JSON.stringify({ error: e.message }), {
