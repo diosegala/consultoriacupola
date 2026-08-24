@@ -14,6 +14,7 @@ import {
   Wand2, CheckCircle2, AlertCircle, RefreshCw, BarChart3,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { DocumentoFeedback } from '@/components/cliente/DocumentoFeedback';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
