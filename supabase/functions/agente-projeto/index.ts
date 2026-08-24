@@ -589,10 +589,27 @@ ${checklistPeriodo.filter((c) => c.concluido).map((c: any) => `- [x] ${c.titulo}
 
     const INSTRUCAO_CONTINUACAO = `Continue exatamente de onde parou, sem repetir nada do que já foi escrito e sem reintroduzir o documento. Mantenha a mesma formatação markdown e o mesmo tom. Complete todas as seções que ainda faltam e, ao terminar o documento inteiro, escreva na última linha, sozinho, exatamente: ${FIM_MARCADOR}`;
 
+    // Modo "continuar geração": retoma um documento salvo incompleto
+    let conteudoInicial = "";
+    if (continuar_documento_id) {
+      const { data: docExistente } = await serviceClient
+        .from("projeto_documentos")
+        .select("conteudo")
+        .eq("id", continuar_documento_id)
+        .maybeSingle();
+      conteudoInicial = (docExistente?.conteudo ?? "").trim();
+      if (!conteudoInicial) {
+        return new Response(JSON.stringify({ error: "Documento a continuar não encontrado ou vazio." }), {
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     let conteudo = "";
     let truncado = false;
     let lastStatus = 500;
     let lastErrorMessage = "Erro na API de IA";
+
 
     if (provedor === "openai") {
       const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
