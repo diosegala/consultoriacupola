@@ -52,6 +52,7 @@ System-only notifications (no emails). No data/report exports. Hard deletes use 
 - [Consultant Performance Report](mem://features/consultant-performance-report) — High fidelity HTML to PDF view
 - [Client Performance View](mem://features/client-performance-view) — Tab and print report for client engagement history
 - [Project AI Agents](mem://features/project-ai-agents) — 3 agents (Diagnóstico, OKRs, Briefing), doc extraction
+- [Agentes: feedback e anti-truncamento](mem://features/agentes-feedback-loop) — marcador de fim, continuações, feedbacks, diretrizes aprendidas
 - [Risco de churn por engajamento](mem://features/risco-churn-engajamento) — Regras do bloco Risco de churn e alerta score_cliente_em_queda
 - [Políticas de Decisão](mem://features/politicas-decisao) — Limiares de risco de churn editáveis via tabela politicas_decisao
 - [Pesquisa de Reuniões](mem://features/pesquisa-reunioes) — Chat com busca semântica nas transcrições de reuniões, fontes citadas, escopo por carteira
