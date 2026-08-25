@@ -11,6 +11,7 @@ const corsHeaders = {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
+    const { periodo_meses = null } = await req.json().catch(() => ({}));
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const authHeader = req.headers.get("Authorization") ?? "";
@@ -33,11 +34,19 @@ serve(async (req) => {
       .select("cliente_id, respostas, status")
       .in("status", ["respondido", "finalizado", "concluido"]);
 
-    const { data: reunioes } = await admin
+    let reunioesQuery = admin
       .from("reunioes")
       .select("cliente_id, score_cliente, analise_cliente")
       .eq("status_analise", "concluido")
       .not("score_cliente", "is", null);
+
+    if (periodo_meses) {
+      const desde = new Date();
+      desde.setMonth(desde.getMonth() - Number(periodo_meses));
+      reunioesQuery = reunioesQuery.gte("data_reuniao", desde.toISOString().slice(0, 10));
+    }
+    const { data: reunioes } = await reunioesQuery;
+
 
     const { data: docs } = await admin
       .from("projeto_documentos")
@@ -118,12 +127,28 @@ Retorne SOMENTE JSON válido (sem markdown fences):
 DADOS (${consolidados.length} clientes):
 ${JSON.stringify(consolidados).slice(0, 60000)}`;
 
+    const { data: correcoes } = await admin
+      .from("insight_correcoes")
+      .select("secao, tema, operacao_ia, operacao_correta, observacao")
+      .eq("tipo_insight", "perfil_clientes")
+      .order("created_at", { ascending: false })
+      .limit(40);
+
+    const promptFinal = (correcoes || []).length
+      ? `${prompt}
+
+CORREÇÕES HUMANAS ANTERIORES (obrigatório respeitar) ao classificar a operação:
+${(correcoes || []).map((c: any) => `- [${c.secao}] "${c.tema}": você disse "${c.operacao_ia ?? '?'}", o correto é "${c.operacao_correta}".${c.observacao ? ` Observação: ${c.observacao}` : ""}`).join("\n")}
+
+Lembre: temas de carteira de locação, inadimplência, garantias, vistorias, proprietários, inquilinos e administração de contratos são SEMPRE "aluguel", nunca "vendas".`
+      : prompt;
 
     const claude = await callClaude({
       system: "Você é um analista sênior de produto e consultoria. Responda apenas com JSON válido, sem markdown fences.",
-      messages: [{ role: "user", content: prompt }],
+      messages: [{ role: "user", content: promptFinal }],
       max_tokens: 8000,
     });
+
     if (!claude.ok) {
       await logAiUsage({
         admin, agente_tipo: "insights_perfil_clientes", user_id: user.id,
@@ -145,8 +170,10 @@ ${JSON.stringify(consolidados).slice(0, 60000)}`;
       .from("insights_agregados")
       .insert({
         tipo: "perfil_clientes",
-        periodo_analisado: "all",
-        filtros: {},
+        periodo_analisado: periodo_meses ? `${periodo_meses}m` : "all",
+        filtros: { periodo_meses },
+
+
         conteudo,
         gerado_por: user.id,
       })

@@ -9,10 +9,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, Building2, FileText, Key, Layers, Lightbulb, MessageSquareQuote, RefreshCw, Save, TrendingUp } from 'lucide-react';
+import { AlertTriangle, Building2, FileText, Key, Layers, Lightbulb, MessageSquareQuote, RefreshCw, Save, TrendingUp, Wand2 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Cell, Tooltip } from 'recharts';
 import { toast } from 'sonner';
+
+const PERIODOS = [
+  { value: '1', label: 'Último mês' },
+  { value: '3', label: 'Último trimestre' },
+  { value: '6', label: 'Último semestre' },
+  { value: '12', label: 'Últimos 12 meses' },
+];
+
 
 type Insight = {
   id: string;
@@ -51,6 +60,88 @@ function OperacaoBadge({ op }: { op?: string }) {
     </Badge>
   );
 }
+
+type CorrigirFn = (secao: string, tema: string, operacaoIa: string | undefined, operacaoCorreta: Operacao) => Promise<void>;
+
+function CorrigirOperacao({ secao, tema, operacao, onCorrigir }: { secao: string; tema: string; operacao?: string; onCorrigir?: CorrigirFn }) {
+  const [salvando, setSalvando] = useState(false);
+  if (!onCorrigir) return null;
+  const atual = normalizeOp(operacao);
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button size="sm" variant="ghost" className="h-6 px-2 text-xs text-muted-foreground" disabled={salvando}>
+          <Wand2 className="h-3 w-3 mr-1" /> Corrigir operação
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuLabel className="text-xs">Operação correta</DropdownMenuLabel>
+        {OPERACOES.map((o) => (
+          <DropdownMenuItem
+            key={o.value}
+            disabled={o.value === atual}
+            onSelect={async () => {
+              setSalvando(true);
+              try {
+                await onCorrigir(secao, tema, operacao, o.value);
+              } finally {
+                setSalvando(false);
+              }
+            }}
+          >
+            <o.icon className="h-3.5 w-3.5 mr-2" /> {o.label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+const SECAO_KEY: Record<string, string> = {
+  dores: 'dores',
+  demandas: 'demandas',
+  resistencias: 'resistencias',
+  oportunidades: 'oportunidades_produto',
+};
+
+function useCorrigirOperacao(insight: Insight | null, tipoInsight: string, reload: () => Promise<void>): CorrigirFn {
+  return async (secao, tema, operacaoIa, operacaoCorreta) => {
+    if (!insight) return;
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const { error: errIns } = await supabase.from('insight_correcoes' as any).insert({
+        insight_id: insight.id,
+        tipo_insight: tipoInsight,
+        secao,
+        tema,
+        operacao_ia: operacaoIa ?? null,
+        operacao_correta: operacaoCorreta,
+        user_id: userData.user?.id,
+      });
+      if (errIns) throw errIns;
+
+      const key = SECAO_KEY[secao] ?? secao;
+      const conteudo = JSON.parse(JSON.stringify(insight.conteudo || {}));
+      const lista = conteudo[key];
+      if (Array.isArray(lista)) {
+        const alvo = lista.find((x: any) => (x?.tema ?? x?.descricao) === tema);
+        if (alvo) alvo.operacao = operacaoCorreta;
+      }
+      const { error: errUpd } = await supabase
+        .from('insights_agregados' as any)
+        .update({ conteudo })
+        .eq('id', insight.id);
+      if (errUpd) throw errUpd;
+
+      toast.success('Correção registrada — o agente vai considerá-la nas próximas análises.');
+      await reload();
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao registrar correção');
+    }
+  };
+}
+
+
 
 function useUltimoInsight(tipo: string) {
   const [insight, setInsight] = useState<Insight | null>(null);
@@ -195,7 +286,7 @@ function DoresChart({ dores }: { dores: any[] }) {
   );
 }
 
-function DoresPainel({ conteudo, filtro }: { conteudo: any; filtro: Operacao | 'todas' }) {
+function DoresPainel({ conteudo, filtro, onCorrigir }: { conteudo: any; filtro: Operacao | 'todas'; onCorrigir?: CorrigirFn }) {
   const match = (item: any) => filtro === 'todas' || normalizeOp(item?.operacao) === filtro;
   const dores = (conteudo.dores || []).filter(match);
   const demandas = (conteudo.demandas || []).filter(match);
@@ -240,6 +331,9 @@ function DoresPainel({ conteudo, filtro }: { conteudo: any; filtro: Operacao | '
                   </div>
                   <Progress value={(freq / maxFreq) * 100} className="h-1.5" />
                   {d.exemplo && <p className="text-sm text-muted-foreground italic">"{d.exemplo}"</p>}
+                  <div className="flex justify-end">
+                    <CorrigirOperacao secao="dores" tema={d.tema} operacao={d.operacao} onCorrigir={onCorrigir} />
+                  </div>
                 </CardContent>
               </Card>
             );
@@ -256,7 +350,10 @@ function DoresPainel({ conteudo, filtro }: { conteudo: any; filtro: Operacao | '
                       <span>{d.tema}</span>
                       <Badge variant="outline">{d.frequencia_clientes}</Badge>
                     </div>
-                    {filtro === 'todas' && <OperacaoBadge op={d.operacao} />}
+                    <div className="flex items-center justify-between gap-2">
+                      {filtro === 'todas' ? <OperacaoBadge op={d.operacao} /> : <span />}
+                      <CorrigirOperacao secao="demandas" tema={d.tema} operacao={d.operacao} onCorrigir={onCorrigir} />
+                    </div>
                   </div>
                 ))}
                 {!demandas.length && <p className="text-xs text-muted-foreground">Sem demandas nesta operação.</p>}
@@ -272,7 +369,10 @@ function DoresPainel({ conteudo, filtro }: { conteudo: any; filtro: Operacao | '
                   <div className="space-y-1">
                     <p className="text-sm font-medium">{r.tema}</p>
                     <p className="text-xs text-muted-foreground">{r.descricao}</p>
-                    {filtro === 'todas' && <OperacaoBadge op={r.operacao} />}
+                    <div className="flex items-center gap-2">
+                      {filtro === 'todas' && <OperacaoBadge op={r.operacao} />}
+                      <CorrigirOperacao secao="resistencias" tema={r.tema} operacao={r.operacao} onCorrigir={onCorrigir} />
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -287,6 +387,7 @@ function DoresPainel({ conteudo, filtro }: { conteudo: any; filtro: Operacao | '
 
 function DoresSection() {
   const { insight, loading, reload } = useUltimoInsight('dores_recorrentes');
+  const corrigir = useCorrigirOperacao(insight, 'dores_recorrentes', reload);
   const { data: consultores } = useConsultores(true);
   const [periodo, setPeriodo] = useState('6');
   const [tipoContrato, setTipoContrato] = useState('todos');
@@ -350,9 +451,7 @@ function DoresSection() {
             <Select value={periodo} onValueChange={setPeriodo}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="3">Últimos 3 meses</SelectItem>
-                <SelectItem value="6">Últimos 6 meses</SelectItem>
-                <SelectItem value="12">Últimos 12 meses</SelectItem>
+                {PERIODOS.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -431,7 +530,7 @@ function DoresSection() {
             </TabsList>
             {(['vendas', 'aluguel', 'ambas', 'todas'] as const).map((f) => (
               <TabsContent key={f} value={f} className="mt-6">
-                <DoresPainel conteudo={c} filtro={f} />
+                <DoresPainel conteudo={c} filtro={f} onCorrigir={corrigir} />
               </TabsContent>
             ))}
           </Tabs>
@@ -446,6 +545,8 @@ function PerfilSection() {
   const [gerando, setGerando] = useState(false);
   const [exportando, setExportando] = useState(false);
   const [filtroOp, setFiltroOp] = useState<Operacao | 'todas'>('todas');
+  const [periodo, setPeriodo] = useState('todos');
+  const corrigir = useCorrigirOperacao(insight, 'perfil_clientes', reload);
 
   const exportarGdoc = async () => {
     if (!insight) return;
@@ -463,7 +564,9 @@ function PerfilSection() {
   const gerar = async () => {
     setGerando(true);
     try {
-      const { data, error } = await supabase.functions.invoke('analisar-perfil-clientes', { body: {} });
+      const { data, error } = await supabase.functions.invoke('analisar-perfil-clientes', {
+        body: { periodo_meses: periodo === 'todos' ? null : Number(periodo) },
+      });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
       toast.success(`Análise gerada com ${(data as any).clientes_analisados} clientes.`);
@@ -505,11 +608,22 @@ function PerfilSection() {
             <span className="text-xs font-normal text-muted-foreground">Última análise: {formatDate(insight?.created_at)}</span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
+        <CardContent className="flex flex-wrap items-end gap-2">
+          <div className="w-48">
+            <label className="text-xs text-muted-foreground">Período</label>
+            <Select value={periodo} onValueChange={setPeriodo}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todo o histórico</SelectItem>
+                {PERIODOS.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
           <Button onClick={gerar} disabled={gerando}>
             {gerando ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
             {insight ? 'Atualizar análise' : 'Gerar análise de perfil'}
           </Button>
+
           {insight && (
             <Button variant="outline" onClick={exportarGdoc} disabled={exportando}>
               {exportando ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
@@ -582,9 +696,12 @@ function PerfilSection() {
                     </div>
                     {op.evidencia && <p className="text-xs text-muted-foreground"><span className="font-medium">Evidência:</span> {op.evidencia}</p>}
                     {op.potencial_demanda && <p className="text-xs text-muted-foreground"><span className="font-medium">Potencial:</span> {op.potencial_demanda}</p>}
-                    <Button size="sm" variant="outline" onClick={() => salvarOportunidade(op)}>
-                      <Save className="h-3 w-3 mr-1" /> Salvar como oportunidade
-                    </Button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button size="sm" variant="outline" onClick={() => salvarOportunidade(op)}>
+                        <Save className="h-3 w-3 mr-1" /> Salvar como oportunidade
+                      </Button>
+                      <CorrigirOperacao secao="oportunidades" tema={op.descricao} operacao={op.operacao} onCorrigir={corrigir} />
+                    </div>
                   </CardContent>
                 </Card>
               ))}
