@@ -61,6 +61,88 @@ function OperacaoBadge({ op }: { op?: string }) {
   );
 }
 
+type CorrigirFn = (secao: string, tema: string, operacaoIa: string | undefined, operacaoCorreta: Operacao) => Promise<void>;
+
+function CorrigirOperacao({ secao, tema, operacao, onCorrigir }: { secao: string; tema: string; operacao?: string; onCorrigir?: CorrigirFn }) {
+  const [salvando, setSalvando] = useState(false);
+  if (!onCorrigir) return null;
+  const atual = normalizeOp(operacao);
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button size="sm" variant="ghost" className="h-6 px-2 text-xs text-muted-foreground" disabled={salvando}>
+          <Wand2 className="h-3 w-3 mr-1" /> Corrigir operação
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuLabel className="text-xs">Operação correta</DropdownMenuLabel>
+        {OPERACOES.map((o) => (
+          <DropdownMenuItem
+            key={o.value}
+            disabled={o.value === atual}
+            onSelect={async () => {
+              setSalvando(true);
+              try {
+                await onCorrigir(secao, tema, operacao, o.value);
+              } finally {
+                setSalvando(false);
+              }
+            }}
+          >
+            <o.icon className="h-3.5 w-3.5 mr-2" /> {o.label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+const SECAO_KEY: Record<string, string> = {
+  dores: 'dores',
+  demandas: 'demandas',
+  resistencias: 'resistencias',
+  oportunidades: 'oportunidades_produto',
+};
+
+function useCorrigirOperacao(insight: Insight | null, tipoInsight: string, reload: () => Promise<void>): CorrigirFn {
+  return async (secao, tema, operacaoIa, operacaoCorreta) => {
+    if (!insight) return;
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const { error: errIns } = await supabase.from('insight_correcoes' as any).insert({
+        insight_id: insight.id,
+        tipo_insight: tipoInsight,
+        secao,
+        tema,
+        operacao_ia: operacaoIa ?? null,
+        operacao_correta: operacaoCorreta,
+        user_id: userData.user?.id,
+      });
+      if (errIns) throw errIns;
+
+      const key = SECAO_KEY[secao] ?? secao;
+      const conteudo = JSON.parse(JSON.stringify(insight.conteudo || {}));
+      const lista = conteudo[key];
+      if (Array.isArray(lista)) {
+        const alvo = lista.find((x: any) => (x?.tema ?? x?.descricao) === tema);
+        if (alvo) alvo.operacao = operacaoCorreta;
+      }
+      const { error: errUpd } = await supabase
+        .from('insights_agregados' as any)
+        .update({ conteudo })
+        .eq('id', insight.id);
+      if (errUpd) throw errUpd;
+
+      toast.success('Correção registrada — o agente vai considerá-la nas próximas análises.');
+      await reload();
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao registrar correção');
+    }
+  };
+}
+
+
+
 function useUltimoInsight(tipo: string) {
   const [insight, setInsight] = useState<Insight | null>(null);
   const [loading, setLoading] = useState(true);
