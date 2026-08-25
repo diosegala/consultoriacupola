@@ -608,9 +608,6 @@ function PerfilSection() {
             <span className="text-xs font-normal text-muted-foreground">Última análise: {formatDate(insight?.created_at)}</span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          <Button onClick={gerar} disabled={gerando}>
-            {gerando ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
         <CardContent className="flex flex-wrap items-end gap-2">
           <div className="w-48">
             <label className="text-xs text-muted-foreground">Período</label>
