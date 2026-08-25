@@ -96,12 +96,29 @@ Retorne SOMENTE JSON válido (sem markdown fences), no formato:
 DADOS (${porCliente.size} clientes distintos):
 ${contexto}`;
 
+    // Correções humanas anteriores sobre classificação de operação
+    const { data: correcoes } = await admin
+      .from("insight_correcoes")
+      .select("secao, tema, operacao_ia, operacao_correta, observacao")
+      .eq("tipo_insight", "dores_recorrentes")
+      .order("created_at", { ascending: false })
+      .limit(40);
+
+    const promptFinal = (correcoes || []).length
+      ? `${prompt}
+
+CORREÇÕES HUMANAS ANTERIORES (obrigatório respeitar) — em análises passadas você classificou errado a operação destes temas. Use-as como regra ao classificar temas iguais ou semelhantes:
+${(correcoes || []).map((c: any) => `- [${c.secao}] "${c.tema}": você disse "${c.operacao_ia ?? '?'}", o correto é "${c.operacao_correta}".${c.observacao ? ` Observação: ${c.observacao}` : ""}`).join("\n")}
+
+Lembre: temas de carteira de locação, inadimplência, garantias, vistorias, proprietários, inquilinos e administração de contratos são SEMPRE "aluguel", nunca "vendas".`
+      : prompt;
 
     const claude = await callClaude({
       system: "Você é um analista sênior de consultoria empresarial. Responda apenas com JSON válido, sem markdown fences.",
-      messages: [{ role: "user", content: prompt }],
+      messages: [{ role: "user", content: promptFinal }],
       max_tokens: 8000,
     });
+
     if (!claude.ok) {
       await logAiUsage({
         admin, agente_tipo: "insights_dores_recorrentes", user_id: user.id,
