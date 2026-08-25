@@ -201,7 +201,10 @@ function DoresSection() {
               {insight ? 'Atualizar' : 'Gerar análise de dores'}
             </Button>
             {insight && (
-              <Button variant="outline" onClick={exportar}><Download className="h-4 w-4" /></Button>
+              <Button variant="outline" onClick={exportarGdoc} disabled={exportando}>
+                {exportando ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+                Abrir no Google Docs
+              </Button>
             )}
           </div>
         </CardContent>
