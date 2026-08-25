@@ -135,23 +135,17 @@ function DoresSection() {
     }
   };
 
-  const exportar = () => {
+  const exportarGdoc = async () => {
     if (!insight) return;
-    const c = insight.conteudo || {};
-    let md = `# Dores e Temas Recorrentes\n\n_Gerado em ${formatDate(insight.created_at)} — período ${insight.periodo_analisado}_\n\n`;
-    md += `## Dores mais recorrentes\n\n`;
-    (c.dores || []).forEach((d: any, i: number) => {
-      md += `**${i + 1}. ${d.tema}** — ${d.frequencia_clientes} clientes\n> ${d.exemplo}\n\n`;
-    });
-    md += `\n## O que os clientes pedem\n\n`;
-    (c.demandas || []).forEach((d: any) => { md += `- ${d.tema} _(${d.frequencia_clientes} clientes)_\n`; });
-    md += `\n## Onde há mais resistência\n\n`;
-    (c.resistencias || []).forEach((r: any) => { md += `- **${r.tema}** — ${r.descricao}\n`; });
-    const blob = new Blob([md], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `dores-recorrentes-${new Date().toISOString().slice(0,10)}.md`;
-    a.click(); URL.revokeObjectURL(url);
+    setExportando(true);
+    try {
+      await abrirComoGdoc(tituloComData('Inteligência — Dores e Temas Recorrentes'), doresParaMarkdown(insight));
+      toast.success('Documento criado no Google Docs.');
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao criar Google Doc');
+    } finally {
+      setExportando(false);
+    }
   };
 
   const c = insight?.conteudo || {};
