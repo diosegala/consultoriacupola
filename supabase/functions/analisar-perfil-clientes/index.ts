@@ -173,6 +173,7 @@ Lembre: temas de carteira de locação, inadimplência, garantias, vistorias, pr
         periodo_analisado: periodo_meses ? `${periodo_meses}m` : "all",
         filtros: { periodo_meses },
 
+
         conteudo,
         gerado_por: user.id,
       })
