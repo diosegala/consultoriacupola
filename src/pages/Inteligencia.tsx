@@ -530,7 +530,7 @@ function DoresSection() {
             </TabsList>
             {(['vendas', 'aluguel', 'ambas', 'todas'] as const).map((f) => (
               <TabsContent key={f} value={f} className="mt-6">
-                <DoresPainel conteudo={c} filtro={f} />
+                <DoresPainel conteudo={c} filtro={f} onCorrigir={corrigir} />
               </TabsContent>
             ))}
           </Tabs>
