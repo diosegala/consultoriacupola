@@ -331,6 +331,9 @@ function DoresPainel({ conteudo, filtro, onCorrigir }: { conteudo: any; filtro: 
                   </div>
                   <Progress value={(freq / maxFreq) * 100} className="h-1.5" />
                   {d.exemplo && <p className="text-sm text-muted-foreground italic">"{d.exemplo}"</p>}
+                  <div className="flex justify-end">
+                    <CorrigirOperacao secao="dores" tema={d.tema} operacao={d.operacao} onCorrigir={onCorrigir} />
+                  </div>
                 </CardContent>
               </Card>
             );
