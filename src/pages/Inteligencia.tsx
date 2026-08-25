@@ -45,6 +45,67 @@ function formatDate(iso?: string | null) {
   return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 }
 
+async function abrirComoGdoc(titulo: string, markdown: string) {
+  const { data, error } = await supabase.functions.invoke('criar-gdoc', {
+    body: { titulo, conteudo_markdown: markdown },
+  });
+  if (error) {
+    let message = error.message || 'Erro ao criar Google Doc';
+    const response = (error as any)?.context;
+    if (response && typeof response.json === 'function') {
+      try {
+        const body = await response.json();
+        if (typeof body?.message === 'string') message = body.message;
+        else if (typeof body?.error === 'string') message = body.error;
+      } catch {
+        // mantém mensagem original
+      }
+    }
+    throw new Error(message);
+  }
+  const url = (data as any)?.url as string | undefined;
+  if (!url) throw new Error('Google Doc criado sem URL retornada');
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+function doresParaMarkdown(insight: Insight) {
+  const c = insight.conteudo || {};
+  let md = `# Dores e Temas Recorrentes\n\n_Gerado em ${formatDate(insight.created_at)} — período ${insight.periodo_analisado ?? '—'}_\n\n`;
+  md += `## Dores mais recorrentes\n\n`;
+  (c.dores || []).forEach((d: any, i: number) => {
+    md += `**${i + 1}. ${d.tema}** — ${d.frequencia_clientes} clientes\n${d.exemplo ? `"${d.exemplo}"\n` : ''}\n`;
+  });
+  md += `\n## O que os clientes pedem\n\n`;
+  (c.demandas || []).forEach((d: any) => { md += `- ${d.tema} (${d.frequencia_clientes} clientes)\n`; });
+  md += `\n## Onde há mais resistência\n\n`;
+  (c.resistencias || []).forEach((r: any) => { md += `- ${r.tema} — ${r.descricao}\n`; });
+  return md;
+}
+
+function perfilParaMarkdown(insight: Insight) {
+  const c = insight.conteudo || {};
+  let md = `# Perfil Ideal e Oportunidades\n\n_Gerado em ${formatDate(insight.created_at)}_\n\n`;
+  md += `## Perfil do cliente que mais avança\n\n`;
+  (c.perfil_ideal?.caracteristicas || []).forEach((x: string) => { md += `- ${x}\n`; });
+  if (c.perfil_ideal?.justificativa) md += `\n${c.perfil_ideal.justificativa}\n`;
+  md += `\n## Sinais de alerta no perfil\n\n`;
+  (c.perfil_risco?.caracteristicas || []).forEach((x: string) => { md += `- ${x}\n`; });
+  if (c.perfil_risco?.alertas) md += `\n${c.perfil_risco.alertas}\n`;
+  md += `\n## Oportunidades de produto identificadas\n\n`;
+  (c.oportunidades_produto || []).forEach((op: any, i: number) => {
+    md += `### ${i + 1}. ${op.descricao}\n`;
+    if (op.evidencia) md += `Evidência: ${op.evidencia}\n`;
+    if (op.potencial_demanda) md += `Potencial: ${op.potencial_demanda}\n`;
+    md += `\n`;
+  });
+  return md;
+}
+
+function tituloComData(base: string) {
+  return `${base} (${new Date().toLocaleDateString('pt-BR')})`;
+}
+
+
 function DoresSection() {
   const { insight, loading, reload } = useUltimoInsight('dores_recorrentes');
   const { data: consultores } = useConsultores(true);
