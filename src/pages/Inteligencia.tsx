@@ -268,6 +268,20 @@ function DoresSection() {
 function PerfilSection() {
   const { insight, loading, reload } = useUltimoInsight('perfil_clientes');
   const [gerando, setGerando] = useState(false);
+  const [exportando, setExportando] = useState(false);
+
+  const exportarGdoc = async () => {
+    if (!insight) return;
+    setExportando(true);
+    try {
+      await abrirComoGdoc(tituloComData('Inteligência — Perfil Ideal e Oportunidades'), perfilParaMarkdown(insight));
+      toast.success('Documento criado no Google Docs.');
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao criar Google Doc');
+    } finally {
+      setExportando(false);
+    }
+  };
 
   const gerar = async () => {
     setGerando(true);
