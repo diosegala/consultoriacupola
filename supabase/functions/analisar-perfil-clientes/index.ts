@@ -11,6 +11,7 @@ const corsHeaders = {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
+    const { periodo_meses = null } = await req.json().catch(() => ({}));
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const authHeader = req.headers.get("Authorization") ?? "";
@@ -33,11 +34,19 @@ serve(async (req) => {
       .select("cliente_id, respostas, status")
       .in("status", ["respondido", "finalizado", "concluido"]);
 
-    const { data: reunioes } = await admin
+    let reunioesQuery = admin
       .from("reunioes")
       .select("cliente_id, score_cliente, analise_cliente")
       .eq("status_analise", "concluido")
       .not("score_cliente", "is", null);
+
+    if (periodo_meses) {
+      const desde = new Date();
+      desde.setMonth(desde.getMonth() - Number(periodo_meses));
+      reunioesQuery = reunioesQuery.gte("data_reuniao", desde.toISOString().slice(0, 10));
+    }
+    const { data: reunioes } = await reunioesQuery;
+
 
     const { data: docs } = await admin
       .from("projeto_documentos")
