@@ -369,7 +369,10 @@ function DoresPainel({ conteudo, filtro, onCorrigir }: { conteudo: any; filtro: 
                   <div className="space-y-1">
                     <p className="text-sm font-medium">{r.tema}</p>
                     <p className="text-xs text-muted-foreground">{r.descricao}</p>
-                    {filtro === 'todas' && <OperacaoBadge op={r.operacao} />}
+                    <div className="flex items-center gap-2">
+                      {filtro === 'todas' && <OperacaoBadge op={r.operacao} />}
+                      <CorrigirOperacao secao="resistencias" tema={r.tema} operacao={r.operacao} onCorrigir={onCorrigir} />
+                    </div>
                   </div>
                 </CardContent>
               </Card>
