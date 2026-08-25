@@ -387,6 +387,7 @@ function DoresPainel({ conteudo, filtro, onCorrigir }: { conteudo: any; filtro: 
 
 function DoresSection() {
   const { insight, loading, reload } = useUltimoInsight('dores_recorrentes');
+  const corrigir = useCorrigirOperacao(insight, 'dores_recorrentes', reload);
   const { data: consultores } = useConsultores(true);
   const [periodo, setPeriodo] = useState('6');
   const [tipoContrato, setTipoContrato] = useState('todos');
