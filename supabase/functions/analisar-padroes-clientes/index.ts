@@ -71,20 +71,31 @@ serve(async (req) => {
     const blocos = Array.from(porCliente.entries()).slice(0, 80).map(([id, v], i) => `=== Cliente ${i + 1} (${v.nome}) ===\n${v.resumos.slice(0, 6).join("\n---\n")}`);
     const contexto = blocos.join("\n\n").slice(0, 60000);
 
-    const prompt = `Você recebeu resumos de reuniões de consultoria com diferentes clientes. Analise e identifique:
+    const prompt = `Você recebeu resumos de reuniões de consultoria com imobiliárias. Analise e identifique:
 (1) As 10 dores ou desafios mais recorrentes que os clientes trouxeram, com frequência relativa (em quantos clientes distintos apareceu) e exemplos de como essa dor foi expressa.
 (2) As 5 demandas ou pedidos mais frequentes que os clientes fizeram ao consultor.
 (3) Os 3 temas que geraram mais resistência ou tensão nas reuniões.
 
+MUITO IMPORTANTE — SEGMENTAÇÃO POR OPERAÇÃO:
+Imobiliárias possuem duas operações distintas: VENDAS (captação e venda de imóveis, corretores, funil comercial, VGV) e LOCAÇÃO/ALUGUEL (carteira de locação, administração de contratos, inadimplência, garantias, vistorias, gestão de proprietários e inquilinos).
+Para CADA item das três listas, classifique o campo "operacao" como:
+- "vendas" — quando a dor/demanda/resistência é específica da operação de vendas;
+- "aluguel" — quando é específica da operação de locação;
+- "ambas" — quando é transversal (gestão, pessoas, processos, tecnologia, cultura).
+Se ambas as operações aparecem mas com pesos diferentes, escolha a predominante. Não use "ambas" como saída fácil: só classifique assim quando realmente for transversal.
+Priorize identificar dores específicas de cada operação, mesmo que apareçam em menos clientes, para que a leitura por operação seja útil.
+
 Retorne SOMENTE JSON válido (sem markdown fences), no formato:
 {
-  "dores": [{"tema": "...", "frequencia_clientes": N, "exemplo": "..."}],
-  "demandas": [{"tema": "...", "frequencia_clientes": N}],
-  "resistencias": [{"tema": "...", "descricao": "..."}]
+  "dores": [{"tema": "...", "operacao": "vendas|aluguel|ambas", "frequencia_clientes": N, "exemplo": "...", "impacto": "alto|medio|baixo"}],
+  "demandas": [{"tema": "...", "operacao": "vendas|aluguel|ambas", "frequencia_clientes": N}],
+  "resistencias": [{"tema": "...", "operacao": "vendas|aluguel|ambas", "descricao": "..."}],
+  "resumo_executivo": {"vendas": "2-3 frases sobre o cenário da operação de vendas", "aluguel": "2-3 frases sobre o cenário da operação de locação", "ambas": "2-3 frases sobre os temas transversais"}
 }
 
 DADOS (${porCliente.size} clientes distintos):
 ${contexto}`;
+
 
     const claude = await callClaude({
       system: "Você é um analista sênior de consultoria empresarial. Responda apenas com JSON válido, sem markdown fences.",
