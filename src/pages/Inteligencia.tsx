@@ -286,7 +286,7 @@ function DoresChart({ dores }: { dores: any[] }) {
   );
 }
 
-function DoresPainel({ conteudo, filtro }: { conteudo: any; filtro: Operacao | 'todas' }) {
+function DoresPainel({ conteudo, filtro, onCorrigir }: { conteudo: any; filtro: Operacao | 'todas'; onCorrigir?: CorrigirFn }) {
   const match = (item: any) => filtro === 'todas' || normalizeOp(item?.operacao) === filtro;
   const dores = (conteudo.dores || []).filter(match);
   const demandas = (conteudo.demandas || []).filter(match);
