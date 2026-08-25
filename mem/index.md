@@ -56,6 +56,7 @@ System-only notifications (no emails). No data/report exports. Hard deletes use 
 - [Risco de churn por engajamento](mem://features/risco-churn-engajamento) — Regras do bloco Risco de churn e alerta score_cliente_em_queda
 - [Políticas de Decisão](mem://features/politicas-decisao) — Limiares de risco de churn editáveis via tabela politicas_decisao
 - [Pesquisa de Reuniões](mem://features/pesquisa-reunioes) — Chat com busca semântica nas transcrições de reuniões, fontes citadas, escopo por carteira
+- [Inteligência por Operação](mem://features/inteligencia-por-operacao) — Dores/oportunidades segmentadas em vendas, locação e transversal; relatório visual com gráfico e sub-abas
 - [AI Agent Management](mem://features/ai-agent-management) — Admin config for prompts, ref docs, Gemini/GPT-4o
 - [AI Engine Integration](mem://technical/ai-engine-integration) — Gemini fallback logic + GPT-4o secret handling
 

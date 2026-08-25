@@ -106,15 +106,18 @@ serve(async (req) => {
 (2) Quais características estão correlacionadas com baixo engajamento (< 5)? O que esses clientes têm em comum?
 (3) Com base nas demandas/dores que aparecem no questionário e nos dados de engajamento, quais necessidades ainda não são atendidas pelos produtos atuais? Há padrões que sugerem oportunidade de um novo produto ou formato?
 
+SEGMENTAÇÃO POR OPERAÇÃO: imobiliárias têm duas operações distintas — VENDAS (captação, corretores, funil comercial, VGV) e LOCAÇÃO/ALUGUEL (carteira, contratos, inadimplência, garantias, vistorias). Em cada oportunidade de produto, classifique "operacao" como "vendas", "aluguel" ou "ambas" (transversal).
+
 Retorne SOMENTE JSON válido (sem markdown fences):
 {
   "perfil_ideal": {"caracteristicas": ["..."], "justificativa": "..."},
   "perfil_risco": {"caracteristicas": ["..."], "alertas": "..."},
-  "oportunidades_produto": [{"descricao": "...", "evidencia": "...", "potencial_demanda": "..."}]
+  "oportunidades_produto": [{"descricao": "...", "operacao": "vendas|aluguel|ambas", "evidencia": "...", "potencial_demanda": "..."}]
 }
 
 DADOS (${consolidados.length} clientes):
 ${JSON.stringify(consolidados).slice(0, 60000)}`;
+
 
     const claude = await callClaude({
       system: "Você é um analista sênior de produto e consultoria. Responda apenas com JSON válido, sem markdown fences.",

@@ -7,9 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, FileText, Lightbulb, RefreshCw, Save, TrendingUp } from 'lucide-react';
+import { AlertTriangle, Building2, FileText, Key, Layers, Lightbulb, MessageSquareQuote, RefreshCw, Save, TrendingUp } from 'lucide-react';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Cell, Tooltip } from 'recharts';
 import { toast } from 'sonner';
 
 type Insight = {
@@ -20,6 +22,35 @@ type Insight = {
   conteudo: any;
   created_at: string;
 };
+
+type Operacao = 'vendas' | 'aluguel' | 'ambas';
+
+const OPERACOES: { value: Operacao; label: string; icon: typeof Building2; chartColor: string; badgeClass: string }[] = [
+  { value: 'vendas', label: 'Vendas', icon: Building2, chartColor: 'hsl(var(--primary))', badgeClass: 'border-primary/40 text-primary' },
+  { value: 'aluguel', label: 'Locação', icon: Key, chartColor: 'hsl(var(--chart-2, 199 89% 55%))', badgeClass: 'border-sky-500/40 text-sky-400' },
+  { value: 'ambas', label: 'Transversal', icon: Layers, chartColor: 'hsl(var(--muted-foreground))', badgeClass: 'border-muted-foreground/40 text-muted-foreground' },
+];
+
+function opMeta(op?: string) {
+  return OPERACOES.find((o) => o.value === normalizeOp(op)) ?? OPERACOES[2];
+}
+
+function normalizeOp(op?: string): Operacao {
+  const v = (op || '').toLowerCase();
+  if (v.startsWith('venda')) return 'vendas';
+  if (v.startsWith('alug') || v.startsWith('loca')) return 'aluguel';
+  return 'ambas';
+}
+
+function OperacaoBadge({ op }: { op?: string }) {
+  const meta = opMeta(op);
+  const Icon = meta.icon;
+  return (
+    <Badge variant="outline" className={`gap-1 ${meta.badgeClass}`}>
+      <Icon className="h-3 w-3" /> {meta.label}
+    </Badge>
+  );
+}
 
 function useUltimoInsight(tipo: string) {
   const [insight, setInsight] = useState<Insight | null>(null);
@@ -71,14 +102,31 @@ async function abrirComoGdoc(titulo: string, markdown: string) {
 function doresParaMarkdown(insight: Insight) {
   const c = insight.conteudo || {};
   let md = `# Dores e Temas Recorrentes\n\n_Gerado em ${formatDate(insight.created_at)} — período ${insight.periodo_analisado ?? '—'}_\n\n`;
-  md += `## Dores mais recorrentes\n\n`;
-  (c.dores || []).forEach((d: any, i: number) => {
-    md += `**${i + 1}. ${d.tema}** — ${d.frequencia_clientes} clientes\n${d.exemplo ? `"${d.exemplo}"\n` : ''}\n`;
-  });
-  md += `\n## O que os clientes pedem\n\n`;
-  (c.demandas || []).forEach((d: any) => { md += `- ${d.tema} (${d.frequencia_clientes} clientes)\n`; });
-  md += `\n## Onde há mais resistência\n\n`;
-  (c.resistencias || []).forEach((r: any) => { md += `- ${r.tema} — ${r.descricao}\n`; });
+  for (const op of OPERACOES) {
+    const dores = (c.dores || []).filter((d: any) => normalizeOp(d.operacao) === op.value);
+    const demandas = (c.demandas || []).filter((d: any) => normalizeOp(d.operacao) === op.value);
+    const resistencias = (c.resistencias || []).filter((r: any) => normalizeOp(r.operacao) === op.value);
+    if (!dores.length && !demandas.length && !resistencias.length) continue;
+    md += `## Operação: ${op.label}\n\n`;
+    const resumo = c.resumo_executivo?.[op.value];
+    if (resumo) md += `${resumo}\n\n`;
+    if (dores.length) {
+      md += `### Dores mais recorrentes\n\n`;
+      dores.forEach((d: any, i: number) => {
+        md += `**${i + 1}. ${d.tema}** — ${d.frequencia_clientes} clientes\n${d.exemplo ? `"${d.exemplo}"\n` : ''}\n`;
+      });
+    }
+    if (demandas.length) {
+      md += `### O que os clientes pedem\n\n`;
+      demandas.forEach((d: any) => { md += `- ${d.tema} (${d.frequencia_clientes} clientes)\n`; });
+      md += `\n`;
+    }
+    if (resistencias.length) {
+      md += `### Onde há mais resistência\n\n`;
+      resistencias.forEach((r: any) => { md += `- ${r.tema} — ${r.descricao}\n`; });
+      md += `\n`;
+    }
+  }
   return md;
 }
 
@@ -92,12 +140,17 @@ function perfilParaMarkdown(insight: Insight) {
   (c.perfil_risco?.caracteristicas || []).forEach((x: string) => { md += `- ${x}\n`; });
   if (c.perfil_risco?.alertas) md += `\n${c.perfil_risco.alertas}\n`;
   md += `\n## Oportunidades de produto identificadas\n\n`;
-  (c.oportunidades_produto || []).forEach((op: any, i: number) => {
-    md += `### ${i + 1}. ${op.descricao}\n`;
-    if (op.evidencia) md += `Evidência: ${op.evidencia}\n`;
-    if (op.potencial_demanda) md += `Potencial: ${op.potencial_demanda}\n`;
-    md += `\n`;
-  });
+  for (const op of OPERACOES) {
+    const ops = (c.oportunidades_produto || []).filter((o: any) => normalizeOp(o.operacao) === op.value);
+    if (!ops.length) continue;
+    md += `### Operação: ${op.label}\n\n`;
+    ops.forEach((o: any, i: number) => {
+      md += `**${i + 1}. ${o.descricao}**\n`;
+      if (o.evidencia) md += `Evidência: ${o.evidencia}\n`;
+      if (o.potencial_demanda) md += `Potencial: ${o.potencial_demanda}\n`;
+      md += `\n`;
+    });
+  }
   return md;
 }
 
@@ -105,6 +158,132 @@ function tituloComData(base: string) {
   return `${base} (${new Date().toLocaleDateString('pt-BR')})`;
 }
 
+function DoresChart({ dores }: { dores: any[] }) {
+  const data = useMemo(
+    () => dores
+      .map((d) => ({
+        tema: String(d.tema || '').length > 34 ? `${String(d.tema).slice(0, 32)}…` : String(d.tema || ''),
+        clientes: Number(d.frequencia_clientes) || 0,
+        cor: opMeta(d.operacao).chartColor,
+      }))
+      .sort((a, b) => b.clientes - a.clientes)
+      .slice(0, 10),
+    [dores],
+  );
+  if (!data.length) return null;
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm text-muted-foreground">Frequência das dores (clientes distintos)</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ResponsiveContainer width="100%" height={Math.max(180, data.length * 34)}>
+          <BarChart data={data} layout="vertical" margin={{ left: 8, right: 24 }}>
+            <XAxis type="number" hide />
+            <YAxis type="category" dataKey="tema" width={200} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+            <Tooltip
+              cursor={{ fill: 'hsl(var(--muted) / 0.3)' }}
+              contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }}
+            />
+            <Bar dataKey="clientes" radius={[0, 4, 4, 0]} barSize={16}>
+              {data.map((d, i) => <Cell key={i} fill={d.cor} />)}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DoresPainel({ conteudo, filtro }: { conteudo: any; filtro: Operacao | 'todas' }) {
+  const match = (item: any) => filtro === 'todas' || normalizeOp(item?.operacao) === filtro;
+  const dores = (conteudo.dores || []).filter(match);
+  const demandas = (conteudo.demandas || []).filter(match);
+  const resistencias = (conteudo.resistencias || []).filter(match);
+  const resumo = filtro !== 'todas' ? conteudo.resumo_executivo?.[filtro] : null;
+  const maxFreq = Math.max(1, ...dores.map((d: any) => Number(d.frequencia_clientes) || 0));
+
+  if (!dores.length && !demandas.length && !resistencias.length) {
+    return <p className="text-sm text-muted-foreground">Nenhum item classificado nesta operação na última análise. Gere a análise novamente para segmentar por operação.</p>;
+  }
+
+  return (
+    <div className="space-y-6">
+      {resumo && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="pt-4 flex gap-3">
+            <MessageSquareQuote className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+            <p className="text-sm leading-relaxed">{resumo}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      <DoresChart dores={dores} />
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="space-y-3 lg:col-span-2">
+          <h3 className="text-sm font-semibold text-muted-foreground">Dores mais recorrentes</h3>
+          {dores.map((d: any, i: number) => {
+            const freq = Number(d.frequencia_clientes) || 0;
+            return (
+              <Card key={i}>
+                <CardContent className="pt-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">{i + 1}</span>
+                      <p className="font-medium">{d.tema}</p>
+                    </div>
+                    <div className="flex flex-shrink-0 items-center gap-2">
+                      <OperacaoBadge op={d.operacao} />
+                      <Badge variant="secondary">{freq} clientes</Badge>
+                    </div>
+                  </div>
+                  <Progress value={(freq / maxFreq) * 100} className="h-1.5" />
+                  {d.exemplo && <p className="text-sm text-muted-foreground italic">"{d.exemplo}"</p>}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-muted-foreground">O que os clientes pedem</h3>
+            <Card>
+              <CardContent className="pt-4 space-y-3">
+                {demandas.map((d: any, i: number) => (
+                  <div key={i} className="space-y-1">
+                    <div className="flex items-center justify-between gap-2 text-sm">
+                      <span>{d.tema}</span>
+                      <Badge variant="outline">{d.frequencia_clientes}</Badge>
+                    </div>
+                    {filtro === 'todas' && <OperacaoBadge op={d.operacao} />}
+                  </div>
+                ))}
+                {!demandas.length && <p className="text-xs text-muted-foreground">Sem demandas nesta operação.</p>}
+              </CardContent>
+            </Card>
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-muted-foreground">Onde há mais resistência</h3>
+            {resistencias.map((r: any, i: number) => (
+              <Card key={i}>
+                <CardContent className="pt-4 flex gap-3">
+                  <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-1" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">{r.tema}</p>
+                    <p className="text-xs text-muted-foreground">{r.descricao}</p>
+                    {filtro === 'todas' && <OperacaoBadge op={r.operacao} />}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+            {!resistencias.length && <p className="text-xs text-muted-foreground">Sem resistências nesta operação.</p>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function DoresSection() {
   const { insight, loading, reload } = useUltimoInsight('dores_recorrentes');
@@ -150,6 +329,11 @@ function DoresSection() {
   };
 
   const c = insight?.conteudo || {};
+  const contagem = useMemo(() => {
+    const base: Record<Operacao, number> = { vendas: 0, aluguel: 0, ambas: 0 };
+    for (const d of c.dores || []) base[normalizeOp(d.operacao)] += 1;
+    return base;
+  }, [c]);
 
   return (
     <div className="space-y-6">
@@ -215,51 +399,43 @@ function DoresSection() {
       ) : !insight ? (
         <p className="text-sm text-muted-foreground">Nenhuma análise gerada ainda.</p>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="space-y-3 lg:col-span-2">
-            <h3 className="text-sm font-semibold text-muted-foreground">Dores mais recorrentes</h3>
-            {(c.dores || []).map((d: any, i: number) => (
-              <Card key={i}>
-                <CardContent className="pt-4 space-y-2">
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="font-medium">{d.tema}</p>
-                    <Badge variant="secondary">{d.frequencia_clientes} clientes</Badge>
-                  </div>
-                  {d.exemplo && <p className="text-sm text-muted-foreground italic">"{d.exemplo}"</p>}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-muted-foreground">O que os clientes pedem</h3>
-              <Card>
-                <CardContent className="pt-4 space-y-2">
-                  {(c.demandas || []).map((d: any, i: number) => (
-                    <div key={i} className="flex items-center justify-between text-sm">
-                      <span>{d.tema}</span>
-                      <Badge variant="outline">{d.frequencia_clientes}</Badge>
+        <>
+          <div className="grid gap-4 md:grid-cols-3">
+            {OPERACOES.map((op) => {
+              const Icon = op.icon;
+              return (
+                <Card key={op.value}>
+                  <CardContent className="pt-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-9 w-9 items-center justify-center rounded-md bg-muted">
+                        <Icon className="h-4 w-4" />
+                      </span>
+                      <div>
+                        <p className="text-sm font-medium">{op.label}</p>
+                        <p className="text-xs text-muted-foreground">dores identificadas</p>
+                      </div>
                     </div>
-                  ))}
-                </CardContent>
-              </Card>
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-muted-foreground">Onde há mais resistência</h3>
-              {(c.resistencias || []).map((r: any, i: number) => (
-                <Card key={i}>
-                  <CardContent className="pt-4 flex gap-3">
-                    <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-1" />
-                    <div>
-                      <p className="text-sm font-medium">{r.tema}</p>
-                      <p className="text-xs text-muted-foreground">{r.descricao}</p>
-                    </div>
+                    <span className="text-2xl font-bold">{contagem[op.value]}</span>
                   </CardContent>
                 </Card>
-              ))}
-            </div>
+              );
+            })}
           </div>
-        </div>
+
+          <Tabs defaultValue="vendas">
+            <TabsList>
+              <TabsTrigger value="vendas">Vendas</TabsTrigger>
+              <TabsTrigger value="aluguel">Locação</TabsTrigger>
+              <TabsTrigger value="ambas">Transversal</TabsTrigger>
+              <TabsTrigger value="todas">Visão geral</TabsTrigger>
+            </TabsList>
+            {(['vendas', 'aluguel', 'ambas', 'todas'] as const).map((f) => (
+              <TabsContent key={f} value={f} className="mt-6">
+                <DoresPainel conteudo={c} filtro={f} />
+              </TabsContent>
+            ))}
+          </Tabs>
+        </>
       )}
     </div>
   );
@@ -269,6 +445,7 @@ function PerfilSection() {
   const { insight, loading, reload } = useUltimoInsight('perfil_clientes');
   const [gerando, setGerando] = useState(false);
   const [exportando, setExportando] = useState(false);
+  const [filtroOp, setFiltroOp] = useState<Operacao | 'todas'>('todas');
 
   const exportarGdoc = async () => {
     if (!insight) return;
@@ -315,6 +492,9 @@ function PerfilSection() {
   };
 
   const c = insight?.conteudo || {};
+  const oportunidades = (c.oportunidades_produto || []).filter(
+    (o: any) => filtroOp === 'todas' || normalizeOp(o.operacao) === filtroOp,
+  );
 
   return (
     <div className="space-y-6">
@@ -345,26 +525,36 @@ function PerfilSection() {
         <p className="text-sm text-muted-foreground">Nenhuma análise gerada ainda.</p>
       ) : (
         <div className="grid gap-6 lg:grid-cols-2">
-          <Card>
+          <Card className="border-emerald-500/30">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base"><TrendingUp className="h-4 w-4 text-emerald-500" /> Perfil do cliente que mais avança</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
-              <ul className="list-disc pl-5 space-y-1">
-                {(c.perfil_ideal?.caracteristicas || []).map((x: string, i: number) => <li key={i}>{x}</li>)}
+              <ul className="space-y-2">
+                {(c.perfil_ideal?.caracteristicas || []).map((x: string, i: number) => (
+                  <li key={i} className="flex gap-2">
+                    <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-500" />
+                    <span>{x}</span>
+                  </li>
+                ))}
               </ul>
               {c.perfil_ideal?.justificativa && (
                 <p className="text-muted-foreground text-xs">{c.perfil_ideal.justificativa}</p>
               )}
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border-amber-500/30">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base"><AlertTriangle className="h-4 w-4 text-amber-500" /> Sinais de alerta no perfil</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
-              <ul className="list-disc pl-5 space-y-1">
-                {(c.perfil_risco?.caracteristicas || []).map((x: string, i: number) => <li key={i}>{x}</li>)}
+              <ul className="space-y-2">
+                {(c.perfil_risco?.caracteristicas || []).map((x: string, i: number) => (
+                  <li key={i} className="flex gap-2">
+                    <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-500" />
+                    <span>{x}</span>
+                  </li>
+                ))}
               </ul>
               {c.perfil_risco?.alertas && (
                 <p className="text-muted-foreground text-xs">{c.perfil_risco.alertas}</p>
@@ -372,12 +562,24 @@ function PerfilSection() {
             </CardContent>
           </Card>
           <div className="lg:col-span-2 space-y-3">
-            <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2"><Lightbulb className="h-4 w-4" /> Oportunidades de produto identificadas</h3>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2"><Lightbulb className="h-4 w-4" /> Oportunidades de produto identificadas</h3>
+              <div className="flex flex-wrap gap-1">
+                {(['todas', 'vendas', 'aluguel', 'ambas'] as const).map((f) => (
+                  <Button key={f} size="sm" variant={filtroOp === f ? 'default' : 'outline'} onClick={() => setFiltroOp(f)}>
+                    {f === 'todas' ? 'Todas' : OPERACOES.find((o) => o.value === f)!.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
             <div className="grid gap-3 md:grid-cols-2">
-              {(c.oportunidades_produto || []).map((op: any, i: number) => (
+              {oportunidades.map((op: any, i: number) => (
                 <Card key={i}>
                   <CardContent className="pt-4 space-y-2">
-                    <p className="font-medium text-sm">{op.descricao}</p>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-medium text-sm">{op.descricao}</p>
+                      <OperacaoBadge op={op.operacao} />
+                    </div>
                     {op.evidencia && <p className="text-xs text-muted-foreground"><span className="font-medium">Evidência:</span> {op.evidencia}</p>}
                     {op.potencial_demanda && <p className="text-xs text-muted-foreground"><span className="font-medium">Potencial:</span> {op.potencial_demanda}</p>}
                     <Button size="sm" variant="outline" onClick={() => salvarOportunidade(op)}>
@@ -386,6 +588,7 @@ function PerfilSection() {
                   </CardContent>
                 </Card>
               ))}
+              {!oportunidades.length && <p className="text-xs text-muted-foreground">Nenhuma oportunidade nesta operação.</p>}
             </div>
           </div>
         </div>
@@ -403,7 +606,7 @@ export default function Inteligencia() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Inteligência</h1>
-        <p className="text-sm text-muted-foreground">Análises agregadas sobre dores, perfis e oportunidades de produto. Executadas sob demanda.</p>
+        <p className="text-sm text-muted-foreground">Análises agregadas sobre dores, perfis e oportunidades de produto, separadas por operação de vendas e de locação.</p>
       </div>
       <Tabs defaultValue="dores">
         <TabsList>
