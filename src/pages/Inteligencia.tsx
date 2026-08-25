@@ -311,11 +311,17 @@ function PerfilSection() {
             <span className="text-xs font-normal text-muted-foreground">Última análise: {formatDate(insight?.created_at)}</span>
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-wrap gap-2">
           <Button onClick={gerar} disabled={gerando}>
             {gerando ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
             {insight ? 'Atualizar análise' : 'Gerar análise de perfil'}
           </Button>
+          {insight && (
+            <Button variant="outline" onClick={exportarGdoc} disabled={exportando}>
+              {exportando ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+              Abrir no Google Docs
+            </Button>
+          )}
         </CardContent>
       </Card>
 
