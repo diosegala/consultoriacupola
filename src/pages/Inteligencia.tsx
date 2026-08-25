@@ -545,6 +545,8 @@ function PerfilSection() {
   const [gerando, setGerando] = useState(false);
   const [exportando, setExportando] = useState(false);
   const [filtroOp, setFiltroOp] = useState<Operacao | 'todas'>('todas');
+  const [periodo, setPeriodo] = useState('todos');
+  const corrigir = useCorrigirOperacao(insight, 'perfil_clientes', reload);
 
   const exportarGdoc = async () => {
     if (!insight) return;
