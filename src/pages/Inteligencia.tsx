@@ -9,10 +9,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, Building2, FileText, Key, Layers, Lightbulb, MessageSquareQuote, RefreshCw, Save, TrendingUp } from 'lucide-react';
+import { AlertTriangle, Building2, FileText, Key, Layers, Lightbulb, MessageSquareQuote, RefreshCw, Save, TrendingUp, Wand2 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Cell, Tooltip } from 'recharts';
 import { toast } from 'sonner';
+
+const PERIODOS = [
+  { value: '1', label: 'Último mês' },
+  { value: '3', label: 'Último trimestre' },
+  { value: '6', label: 'Último semestre' },
+  { value: '12', label: 'Últimos 12 meses' },
+];
+
 
 type Insight = {
   id: string;
