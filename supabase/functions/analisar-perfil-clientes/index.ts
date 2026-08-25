@@ -127,12 +127,28 @@ Retorne SOMENTE JSON válido (sem markdown fences):
 DADOS (${consolidados.length} clientes):
 ${JSON.stringify(consolidados).slice(0, 60000)}`;
 
+    const { data: correcoes } = await admin
+      .from("insight_correcoes")
+      .select("secao, tema, operacao_ia, operacao_correta, observacao")
+      .eq("tipo_insight", "perfil_clientes")
+      .order("created_at", { ascending: false })
+      .limit(40);
+
+    const promptFinal = (correcoes || []).length
+      ? `${prompt}
+
+CORREÇÕES HUMANAS ANTERIORES (obrigatório respeitar) ao classificar a operação:
+${(correcoes || []).map((c: any) => `- [${c.secao}] "${c.tema}": você disse "${c.operacao_ia ?? '?'}", o correto é "${c.operacao_correta}".${c.observacao ? ` Observação: ${c.observacao}` : ""}`).join("\n")}
+
+Lembre: temas de carteira de locação, inadimplência, garantias, vistorias, proprietários, inquilinos e administração de contratos são SEMPRE "aluguel", nunca "vendas".`
+      : prompt;
 
     const claude = await callClaude({
       system: "Você é um analista sênior de produto e consultoria. Responda apenas com JSON válido, sem markdown fences.",
-      messages: [{ role: "user", content: prompt }],
+      messages: [{ role: "user", content: promptFinal }],
       max_tokens: 8000,
     });
+
     if (!claude.ok) {
       await logAiUsage({
         admin, agente_tipo: "insights_perfil_clientes", user_id: user.id,
