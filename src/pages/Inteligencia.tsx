@@ -350,7 +350,10 @@ function DoresPainel({ conteudo, filtro, onCorrigir }: { conteudo: any; filtro: 
                       <span>{d.tema}</span>
                       <Badge variant="outline">{d.frequencia_clientes}</Badge>
                     </div>
-                    {filtro === 'todas' && <OperacaoBadge op={d.operacao} />}
+                    <div className="flex items-center justify-between gap-2">
+                      {filtro === 'todas' ? <OperacaoBadge op={d.operacao} /> : <span />}
+                      <CorrigirOperacao secao="demandas" tema={d.tema} operacao={d.operacao} onCorrigir={onCorrigir} />
+                    </div>
                   </div>
                 ))}
                 {!demandas.length && <p className="text-xs text-muted-foreground">Sem demandas nesta operação.</p>}
