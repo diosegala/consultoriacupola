@@ -611,8 +611,22 @@ function PerfilSection() {
         <CardContent className="flex flex-wrap gap-2">
           <Button onClick={gerar} disabled={gerando}>
             {gerando ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+        <CardContent className="flex flex-wrap items-end gap-2">
+          <div className="w-48">
+            <label className="text-xs text-muted-foreground">Período</label>
+            <Select value={periodo} onValueChange={setPeriodo}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todo o histórico</SelectItem>
+                {PERIODOS.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button onClick={gerar} disabled={gerando}>
+            {gerando ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
             {insight ? 'Atualizar análise' : 'Gerar análise de perfil'}
           </Button>
+
           {insight && (
             <Button variant="outline" onClick={exportarGdoc} disabled={exportando}>
               {exportando ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
