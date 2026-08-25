@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, Download, Lightbulb, RefreshCw, Save, TrendingUp } from 'lucide-react';
+import { AlertTriangle, FileText, Lightbulb, RefreshCw, Save, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 
 type Insight = {
@@ -45,6 +45,67 @@ function formatDate(iso?: string | null) {
   return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 }
 
+async function abrirComoGdoc(titulo: string, markdown: string) {
+  const { data, error } = await supabase.functions.invoke('criar-gdoc', {
+    body: { titulo, conteudo_markdown: markdown },
+  });
+  if (error) {
+    let message = error.message || 'Erro ao criar Google Doc';
+    const response = (error as any)?.context;
+    if (response && typeof response.json === 'function') {
+      try {
+        const body = await response.json();
+        if (typeof body?.message === 'string') message = body.message;
+        else if (typeof body?.error === 'string') message = body.error;
+      } catch {
+        // mantém mensagem original
+      }
+    }
+    throw new Error(message);
+  }
+  const url = (data as any)?.url as string | undefined;
+  if (!url) throw new Error('Google Doc criado sem URL retornada');
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+function doresParaMarkdown(insight: Insight) {
+  const c = insight.conteudo || {};
+  let md = `# Dores e Temas Recorrentes\n\n_Gerado em ${formatDate(insight.created_at)} — período ${insight.periodo_analisado ?? '—'}_\n\n`;
+  md += `## Dores mais recorrentes\n\n`;
+  (c.dores || []).forEach((d: any, i: number) => {
+    md += `**${i + 1}. ${d.tema}** — ${d.frequencia_clientes} clientes\n${d.exemplo ? `"${d.exemplo}"\n` : ''}\n`;
+  });
+  md += `\n## O que os clientes pedem\n\n`;
+  (c.demandas || []).forEach((d: any) => { md += `- ${d.tema} (${d.frequencia_clientes} clientes)\n`; });
+  md += `\n## Onde há mais resistência\n\n`;
+  (c.resistencias || []).forEach((r: any) => { md += `- ${r.tema} — ${r.descricao}\n`; });
+  return md;
+}
+
+function perfilParaMarkdown(insight: Insight) {
+  const c = insight.conteudo || {};
+  let md = `# Perfil Ideal e Oportunidades\n\n_Gerado em ${formatDate(insight.created_at)}_\n\n`;
+  md += `## Perfil do cliente que mais avança\n\n`;
+  (c.perfil_ideal?.caracteristicas || []).forEach((x: string) => { md += `- ${x}\n`; });
+  if (c.perfil_ideal?.justificativa) md += `\n${c.perfil_ideal.justificativa}\n`;
+  md += `\n## Sinais de alerta no perfil\n\n`;
+  (c.perfil_risco?.caracteristicas || []).forEach((x: string) => { md += `- ${x}\n`; });
+  if (c.perfil_risco?.alertas) md += `\n${c.perfil_risco.alertas}\n`;
+  md += `\n## Oportunidades de produto identificadas\n\n`;
+  (c.oportunidades_produto || []).forEach((op: any, i: number) => {
+    md += `### ${i + 1}. ${op.descricao}\n`;
+    if (op.evidencia) md += `Evidência: ${op.evidencia}\n`;
+    if (op.potencial_demanda) md += `Potencial: ${op.potencial_demanda}\n`;
+    md += `\n`;
+  });
+  return md;
+}
+
+function tituloComData(base: string) {
+  return `${base} (${new Date().toLocaleDateString('pt-BR')})`;
+}
+
+
 function DoresSection() {
   const { insight, loading, reload } = useUltimoInsight('dores_recorrentes');
   const { data: consultores } = useConsultores(true);
@@ -52,6 +113,7 @@ function DoresSection() {
   const [tipoContrato, setTipoContrato] = useState('todos');
   const [consultorId, setConsultorId] = useState<string>('todos');
   const [gerando, setGerando] = useState(false);
+  const [exportando, setExportando] = useState(false);
 
   const gerar = async () => {
     setGerando(true);
@@ -74,23 +136,17 @@ function DoresSection() {
     }
   };
 
-  const exportar = () => {
+  const exportarGdoc = async () => {
     if (!insight) return;
-    const c = insight.conteudo || {};
-    let md = `# Dores e Temas Recorrentes\n\n_Gerado em ${formatDate(insight.created_at)} — período ${insight.periodo_analisado}_\n\n`;
-    md += `## Dores mais recorrentes\n\n`;
-    (c.dores || []).forEach((d: any, i: number) => {
-      md += `**${i + 1}. ${d.tema}** — ${d.frequencia_clientes} clientes\n> ${d.exemplo}\n\n`;
-    });
-    md += `\n## O que os clientes pedem\n\n`;
-    (c.demandas || []).forEach((d: any) => { md += `- ${d.tema} _(${d.frequencia_clientes} clientes)_\n`; });
-    md += `\n## Onde há mais resistência\n\n`;
-    (c.resistencias || []).forEach((r: any) => { md += `- **${r.tema}** — ${r.descricao}\n`; });
-    const blob = new Blob([md], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `dores-recorrentes-${new Date().toISOString().slice(0,10)}.md`;
-    a.click(); URL.revokeObjectURL(url);
+    setExportando(true);
+    try {
+      await abrirComoGdoc(tituloComData('Inteligência — Dores e Temas Recorrentes'), doresParaMarkdown(insight));
+      toast.success('Documento criado no Google Docs.');
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao criar Google Doc');
+    } finally {
+      setExportando(false);
+    }
   };
 
   const c = insight?.conteudo || {};
@@ -145,7 +201,10 @@ function DoresSection() {
               {insight ? 'Atualizar' : 'Gerar análise de dores'}
             </Button>
             {insight && (
-              <Button variant="outline" onClick={exportar}><Download className="h-4 w-4" /></Button>
+              <Button variant="outline" onClick={exportarGdoc} disabled={exportando}>
+                {exportando ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+                Abrir no Google Docs
+              </Button>
             )}
           </div>
         </CardContent>
@@ -209,6 +268,20 @@ function DoresSection() {
 function PerfilSection() {
   const { insight, loading, reload } = useUltimoInsight('perfil_clientes');
   const [gerando, setGerando] = useState(false);
+  const [exportando, setExportando] = useState(false);
+
+  const exportarGdoc = async () => {
+    if (!insight) return;
+    setExportando(true);
+    try {
+      await abrirComoGdoc(tituloComData('Inteligência — Perfil Ideal e Oportunidades'), perfilParaMarkdown(insight));
+      toast.success('Documento criado no Google Docs.');
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao criar Google Doc');
+    } finally {
+      setExportando(false);
+    }
+  };
 
   const gerar = async () => {
     setGerando(true);
@@ -252,11 +325,17 @@ function PerfilSection() {
             <span className="text-xs font-normal text-muted-foreground">Última análise: {formatDate(insight?.created_at)}</span>
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-wrap gap-2">
           <Button onClick={gerar} disabled={gerando}>
             {gerando ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
             {insight ? 'Atualizar análise' : 'Gerar análise de perfil'}
           </Button>
+          {insight && (
+            <Button variant="outline" onClick={exportarGdoc} disabled={exportando}>
+              {exportando ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+              Abrir no Google Docs
+            </Button>
+          )}
         </CardContent>
       </Card>
 
