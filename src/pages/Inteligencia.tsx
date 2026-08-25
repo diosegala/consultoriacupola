@@ -113,6 +113,7 @@ function DoresSection() {
   const [tipoContrato, setTipoContrato] = useState('todos');
   const [consultorId, setConsultorId] = useState<string>('todos');
   const [gerando, setGerando] = useState(false);
+  const [exportando, setExportando] = useState(false);
 
   const gerar = async () => {
     setGerando(true);
