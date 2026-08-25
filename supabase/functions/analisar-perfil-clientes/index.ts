@@ -170,8 +170,9 @@ Lembre: temas de carteira de locação, inadimplência, garantias, vistorias, pr
       .from("insights_agregados")
       .insert({
         tipo: "perfil_clientes",
-        periodo_analisado: "all",
-        filtros: {},
+        periodo_analisado: periodo_meses ? `${periodo_meses}m` : "all",
+        filtros: { periodo_meses },
+
         conteudo,
         gerado_por: user.id,
       })
