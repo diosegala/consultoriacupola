@@ -925,6 +925,53 @@ export type Database = {
           },
         ]
       }
+      insight_correcoes: {
+        Row: {
+          created_at: string
+          id: string
+          insight_id: string | null
+          observacao: string | null
+          operacao_correta: string
+          operacao_ia: string | null
+          secao: string
+          tema: string
+          tipo_insight: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          insight_id?: string | null
+          observacao?: string | null
+          operacao_correta: string
+          operacao_ia?: string | null
+          secao: string
+          tema: string
+          tipo_insight: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          insight_id?: string | null
+          observacao?: string | null
+          operacao_correta?: string
+          operacao_ia?: string | null
+          secao?: string
+          tema?: string
+          tipo_insight?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insight_correcoes_insight_id_fkey"
+            columns: ["insight_id"]
+            isOneToOne: false
+            referencedRelation: "insights_agregados"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       insights_agregados: {
         Row: {
           conteudo: Json
