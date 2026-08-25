@@ -564,7 +564,9 @@ function PerfilSection() {
   const gerar = async () => {
     setGerando(true);
     try {
-      const { data, error } = await supabase.functions.invoke('analisar-perfil-clientes', { body: {} });
+      const { data, error } = await supabase.functions.invoke('analisar-perfil-clientes', {
+        body: { periodo_meses: periodo === 'todos' ? null : Number(periodo) },
+      });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
       toast.success(`Análise gerada com ${(data as any).clientes_analisados} clientes.`);
