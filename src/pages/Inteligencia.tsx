@@ -696,9 +696,12 @@ function PerfilSection() {
                     </div>
                     {op.evidencia && <p className="text-xs text-muted-foreground"><span className="font-medium">Evidência:</span> {op.evidencia}</p>}
                     {op.potencial_demanda && <p className="text-xs text-muted-foreground"><span className="font-medium">Potencial:</span> {op.potencial_demanda}</p>}
-                    <Button size="sm" variant="outline" onClick={() => salvarOportunidade(op)}>
-                      <Save className="h-3 w-3 mr-1" /> Salvar como oportunidade
-                    </Button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button size="sm" variant="outline" onClick={() => salvarOportunidade(op)}>
+                        <Save className="h-3 w-3 mr-1" /> Salvar como oportunidade
+                      </Button>
+                      <CorrigirOperacao secao="oportunidades" tema={op.descricao} operacao={op.operacao} onCorrigir={corrigir} />
+                    </div>
                   </CardContent>
                 </Card>
               ))}
