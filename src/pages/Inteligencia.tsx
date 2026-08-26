@@ -143,7 +143,7 @@ function useCorrigirOperacao(insight: Insight | null, tipoInsight: string, reloa
 
 
 
-function useUltimoInsight(tipo: string) {
+function useUltimoInsight(tipo: string, periodoAnalisado: string) {
   const [insight, setInsight] = useState<Insight | null>(null);
   const [loading, setLoading] = useState(true);
   const reload = async () => {
@@ -152,13 +152,14 @@ function useUltimoInsight(tipo: string) {
       .from('insights_agregados' as any)
       .select('*')
       .eq('tipo', tipo)
+      .eq('periodo_analisado', periodoAnalisado)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
     setInsight((data as any) ?? null);
     setLoading(false);
   };
-  useEffect(() => { reload(); }, [tipo]);
+  useEffect(() => { reload(); }, [tipo, periodoAnalisado]);
   return { insight, loading, reload };
 }
 
@@ -386,10 +387,10 @@ function DoresPainel({ conteudo, filtro, onCorrigir }: { conteudo: any; filtro: 
 }
 
 function DoresSection() {
-  const { insight, loading, reload } = useUltimoInsight('dores_recorrentes');
+  const [periodo, setPeriodo] = useState('6');
+  const { insight, loading, reload } = useUltimoInsight('dores_recorrentes', `${periodo}m`);
   const corrigir = useCorrigirOperacao(insight, 'dores_recorrentes', reload);
   const { data: consultores } = useConsultores(true);
-  const [periodo, setPeriodo] = useState('6');
   const [tipoContrato, setTipoContrato] = useState('todos');
   const [consultorId, setConsultorId] = useState<string>('todos');
   const [gerando, setGerando] = useState(false);
@@ -541,11 +542,12 @@ function DoresSection() {
 }
 
 function PerfilSection() {
-  const { insight, loading, reload } = useUltimoInsight('perfil_clientes');
+  const [periodo, setPeriodo] = useState('todos');
+  const periodoAnalisado = periodo === 'todos' ? 'all' : `${periodo}m`;
+  const { insight, loading, reload } = useUltimoInsight('perfil_clientes', periodoAnalisado);
   const [gerando, setGerando] = useState(false);
   const [exportando, setExportando] = useState(false);
   const [filtroOp, setFiltroOp] = useState<Operacao | 'todas'>('todas');
-  const [periodo, setPeriodo] = useState('todos');
   const corrigir = useCorrigirOperacao(insight, 'perfil_clientes', reload);
 
   const exportarGdoc = async () => {
