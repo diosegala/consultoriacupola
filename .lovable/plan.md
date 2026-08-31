@@ -9,6 +9,8 @@ Ferramenta de mensagens entre os usuários da plataforma, com conversas 1:1 e gr
 - Botão "Nova conversa": escolher um usuário (1:1) ou vários (grupo, com nome).
 - Coluna direita: thread da conversa, mensagens agrupadas por dia, bolhas diferenciadas para mensagens próprias, envio com Enter, indicador "digitando...", ponto verde de presença online.
 - Anexos: botão de clipe para imagem/documento; imagens renderizadas inline, demais arquivos como card com nome e link de download.
+- Responder mensagem específica: cada bolha tem ação "Responder", o composer mostra a citação (autor + trecho) acima do campo, e a mensagem enviada exibe a citação clicável que rola até a mensagem original destacando-a.
+
 
 **Widget flutuante**
 - Balão fixo no canto (ao lado do Oráculo) com badge do total de não lidas.
