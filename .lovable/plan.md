@@ -9,6 +9,8 @@ Ferramenta de mensagens entre os usuários da plataforma, com conversas 1:1 e gr
 - Botão "Nova conversa": escolher um usuário (1:1) ou vários (grupo, com nome).
 - Coluna direita: thread da conversa, mensagens agrupadas por dia, bolhas diferenciadas para mensagens próprias, envio com Enter, indicador "digitando...", ponto verde de presença online.
 - Anexos: botão de clipe para imagem/documento; imagens renderizadas inline, demais arquivos como card com nome e link de download.
+- Responder mensagem específica: cada bolha tem ação "Responder", o composer mostra a citação (autor + trecho) acima do campo, e a mensagem enviada exibe a citação clicável que rola até a mensagem original destacando-a.
+
 
 **Widget flutuante**
 - Balão fixo no canto (ao lado do Oráculo) com badge do total de não lidas.
@@ -27,7 +29,7 @@ Ferramenta de mensagens entre os usuários da plataforma, com conversas 1:1 e gr
 Migration (com GRANTs para `authenticated` e `service_role`, RLS habilitado):
 - `chat_conversas`: `tipo` ('direta'|'grupo'), `nome`, `criado_por`, `ultima_mensagem_em`.
 - `chat_participantes`: `conversa_id`, `user_id`, `ultima_leitura_em`, `arquivada`.
-- `chat_mensagens`: `conversa_id`, `user_id`, `conteudo`, `anexo_url`, `anexo_nome`, `anexo_tipo`, `anexo_tamanho`, `editada_em`, `deletada_em`.
+- `chat_mensagens`: `conversa_id`, `user_id`, `conteudo`, `anexo_url`, `anexo_nome`, `anexo_tipo`, `anexo_tamanho`, `reply_to_id` (auto-referência com `ON DELETE SET NULL`), `editada_em`, `deletada_em`.
 - Função SECURITY DEFINER `is_chat_participante(_conversa_id, _user_id)` para evitar recursão de RLS entre participantes e mensagens.
 - Políticas: SELECT/INSERT em mensagens somente para participantes; UPDATE/DELETE (soft delete) só do próprio autor; participantes atualizam apenas a própria linha.
 - Trigger em `chat_mensagens` para atualizar `ultima_mensagem_em` da conversa e inserir notificação para os demais participantes.
@@ -39,11 +41,14 @@ Storage: bucket privado `chat-anexos`, caminho `conversa_id/arquivo`, com polít
 Frontend:
 - `src/hooks/useChat.ts`: lista de conversas, mensagens paginadas (50 por página, scroll infinito para cima), envio, upload de anexo, marcar como lido, contagem de não lidas.
 - Realtime em `useEffect` com `supabase.removeChannel` no cleanup: canal `postgres_changes` por conversa para mensagens novas, canal global para a lista, e canal de `presence` + `broadcast` para online/digitando.
-- Componentes em `src/components/chat/`: `ChatLayout`, `ConversaList`, `ConversaThread`, `MessageBubble`, `MessageComposer`, `NovaConversaDialog`, `ChatFloatingWidget`.
+- Componentes em `src/components/chat/`: `ChatLayout`, `ConversaList`, `ConversaThread`, `MessageBubble`, `ReplyPreview`, `MessageComposer`, `NovaConversaDialog`, `ChatFloatingWidget`.
+- Respostas: a mensagem citada é carregada junto (self-join no fetch) e guardada em cache local; se a original não estiver na página carregada, o clique busca e carrega o trecho anterior antes de rolar até ela. Validação garante que `reply_to_id` pertence à mesma conversa.
+
 - Nova rota `/mensagens` em `App.tsx` (dentro do layout autenticado), item na `Sidebar.tsx`, widget montado no `AppLayout.tsx`.
 - Lista de usuários disponíveis a partir de `consultores` ativos com vínculo em `consultor_user`.
 - Composer mantém o foco após enviar e ao trocar de conversa; envio otimista com estado "enviando".
 - Estilo seguindo o design system atual (tokens semânticos, tema escuro, verde Cupola).
 
 ## Fora do escopo desta etapa
-Reações, respostas encadeadas, busca dentro do histórico, mensagens de voz e chamadas.
+Reações, threads em painel separado, busca dentro do histórico, mensagens de voz e chamadas.
+
