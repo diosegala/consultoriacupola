@@ -16,10 +16,12 @@ import {
   Sparkles,
   Bot,
   Brain,
-  Search
+  Search,
+  MessageSquare
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { useChatBadge } from '@/components/chat/useChatBadge';
 import cupolaLogoBranca from '@/assets/cupola-logo-branca.png';
 import cupolaIcon from '@/assets/cupola-icon.png';
 import { Button } from '@/components/ui/button';
@@ -32,6 +34,7 @@ const adminMenuItems = [
   { to: '/contratos', icon: FileText, label: 'Contratos' },
   { to: '/consultores', icon: UserCog, label: 'Consultores' },
   { to: '/projetos', icon: Kanban, label: 'Projetos' },
+  { to: '/mensagens', icon: MessageSquare, label: 'Mensagens' },
   { to: '/reunioes', icon: Video, label: 'Reuniões' },
   { to: '/agenda', icon: CalendarDays, label: 'Agenda' },
   { to: '/oraculo', icon: Sparkles, label: 'Oráculo' },
@@ -47,6 +50,7 @@ const consultorMenuItems = [
   { to: '/meu-painel', icon: LayoutDashboard, label: 'Meu Painel' },
   { to: '/clientes', icon: Users, label: 'Meus Clientes' },
   { to: '/projetos', icon: Kanban, label: 'Projetos' },
+  { to: '/mensagens', icon: MessageSquare, label: 'Mensagens' },
   { to: '/agenda', icon: CalendarDays, label: 'Agenda' },
   { to: '/reunioes', icon: Video, label: 'Reuniões' },
   { to: '/oraculo', icon: Sparkles, label: 'Oráculo' },
@@ -60,6 +64,7 @@ export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const { signOut, user, isConsultor } = useAuth();
   const location = useLocation();
+  const { total: chatNaoLidas } = useChatBadge();
 
   const menuItems = isConsultor ? consultorMenuItems : adminMenuItems;
 
@@ -107,6 +112,14 @@ export function Sidebar() {
             >
               <item.icon className="h-5 w-5 flex-shrink-0" />
               {!collapsed && <span>{item.label}</span>}
+              {item.to === '/mensagens' && chatNaoLidas > 0 && (
+                <span className={cn(
+                  "ml-auto bg-primary text-primary-foreground text-[10px] font-semibold rounded-full px-1.5 py-0.5 min-w-5 text-center",
+                  collapsed && "absolute top-0 right-1 ml-0"
+                )}>
+                  {chatNaoLidas > 99 ? '99+' : chatNaoLidas}
+                </span>
+              )}
             </NavLink>
           );
         })}

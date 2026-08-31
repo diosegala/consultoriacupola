@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Sidebar } from './Sidebar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { OraculoFloatingChat } from '@/components/oraculo/OraculoFloatingChat';
+import { ChatFloatingWidget } from '@/components/chat/ChatFloatingWidget';
 import { ErrorBoundary } from './ErrorBoundary';
 import { NotificationBell } from './NotificationBell';
 
@@ -61,6 +62,7 @@ export function AppLayout() {
         </div>
       </main>
       <OraculoFloatingChat />
+      <ChatFloatingWidget />
     </div>
   );
 }

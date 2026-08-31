@@ -2686,6 +2686,13 @@ export type Database = {
         }[]
       }
       chat_direta_key: { Args: { _conversa_id: string }; Returns: string }
+      chat_diretorio_usuarios: {
+        Args: never
+        Returns: {
+          nome: string
+          user_id: string
+        }[]
+      }
       criar_cards_renovacao: { Args: never; Returns: number }
       gerar_notificacoes_contratos_vencendo: { Args: never; Returns: number }
       get_consultor_id_for_user: { Args: { _user_id: string }; Returns: string }
