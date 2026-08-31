@@ -120,7 +120,7 @@ export function useChatConversas() {
   useEffect(() => {
     if (!user) return;
     const channel = supabase
-      .channel('chat-lista')
+      .channel(`chat-lista-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_mensagens' }, () => carregar())
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_participantes' }, () => carregar())
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chat_conversas' }, () => carregar())
@@ -195,7 +195,7 @@ export function useChatMensagens(conversaId: string | null) {
   useEffect(() => {
     if (!conversaId || !user) return;
     const channel = supabase
-      .channel(`chat-msgs-${conversaId}`)
+      .channel(`chat-msgs-${conversaId}-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'chat_mensagens', filter: `conversa_id=eq.${conversaId}` },
@@ -309,47 +309,82 @@ export function useChatMensagens(conversaId: string | null) {
   return { mensagens, loading, hasMore, carregarMais, enviar, marcarLida, deletar };
 }
 
+// Presença usa tópico fixo compartilhado entre todos os usuários/instâncias.
+// Singleton em nível de módulo evita "cannot add callbacks after subscribe()"
+// quando múltiplos componentes (página + widget) montam simultaneamente.
+type PresencaShared = {
+  channel: ReturnType<typeof supabase.channel>;
+  userId: string;
+  syncListeners: Set<(onlineIds: Set<string>) => void>;
+  digitandoListeners: Set<(payload: { user_id: string; conversa_id: string }) => void>;
+};
+let presencaShared: PresencaShared | null = null;
+
+function getPresencaShared(userId: string): PresencaShared {
+  if (presencaShared && presencaShared.userId !== userId) {
+    supabase.removeChannel(presencaShared.channel);
+    presencaShared = null;
+  }
+  if (!presencaShared) {
+    const shared: PresencaShared = {
+      channel: null as unknown as ReturnType<typeof supabase.channel>,
+      userId,
+      syncListeners: new Set(),
+      digitandoListeners: new Set(),
+    };
+    const channel = supabase.channel('chat-presenca', { config: { presence: { key: userId } } });
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        const ids = new Set(Object.keys(channel.presenceState()));
+        shared.syncListeners.forEach((f) => f(ids));
+      })
+      .on('broadcast', { event: 'digitando' }, (payload) => {
+        shared.digitandoListeners.forEach((f) => f(payload.payload as { user_id: string; conversa_id: string }));
+      })
+      .subscribe();
+    shared.channel = channel;
+    presencaShared = shared;
+  }
+  return presencaShared;
+}
+
 export function useChatPresenca(conversaId: string | null, nomesPorId: Map<string, string>) {
   const { user } = useAuth();
   const [online, setOnline] = useState<Set<string>>(new Set());
   const [digitando, setDigitando] = useState<string[]>([]);
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const digitandoTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => {
     if (!user) return;
-    const channel = supabase.channel('chat-presenca', { config: { presence: { key: user.id } } });
-    channel
-      .on('presence', { event: 'sync' }, () => {
-        const state = channel.presenceState();
-        setOnline(new Set(Object.keys(state)));
-      })
-      .on('broadcast', { event: 'digitando' }, (payload) => {
-        const { user_id, conversa_id } = payload.payload as { user_id: string; conversa_id: string };
-        if (user_id === user.id || conversa_id !== conversaId) return;
-        const nome = nomesPorId.get(user_id) ?? 'Alguém';
-        setDigitando((cur) => (cur.includes(nome) ? cur : [...cur, nome]));
-        const t = digitandoTimers.current.get(user_id);
-        if (t) clearTimeout(t);
-        digitandoTimers.current.set(
-          user_id,
-          setTimeout(() => {
-            setDigitando((cur) => cur.filter((n) => n !== nome));
-            digitandoTimers.current.delete(user_id);
-          }, 3000)
-        );
-      })
-      .subscribe();
-    channelRef.current = channel;
+    const shared = getPresencaShared(user.id);
+
+    const onSync = (ids: Set<string>) => setOnline(new Set(ids));
+    const onDigitando = ({ user_id, conversa_id }: { user_id: string; conversa_id: string }) => {
+      if (user_id === user.id || conversa_id !== conversaId) return;
+      const nome = nomesPorId.get(user_id) ?? 'Alguém';
+      setDigitando((cur) => (cur.includes(nome) ? cur : [...cur, nome]));
+      const t = digitandoTimers.current.get(user_id);
+      if (t) clearTimeout(t);
+      digitandoTimers.current.set(
+        user_id,
+        setTimeout(() => {
+          setDigitando((cur) => cur.filter((n) => n !== nome));
+          digitandoTimers.current.delete(user_id);
+        }, 3000)
+      );
+    };
+
+    shared.syncListeners.add(onSync);
+    shared.digitandoListeners.add(onDigitando);
     return () => {
-      supabase.removeChannel(channel);
-      channelRef.current = null;
+      shared.syncListeners.delete(onSync);
+      shared.digitandoListeners.delete(onDigitando);
     };
   }, [user, conversaId, nomesPorId]);
 
   const emitirDigitando = useCallback(() => {
     if (!conversaId || !user) return;
-    channelRef.current?.send({
+    presencaShared?.channel.send({
       type: 'broadcast',
       event: 'digitando',
       payload: { user_id: user.id, conversa_id: conversaId },

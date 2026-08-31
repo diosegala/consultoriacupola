@@ -41,7 +41,7 @@ export function useChatBadge() {
     if (!user) return;
     carregar();
     const channel = supabase
-      .channel('chat-badge')
+      .channel(`chat-badge-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_mensagens' }, carregar)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_participantes' }, carregar)
       .subscribe();
