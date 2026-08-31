@@ -50,4 +50,5 @@ Frontend:
 - Estilo seguindo o design system atual (tokens semânticos, tema escuro, verde Cupola).
 
 ## Fora do escopo desta etapa
-Reações, respostas encadeadas, busca dentro do histórico, mensagens de voz e chamadas.
+Reações, threads em painel separado, busca dentro do histórico, mensagens de voz e chamadas.
+
