@@ -37,6 +37,7 @@ import { DiscProfileCard } from '@/components/disc/DiscProfileCard';
 import { PoliticaRiscoChurnCard } from '@/components/configuracoes/PoliticaRiscoChurnCard';
 import { DiretrizesAgentesCard } from '@/components/configuracoes/DiretrizesAgentesCard';
 import { useMyConsultorId } from '@/hooks/useDisc';
+import { AcessosLogCard } from '@/components/configuracoes/AcessosLogCard';
 
 export default function Configuracoes() {
   const { toast } = useToast();
