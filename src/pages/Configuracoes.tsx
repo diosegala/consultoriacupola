@@ -572,6 +572,9 @@ export default function Configuracoes() {
                 )}
               </CardContent>
             </Card>
+            )}
+
+            <AcessosLogCard />
           </TabsContent>
         )}
 
