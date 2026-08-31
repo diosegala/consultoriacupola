@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      acessos_log: {
+        Row: {
+          created_at: string
+          email: string | null
+          evento: string
+          id: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          evento?: string
+          id?: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          evento?: string
+          id?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       agente_diretrizes: {
         Row: {
           aprovado_em: string | null
