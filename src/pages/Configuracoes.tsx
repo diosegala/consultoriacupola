@@ -37,6 +37,7 @@ import { DiscProfileCard } from '@/components/disc/DiscProfileCard';
 import { PoliticaRiscoChurnCard } from '@/components/configuracoes/PoliticaRiscoChurnCard';
 import { DiretrizesAgentesCard } from '@/components/configuracoes/DiretrizesAgentesCard';
 import { useMyConsultorId } from '@/hooks/useDisc';
+import { AcessosLogCard } from '@/components/configuracoes/AcessosLogCard';
 
 export default function Configuracoes() {
   const { toast } = useToast();
@@ -411,7 +412,7 @@ export default function Configuracoes() {
       <Tabs defaultValue="conta" className="w-full">
         <TabsList className="bg-secondary">
           <TabsTrigger value="conta">Minha Conta</TabsTrigger>
-          {isAdmin && <TabsTrigger value="usuarios">Usuários</TabsTrigger>}
+          {(isAdmin || isDirector) && <TabsTrigger value="usuarios">Usuários</TabsTrigger>}
           {isAdmin && <TabsTrigger value="agentes">Agentes IA</TabsTrigger>}
           <TabsTrigger value="tipos">Tipos de Consultoria</TabsTrigger>
           <TabsTrigger value="crms">CRMs</TabsTrigger>
@@ -458,9 +459,10 @@ export default function Configuracoes() {
           </div>
         </TabsContent>
 
-        {/* Usuários (admin only) */}
-        {isAdmin && (
-          <TabsContent value="usuarios" className="mt-6">
+        {/* Usuários (admin e diretor) */}
+        {(isAdmin || isDirector) && (
+          <TabsContent value="usuarios" className="mt-6 space-y-6">
+            {isAdmin && (
             <Card className="bg-card border-border">
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="flex items-center gap-2 text-foreground">
@@ -570,6 +572,9 @@ export default function Configuracoes() {
                 )}
               </CardContent>
             </Card>
+            )}
+
+            <AcessosLogCard />
           </TabsContent>
         )}
 

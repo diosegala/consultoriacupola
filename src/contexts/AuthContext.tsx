@@ -98,16 +98,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  const registrarAcesso = async (evento: 'login' | 'logout') => {
+    try {
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) return;
+      await supabase.from('acessos_log').insert({
+        user_id: data.user.id,
+        email: data.user.email,
+        evento,
+        user_agent: navigator.userAgent,
+      });
+    } catch {
+      // logging de acesso nunca deve bloquear o fluxo
+    }
+  };
+
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (!error) await registrarAcesso('login');
     return { error };
   };
 
   const signOut = async () => {
+    await registrarAcesso('logout');
     setUserRole(null);
     setForcePasswordChange(false);
     await supabase.auth.signOut();
   };
+
 
   const isAdmin = userRole === 'admin';
   const isConsultor = userRole === 'consultor';
