@@ -29,7 +29,7 @@ Ferramenta de mensagens entre os usuários da plataforma, com conversas 1:1 e gr
 Migration (com GRANTs para `authenticated` e `service_role`, RLS habilitado):
 - `chat_conversas`: `tipo` ('direta'|'grupo'), `nome`, `criado_por`, `ultima_mensagem_em`.
 - `chat_participantes`: `conversa_id`, `user_id`, `ultima_leitura_em`, `arquivada`.
-- `chat_mensagens`: `conversa_id`, `user_id`, `conteudo`, `anexo_url`, `anexo_nome`, `anexo_tipo`, `anexo_tamanho`, `editada_em`, `deletada_em`.
+- `chat_mensagens`: `conversa_id`, `user_id`, `conteudo`, `anexo_url`, `anexo_nome`, `anexo_tipo`, `anexo_tamanho`, `reply_to_id` (auto-referência com `ON DELETE SET NULL`), `editada_em`, `deletada_em`.
 - Função SECURITY DEFINER `is_chat_participante(_conversa_id, _user_id)` para evitar recursão de RLS entre participantes e mensagens.
 - Políticas: SELECT/INSERT em mensagens somente para participantes; UPDATE/DELETE (soft delete) só do próprio autor; participantes atualizam apenas a própria linha.
 - Trigger em `chat_mensagens` para atualizar `ultima_mensagem_em` da conversa e inserir notificação para os demais participantes.
