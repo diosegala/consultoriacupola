@@ -33,6 +33,7 @@ import MeuPainel from "./pages/MeuPainel";
 import Agentes from "./pages/Agentes";
 import Inteligencia from "./pages/Inteligencia";
 import PesquisaReunioes from "./pages/PesquisaReunioes";
+import Mensagens from "./pages/Mensagens";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 
 const queryClient = new QueryClient({
@@ -81,6 +82,7 @@ const App = () => (
               <Route path="/meu-painel" element={<MeuPainel />} />
               <Route path="/agentes" element={<Agentes />} />
               <Route path="/inteligencia" element={<Inteligencia />} />
+              <Route path="/mensagens" element={<Mensagens />} />
               <Route path="/integracoes" element={<MinhasIntegracoes />} />
             </Route>
             <Route path="*" element={<NotFound />} />

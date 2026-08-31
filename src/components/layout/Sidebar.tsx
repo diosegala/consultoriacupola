@@ -16,10 +16,12 @@ import {
   Sparkles,
   Bot,
   Brain,
-  Search
+  Search,
+  MessageSquare
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { useChatBadge } from '@/hooks/useChatBadge';
 import cupolaLogoBranca from '@/assets/cupola-logo-branca.png';
 import cupolaIcon from '@/assets/cupola-icon.png';
 import { Button } from '@/components/ui/button';
