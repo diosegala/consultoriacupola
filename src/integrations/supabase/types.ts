@@ -358,6 +358,131 @@ export type Database = {
           },
         ]
       }
+      chat_conversas: {
+        Row: {
+          created_at: string
+          criado_por: string
+          id: string
+          nome: string | null
+          tipo: string
+          ultima_mensagem_em: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          criado_por: string
+          id?: string
+          nome?: string | null
+          tipo?: string
+          ultima_mensagem_em?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          criado_por?: string
+          id?: string
+          nome?: string | null
+          tipo?: string
+          ultima_mensagem_em?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      chat_mensagens: {
+        Row: {
+          anexo_nome: string | null
+          anexo_tamanho: number | null
+          anexo_tipo: string | null
+          anexo_url: string | null
+          conteudo: string
+          conversa_id: string
+          created_at: string
+          deletada_em: string | null
+          editada_em: string | null
+          id: string
+          reply_to_id: string | null
+          user_id: string
+        }
+        Insert: {
+          anexo_nome?: string | null
+          anexo_tamanho?: number | null
+          anexo_tipo?: string | null
+          anexo_url?: string | null
+          conteudo?: string
+          conversa_id: string
+          created_at?: string
+          deletada_em?: string | null
+          editada_em?: string | null
+          id?: string
+          reply_to_id?: string | null
+          user_id: string
+        }
+        Update: {
+          anexo_nome?: string | null
+          anexo_tamanho?: number | null
+          anexo_tipo?: string | null
+          anexo_url?: string | null
+          conteudo?: string
+          conversa_id?: string
+          created_at?: string
+          deletada_em?: string | null
+          editada_em?: string | null
+          id?: string
+          reply_to_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_mensagens_conversa_id_fkey"
+            columns: ["conversa_id"]
+            isOneToOne: false
+            referencedRelation: "chat_conversas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_mensagens_reply_to_id_fkey"
+            columns: ["reply_to_id"]
+            isOneToOne: false
+            referencedRelation: "chat_mensagens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_participantes: {
+        Row: {
+          arquivada: boolean
+          conversa_id: string
+          created_at: string
+          id: string
+          ultima_leitura_em: string
+          user_id: string
+        }
+        Insert: {
+          arquivada?: boolean
+          conversa_id: string
+          created_at?: string
+          id?: string
+          ultima_leitura_em?: string
+          user_id: string
+        }
+        Update: {
+          arquivada?: boolean
+          conversa_id?: string
+          created_at?: string
+          id?: string
+          ultima_leitura_em?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_participantes_conversa_id_fkey"
+            columns: ["conversa_id"]
+            isOneToOne: false
+            referencedRelation: "chat_conversas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       checklist_templates: {
         Row: {
           created_at: string
@@ -2560,6 +2685,7 @@ export type Database = {
           similarity: number
         }[]
       }
+      chat_direta_key: { Args: { _conversa_id: string }; Returns: string }
       criar_cards_renovacao: { Args: never; Returns: number }
       gerar_notificacoes_contratos_vencendo: { Args: never; Returns: number }
       get_consultor_id_for_user: { Args: { _user_id: string }; Returns: string }
@@ -2576,6 +2702,10 @@ export type Database = {
       }
       is_admin_or_director: { Args: { _uid: string }; Returns: boolean }
       is_authorized_user: { Args: { _user_id: string }; Returns: boolean }
+      is_chat_participante: {
+        Args: { _conversa_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "director" | "consultor"
