@@ -120,7 +120,7 @@ export function useChatConversas() {
   useEffect(() => {
     if (!user) return;
     const channel = supabase
-      .channel('chat-lista')
+      .channel(`chat-lista-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_mensagens' }, () => carregar())
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_participantes' }, () => carregar())
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chat_conversas' }, () => carregar())
@@ -195,7 +195,7 @@ export function useChatMensagens(conversaId: string | null) {
   useEffect(() => {
     if (!conversaId || !user) return;
     const channel = supabase
-      .channel(`chat-msgs-${conversaId}`)
+      .channel(`chat-msgs-${conversaId}-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'chat_mensagens', filter: `conversa_id=eq.${conversaId}` },
@@ -318,7 +318,7 @@ export function useChatPresenca(conversaId: string | null, nomesPorId: Map<strin
 
   useEffect(() => {
     if (!user) return;
-    const channel = supabase.channel('chat-presenca', { config: { presence: { key: user.id } } });
+    const channel = supabase.channel(`chat-presenca-${Math.random().toString(36).slice(2)}`, { config: { presence: { key: user.id } } });
     channel
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState();
