@@ -41,7 +41,9 @@ Storage: bucket privado `chat-anexos`, caminho `conversa_id/arquivo`, com polít
 Frontend:
 - `src/hooks/useChat.ts`: lista de conversas, mensagens paginadas (50 por página, scroll infinito para cima), envio, upload de anexo, marcar como lido, contagem de não lidas.
 - Realtime em `useEffect` com `supabase.removeChannel` no cleanup: canal `postgres_changes` por conversa para mensagens novas, canal global para a lista, e canal de `presence` + `broadcast` para online/digitando.
-- Componentes em `src/components/chat/`: `ChatLayout`, `ConversaList`, `ConversaThread`, `MessageBubble`, `MessageComposer`, `NovaConversaDialog`, `ChatFloatingWidget`.
+- Componentes em `src/components/chat/`: `ChatLayout`, `ConversaList`, `ConversaThread`, `MessageBubble`, `ReplyPreview`, `MessageComposer`, `NovaConversaDialog`, `ChatFloatingWidget`.
+- Respostas: a mensagem citada é carregada junto (self-join no fetch) e guardada em cache local; se a original não estiver na página carregada, o clique busca e carrega o trecho anterior antes de rolar até ela. Validação garante que `reply_to_id` pertence à mesma conversa.
+
 - Nova rota `/mensagens` em `App.tsx` (dentro do layout autenticado), item na `Sidebar.tsx`, widget montado no `AppLayout.tsx`.
 - Lista de usuários disponíveis a partir de `consultores` ativos com vínculo em `consultor_user`.
 - Composer mantém o foco após enviar e ao trocar de conversa; envio otimista com estado "enviando".
