@@ -459,9 +459,10 @@ export default function Configuracoes() {
           </div>
         </TabsContent>
 
-        {/* Usuários (admin only) */}
-        {isAdmin && (
-          <TabsContent value="usuarios" className="mt-6">
+        {/* Usuários (admin e diretor) */}
+        {(isAdmin || isDirector) && (
+          <TabsContent value="usuarios" className="mt-6 space-y-6">
+            {isAdmin && (
             <Card className="bg-card border-border">
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="flex items-center gap-2 text-foreground">
