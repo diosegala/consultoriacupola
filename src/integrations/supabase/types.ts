@@ -807,6 +807,7 @@ export type Database = {
       consultores: {
         Row: {
           ativo: boolean
+          avatar_url: string | null
           created_at: string
           email: string | null
           id: string
@@ -815,6 +816,7 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
+          avatar_url?: string | null
           created_at?: string
           email?: string | null
           id?: string
@@ -823,6 +825,7 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          avatar_url?: string | null
           created_at?: string
           email?: string | null
           id?: string
@@ -2716,6 +2719,7 @@ export type Database = {
       chat_diretorio_usuarios: {
         Args: never
         Returns: {
+          avatar_url: string
           nome: string
           user_id: string
         }[]
