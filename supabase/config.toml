@@ -1,4 +1,1 @@
 project_id = "gujsesjqersadunthqwm"
-
-[functions.emergency-reset-password]
-verify_jwt = false
