@@ -115,13 +115,14 @@ export function useChatConversas() {
     setLoading(false);
   }, [user]);
 
-  // carrega diretório primeiro para resolver nomes
+  // carrega diretório primeiro para resolver nomes e avatares
   useEffect(() => {
     supabase.rpc('chat_diretorio_usuarios').then(({ data }) => {
-      for (const u of (data as UsuarioDiretorio[]) ?? []) diretorio.current.set(u.user_id, u.nome);
+      for (const u of (data as UsuarioDiretorio[]) ?? []) diretorio.current.set(u.user_id, u);
       carregar();
     });
   }, [carregar]);
+
 
   // Realtime: mensagens novas atualizam lista
   useEffect(() => {
