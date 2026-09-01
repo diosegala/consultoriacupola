@@ -24,7 +24,7 @@ export interface ChatConversa {
   nome: string | null;
   criado_por: string;
   ultima_mensagem_em: string;
-  participantes: { user_id: string; nome: string }[];
+  participantes: { user_id: string; nome: string; avatar_url: string | null }[];
   minha_leitura_em: string;
   ultima_mensagem: ChatMensagem | null;
   nao_lidas: number;
@@ -33,6 +33,7 @@ export interface ChatConversa {
 export interface UsuarioDiretorio {
   user_id: string;
   nome: string;
+  avatar_url: string | null;
 }
 
 export function useChatDiretorio() {
@@ -44,6 +45,7 @@ export function useChatDiretorio() {
   }, []);
   return usuarios;
 }
+
 
 export function useChatConversas() {
   const { user } = useAuth();
