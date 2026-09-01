@@ -51,7 +51,7 @@ export function useChatConversas() {
   const { user } = useAuth();
   const [conversas, setConversas] = useState<ChatConversa[]>([]);
   const [loading, setLoading] = useState(true);
-  const diretorio = useRef<Map<string, string>>(new Map());
+  const diretorio = useRef<Map<string, UsuarioDiretorio>>(new Map());
   const [, forceRender] = useState(0);
 
   const carregar = useCallback(async () => {
