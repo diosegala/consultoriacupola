@@ -26,6 +26,7 @@ export default function Mensagens() {
           onSelecionar={selecionar}
           onNova={() => setNovaOpen(true)}
           loading={loading}
+          onAvatarAtualizado={recarregar}
         />
       </div>
       <div className={`flex-1 ${ativaId ? '' : 'hidden md:flex'} flex-col`}>
