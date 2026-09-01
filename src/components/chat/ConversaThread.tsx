@@ -5,6 +5,7 @@ import { ChatConversa, ChatMensagem, nomeConversa, useChatMensagens, useChatPres
 import { MessageBubble, labelDia } from './MessageBubble';
 import { MessageComposer } from './MessageComposer';
 import { Button } from '@/components/ui/button';
+import { UserAvatar } from './UserAvatar';
 
 interface Props {
   conversa: ChatConversa;
@@ -85,7 +86,13 @@ export function ConversaThread({ conversa, onRefreshLista }: Props) {
   return (
     <div className="flex flex-col h-full">
       <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-        <div>
+        <div className="flex items-center gap-3">
+          <UserAvatar
+            nome={nome}
+            avatarPath={outroDireto?.avatar_url}
+            online={conversa.tipo === 'direta' ? outroOnline : undefined}
+          />
+          <div>
           <h3 className="font-semibold text-foreground">{nome}</h3>
           {conversa.tipo === 'direta' ? (
             <span className="text-xs text-muted-foreground flex items-center gap-1.5">
@@ -97,6 +104,7 @@ export function ConversaThread({ conversa, onRefreshLista }: Props) {
               {conversa.participantes.length} participantes · {conversa.participantes.map((p) => p.nome.split(' ')[0]).join(', ')}
             </span>
           )}
+          </div>
         </div>
       </div>
 
