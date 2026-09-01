@@ -349,7 +349,13 @@ function getPresencaShared(userId: string): PresencaShared {
       .on('broadcast', { event: 'digitando' }, (payload) => {
         shared.digitandoListeners.forEach((f) => f(payload.payload as { user_id: string; conversa_id: string }));
       })
-      .subscribe();
+      .subscribe(async (status) => {
+        // sem track() o usuário nunca aparece como online para os demais
+        if (status === 'SUBSCRIBED') {
+          await channel.track({ user_id: userId, online_em: new Date().toISOString() });
+        }
+      });
+
     shared.channel = channel;
     presencaShared = shared;
   }
