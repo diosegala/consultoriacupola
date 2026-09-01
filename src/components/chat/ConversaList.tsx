@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
 import { format, isToday, isYesterday } from 'date-fns';
-import { Plus, UserRound } from 'lucide-react';
+import { Plus, UserRound, UsersRound } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { ChatConversa, nomeConversa, useChatPresenca } from '@/hooks/useChat';
+import { ChatConversa, criarConversaDireta, nomeConversa, useChatDiretorio, useChatPresenca } from '@/hooks/useChat';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserAvatar } from './UserAvatar';
 import { AvatarUploadDialog } from './AvatarUploadDialog';
