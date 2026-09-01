@@ -100,7 +100,12 @@ export function useChatConversas() {
       ultima_mensagem_em: c.ultima_mensagem_em,
       participantes: (parts ?? [])
         .filter((p) => p.conversa_id === c.id)
-        .map((p) => ({ user_id: p.user_id, nome: nomes.get(p.user_id) ?? 'Usuário' })),
+        .map((p) => ({
+          user_id: p.user_id,
+          nome: nomes.get(p.user_id)?.nome ?? 'Usuário',
+          avatar_url: nomes.get(p.user_id)?.avatar_url ?? null,
+        })),
+
       minha_leitura_em: leituraMap.get(c.id) ?? '1970-01-01',
       ultima_mensagem: ultimaPorConversa.get(c.id) ?? null,
       nao_lidas: naoLidasPorConversa.get(c.id) ?? 0,
