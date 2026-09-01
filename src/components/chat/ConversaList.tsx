@@ -172,6 +172,8 @@ export function ConversaList({ conversas, ativa, onSelecionar, onNova, loading, 
             </button>
           );
         })}
+          </>
+        )}
       </div>
       <AvatarUploadDialog open={perfilOpen} onOpenChange={setPerfilOpen} onAtualizado={onAvatarAtualizado} />
     </div>
