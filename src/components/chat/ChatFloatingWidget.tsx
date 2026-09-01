@@ -90,6 +90,7 @@ export function ChatFloatingWidget() {
                 onSelecionar={setAtivaId}
                 onNova={() => setNovaOpen(true)}
                 loading={loading}
+                onAvatarAtualizado={recarregar}
               />
             )}
           </div>

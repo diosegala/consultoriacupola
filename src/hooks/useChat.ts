@@ -24,7 +24,7 @@ export interface ChatConversa {
   nome: string | null;
   criado_por: string;
   ultima_mensagem_em: string;
-  participantes: { user_id: string; nome: string }[];
+  participantes: { user_id: string; nome: string; avatar_url: string | null }[];
   minha_leitura_em: string;
   ultima_mensagem: ChatMensagem | null;
   nao_lidas: number;
@@ -33,6 +33,7 @@ export interface ChatConversa {
 export interface UsuarioDiretorio {
   user_id: string;
   nome: string;
+  avatar_url: string | null;
 }
 
 export function useChatDiretorio() {
@@ -45,11 +46,12 @@ export function useChatDiretorio() {
   return usuarios;
 }
 
+
 export function useChatConversas() {
   const { user } = useAuth();
   const [conversas, setConversas] = useState<ChatConversa[]>([]);
   const [loading, setLoading] = useState(true);
-  const diretorio = useRef<Map<string, string>>(new Map());
+  const diretorio = useRef<Map<string, UsuarioDiretorio>>(new Map());
   const [, forceRender] = useState(0);
 
   const carregar = useCallback(async () => {
@@ -98,7 +100,12 @@ export function useChatConversas() {
       ultima_mensagem_em: c.ultima_mensagem_em,
       participantes: (parts ?? [])
         .filter((p) => p.conversa_id === c.id)
-        .map((p) => ({ user_id: p.user_id, nome: nomes.get(p.user_id) ?? 'Usuário' })),
+        .map((p) => ({
+          user_id: p.user_id,
+          nome: nomes.get(p.user_id)?.nome ?? 'Usuário',
+          avatar_url: nomes.get(p.user_id)?.avatar_url ?? null,
+        })),
+
       minha_leitura_em: leituraMap.get(c.id) ?? '1970-01-01',
       ultima_mensagem: ultimaPorConversa.get(c.id) ?? null,
       nao_lidas: naoLidasPorConversa.get(c.id) ?? 0,
@@ -108,13 +115,14 @@ export function useChatConversas() {
     setLoading(false);
   }, [user]);
 
-  // carrega diretório primeiro para resolver nomes
+  // carrega diretório primeiro para resolver nomes e avatares
   useEffect(() => {
     supabase.rpc('chat_diretorio_usuarios').then(({ data }) => {
-      for (const u of (data as UsuarioDiretorio[]) ?? []) diretorio.current.set(u.user_id, u.nome);
+      for (const u of (data as UsuarioDiretorio[]) ?? []) diretorio.current.set(u.user_id, u);
       carregar();
     });
   }, [carregar]);
+
 
   // Realtime: mensagens novas atualizam lista
   useEffect(() => {
@@ -341,7 +349,13 @@ function getPresencaShared(userId: string): PresencaShared {
       .on('broadcast', { event: 'digitando' }, (payload) => {
         shared.digitandoListeners.forEach((f) => f(payload.payload as { user_id: string; conversa_id: string }));
       })
-      .subscribe();
+      .subscribe(async (status) => {
+        // sem track() o usuário nunca aparece como online para os demais
+        if (status === 'SUBSCRIBED') {
+          await channel.track({ user_id: userId, online_em: new Date().toISOString() });
+        }
+      });
+
     shared.channel = channel;
     presencaShared = shared;
   }
@@ -376,6 +390,9 @@ export function useChatPresenca(conversaId: string | null, nomesPorId: Map<strin
 
     shared.syncListeners.add(onSync);
     shared.digitandoListeners.add(onDigitando);
+    // estado inicial para quem monta depois do primeiro sync
+    onSync(new Set(Object.keys(shared.channel.presenceState())));
+
     return () => {
       shared.syncListeners.delete(onSync);
       shared.digitandoListeners.delete(onDigitando);
