@@ -390,6 +390,9 @@ export function useChatPresenca(conversaId: string | null, nomesPorId: Map<strin
 
     shared.syncListeners.add(onSync);
     shared.digitandoListeners.add(onDigitando);
+    // estado inicial para quem monta depois do primeiro sync
+    onSync(new Set(Object.keys(shared.channel.presenceState())));
+
     return () => {
       shared.syncListeners.delete(onSync);
       shared.digitandoListeners.delete(onDigitando);
