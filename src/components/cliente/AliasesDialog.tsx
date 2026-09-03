@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, Plus, X } from 'lucide-react';
 import { useClienteAliases, useCreateAlias, useDeleteAlias } from '@/hooks/useGoogleDrive';
 import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface AliasesDialogProps {
   open: boolean;
@@ -22,6 +23,7 @@ interface AliasesDialogProps {
 
 export function AliasesDialog({ open, onOpenChange, clienteId, clienteNome }: AliasesDialogProps) {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { data: aliases, isLoading } = useClienteAliases(open ? clienteId : undefined);
   const createAlias = useCreateAlias();
   const deleteAlias = useDeleteAlias();
@@ -36,6 +38,7 @@ export function AliasesDialog({ open, onOpenChange, clienteId, clienteNome }: Al
     }
     try {
       await createAlias.mutateAsync({ cliente_id: clienteId, alias: value });
+      queryClient.invalidateQueries({ queryKey: ['cliente-aliases'] });
       setNewAlias('');
     } catch (e: any) {
       toast({ title: 'Erro ao adicionar apelido', description: e.message, variant: 'destructive' });
@@ -89,7 +92,12 @@ export function AliasesDialog({ open, onOpenChange, clienteId, clienteNome }: Al
                     type="button"
                     aria-label={`Remover apelido ${a.alias}`}
                     className="rounded-sm hover:text-destructive"
-                    onClick={() => deleteAlias.mutate(a.id)}
+                    onClick={() =>
+                      deleteAlias.mutate(a.id, {
+                        onSuccess: () =>
+                          queryClient.invalidateQueries({ queryKey: ['cliente-aliases'] }),
+                      })
+                    }
                   >
                     <X className="h-3 w-3" />
                   </button>
