@@ -1,35 +1,50 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  authenticate,
+  corsHeaders,
+  getValidGoogleToken,
+  jsonResponse,
+} from "../_shared/google.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+async function googleSheetsFetch(
+  accessToken: string,
+  url: string,
+  init: RequestInit = {},
+) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const response = await fetch(url, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        ...(init.headers || {}),
+      },
+    });
 
-const GATEWAY = "https://connector-gateway.lovable.dev/google_sheets/v4";
+    const responseBody = await response.text();
+    if (response.ok) return responseBody ? JSON.parse(responseBody) : null;
+
+    if ((response.status === 429 || response.status >= 500) && attempt < 3) {
+      const retryAfter = Number(response.headers.get("Retry-After"));
+      const delayMs = Number.isFinite(retryAfter) && retryAfter > 0
+        ? retryAfter * 1000
+        : 1000 * 2 ** (attempt - 1);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      continue;
+    }
+
+    throw new Error(`Google Sheets API ${response.status}: ${responseBody}`);
+  }
+
+  throw new Error("Google Sheets API indisponível após novas tentativas");
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    const admin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    );
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } },
-    );
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData?.user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    const auth = await authenticate(req);
+    if ("error" in auth) return auth.error;
+    const { admin, consultorId } = auth;
 
     // Buscar contratos ativos com cliente e consultor
     const { data: contratos, error } = await admin
@@ -48,35 +63,31 @@ Deno.serve(async (req) => {
       .filter((r) => r.nome)
       .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    const SHEETS_KEY = Deno.env.get("GOOGLE_SHEETS_API_KEY");
-    if (!LOVABLE_API_KEY || !SHEETS_KEY) {
-      return new Response(JSON.stringify({ error: "Google Sheets connector não configurado" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const tokenRow = await getValidGoogleToken(admin, consultorId);
+    const scopes = tokenRow.escopo ?? "";
+    if (!scopes.includes("spreadsheets")) {
+      return jsonResponse({
+        error: "Sua conexão Google não tem permissão para criar planilhas. Reconecte o Google em Minhas Integrações.",
+        code: "google_scope_insuficiente",
+      }, 403);
     }
-
-    const gatewayHeaders = {
-      "Authorization": `Bearer ${LOVABLE_API_KEY}`,
-      "X-Connection-Api-Key": SHEETS_KEY,
-      "Content-Type": "application/json",
-    };
+    const accessToken = tokenRow.access_token as string;
 
     const today = new Date().toISOString().slice(0, 10);
     const title = `Clientes Ativos - ${today}`;
 
     // 1) Criar planilha
-    const createRes = await fetch(`${GATEWAY}/spreadsheets`, {
+    const created = await googleSheetsFetch(
+      accessToken,
+      "https://sheets.googleapis.com/v4/spreadsheets",
+      {
       method: "POST",
-      headers: gatewayHeaders,
       body: JSON.stringify({
         properties: { title },
         sheets: [{ properties: { title: "Clientes" } }],
       }),
-    });
-    const createBody = await createRes.text();
-    if (!createRes.ok) {
-      return new Response(JSON.stringify({ error: "Falha ao criar planilha", detail: createBody }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    const created = JSON.parse(createBody);
+      },
+    );
     const spreadsheetId = created.spreadsheetId;
     const spreadsheetUrl = created.spreadsheetUrl;
 
@@ -86,24 +97,19 @@ Deno.serve(async (req) => {
       ...rows.map((r) => [r.nome, r.cidade, r.consultor]),
     ];
     const range = "Clientes!A1:C" + values.length;
-    const putRes = await fetch(
-      `${GATEWAY}/spreadsheets/${spreadsheetId}/values/${range}?valueInputOption=USER_ENTERED`,
+    await googleSheetsFetch(
+      accessToken,
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}?valueInputOption=USER_ENTERED`,
       {
         method: "PUT",
-        headers: gatewayHeaders,
         body: JSON.stringify({ values }),
       },
     );
-    if (!putRes.ok) {
-      const putBody = await putRes.text();
-      return new Response(JSON.stringify({ error: "Falha ao escrever valores", detail: putBody, url: spreadsheetUrl }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
 
-    return new Response(
-      JSON.stringify({ url: spreadsheetUrl, spreadsheetId, total: rows.length }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
-  } catch (e: any) {
-    return new Response(JSON.stringify({ error: e.message || String(e) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return jsonResponse({ url: spreadsheetUrl, spreadsheetId, total: rows.length });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const status = message.includes("não conectado ao Google") ? 400 : 500;
+    return jsonResponse({ error: message }, status);
   }
 });
