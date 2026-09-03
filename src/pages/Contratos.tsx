@@ -133,7 +133,19 @@ export default function Contratos() {
     setIsExporting(true);
     try {
       const { data, error } = await supabase.functions.invoke('exportar-clientes-sheets');
-      if (error) throw error;
+      if (error) {
+        const details = (error as any)?.context?.text
+          ? await (error as any).context.text()
+          : error.message;
+        console.error('exportar-clientes-sheets falhou:', details);
+        let msg = details;
+        try {
+          const parsed = JSON.parse(details);
+          msg = parsed.error || parsed.detail || details;
+        } catch { /* texto puro */ }
+        toast.error('Erro ao exportar: ' + msg);
+        return;
+      }
       if ((data as any)?.url) {
         window.open((data as any).url, '_blank');
         toast.success(`Planilha criada com ${(data as any).total} clientes`);
@@ -146,6 +158,7 @@ export default function Contratos() {
       setIsExporting(false);
     }
   };
+
 
   // Query para a lista principal (com filtros)
   const { data: contratosRaw, isLoading } = useAllContratos({
