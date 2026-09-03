@@ -1,4 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -16,7 +18,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Search, Plus, Trash2, Loader2, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle, Archive, ArchiveRestore } from 'lucide-react';
+import { Search, Plus, Trash2, Loader2, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle, Archive, ArchiveRestore, Tags, X } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { AliasesDialog } from '@/components/cliente/AliasesDialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useClientes, useArquivarCliente, useDesarquivarCliente, useHardDeleteCliente, ClienteComDetalhes } from '@/hooks/useClientes';
 import { useConsultores } from '@/hooks/useConsultores';
@@ -35,6 +39,43 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
+const FILTERS_KEY = 'clientes:filtros';
+
+interface PersistedFilters {
+  search: string;
+  statusFilter: string;
+  consultorFilter: string;
+  tipoFilter: string;
+  sortField: string;
+  sortDirection: string;
+}
+
+function loadFilters(): Partial<PersistedFilters> {
+  try {
+    return JSON.parse(sessionStorage.getItem(FILTERS_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+/** Todos os apelidos, para exibir na listagem sem N requisições. */
+function useTodosAliases() {
+  return useQuery({
+    queryKey: ['cliente-aliases', 'all'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('cliente_aliases' as any)
+        .select('cliente_id, alias');
+      if (error) throw error;
+      const map: Record<string, string[]> = {};
+      (data as any[]).forEach(a => {
+        (map[a.cliente_id] ||= []).push(a.alias);
+      });
+      return map;
+    },
+  });
+}
+
 type SortField = 'nome' | 'cidade' | 'consultor' | 'tipo' | 'mrr' | 'status' | 'data_fim';
 type SortDirection = 'asc' | 'desc';
 
@@ -45,12 +86,22 @@ export default function Clientes() {
   const canArchive = isAdmin || isDirector;
   const canHardDelete = isAdmin;
   const { data: myConsultorId } = useMyConsultorId();
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('todos');
-  const [consultorFilter, setConsultorFilter] = useState('todos');
-  const [tipoFilter, setTipoFilter] = useState('todos');
-  const [sortField, setSortField] = useState<SortField>('nome');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const persisted = useMemo(loadFilters, []);
+  const [search, setSearch] = useState(persisted.search ?? '');
+  const [statusFilter, setStatusFilter] = useState(persisted.statusFilter ?? 'ativo');
+  const [consultorFilter, setConsultorFilter] = useState(persisted.consultorFilter ?? 'todos');
+  const [tipoFilter, setTipoFilter] = useState(persisted.tipoFilter ?? 'todos');
+  const [sortField, setSortField] = useState<SortField>((persisted.sortField as SortField) ?? 'nome');
+  const [sortDirection, setSortDirection] = useState<SortDirection>((persisted.sortDirection as SortDirection) ?? 'asc');
+  const [aliasCliente, setAliasCliente] = useState<ClienteComDetalhes | null>(null);
+
+  // Mantém os filtros ao navegar para o detalhe do cliente e voltar
+  useEffect(() => {
+    sessionStorage.setItem(
+      FILTERS_KEY,
+      JSON.stringify({ search, statusFilter, consultorFilter, tipoFilter, sortField, sortDirection })
+    );
+  }, [search, statusFilter, consultorFilter, tipoFilter, sortField, sortDirection]);
 
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [clienteToArchive, setClienteToArchive] = useState<ClienteComDetalhes | null>(null);
@@ -69,6 +120,7 @@ export default function Clientes() {
     apenas_arquivados: statusFilter === 'arquivados',
   });
 
+  const { data: aliasesMap } = useTodosAliases();
   const { data: consultores } = useConsultores();
   const { data: tiposConsultoria } = useTiposConsultoria();
   const arquivarCliente = useArquivarCliente();
@@ -252,6 +304,38 @@ export default function Clientes() {
               </SelectContent>
             </Select>
           </div>
+
+          {(search || statusFilter !== 'todos' || consultorFilter !== 'todos' || tipoFilter !== 'todos') && (
+            <div className="mt-4 flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-muted-foreground">Filtros ativos:</span>
+              {search && <Badge variant="secondary">Busca: {search}</Badge>}
+              {statusFilter !== 'todos' && <Badge variant="secondary">Status: {statusFilter.replace('_', ' ')}</Badge>}
+              {consultorFilter !== 'todos' && (
+                <Badge variant="secondary">
+                  Consultor: {consultores?.find(c => c.id === consultorFilter)?.nome ?? '—'}
+                </Badge>
+              )}
+              {tipoFilter !== 'todos' && (
+                <Badge variant="secondary">
+                  Tipo: {tiposConsultoria?.find(t => t.id === tipoFilter)?.nome ?? '—'}
+                </Badge>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs text-muted-foreground"
+                onClick={() => {
+                  setSearch('');
+                  setStatusFilter('todos');
+                  setConsultorFilter('todos');
+                  setTipoFilter('todos');
+                }}
+              >
+                <X className="h-3 w-3 mr-1" />
+                Limpar
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -327,7 +411,7 @@ export default function Clientes() {
                       Fim Contrato <SortIcon field="data_fim" />
                     </div>
                   </TableHead>
-                  <TableHead className="w-[120px] text-muted-foreground">Ações</TableHead>
+                  <TableHead className="w-[160px] text-muted-foreground">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -344,7 +428,20 @@ export default function Clientes() {
                       className="border-border cursor-pointer hover:bg-secondary/50"
                       onClick={() => navigate(`/clientes/${cliente.id}`)}
                     >
-                      <TableCell className="font-medium text-foreground">{cliente.nome}</TableCell>
+                      <TableCell className="font-medium text-foreground">
+                        <div className="flex flex-col gap-1">
+                          <span>{cliente.nome}</span>
+                          {(aliasesMap?.[cliente.id]?.length ?? 0) > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {aliasesMap![cliente.id].map(a => (
+                                <Badge key={a} variant="outline" className="text-[10px] font-normal">
+                                  {a}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-foreground">{cliente.cidade}/{cliente.uf}</TableCell>
                       <TableCell className="text-foreground">{cliente.consultor?.nome || '-'}</TableCell>
                       <TableCell className="text-muted-foreground">
@@ -394,6 +491,18 @@ export default function Clientes() {
                           >
                             Ver
                           </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Gerenciar apelidos"
+                            className="text-muted-foreground hover:text-foreground"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setAliasCliente(cliente);
+                            }}
+                          >
+                            <Tags className="h-4 w-4" />
+                          </Button>
                           {canArchive && (
                             <Button
                               variant="ghost"
@@ -428,6 +537,14 @@ export default function Clientes() {
           )}
         </CardContent>
       </Card>
+
+      {/* Apelidos (edição rápida direto da listagem) */}
+      <AliasesDialog
+        open={!!aliasCliente}
+        onOpenChange={(o) => !o && setAliasCliente(null)}
+        clienteId={aliasCliente?.id}
+        clienteNome={aliasCliente?.nome}
+      />
 
       {/* Dialog de Arquivamento (soft delete) */}
       <AlertDialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
