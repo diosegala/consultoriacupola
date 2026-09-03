@@ -80,8 +80,41 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
+    let body: any = {};
+    try { body = await req.json(); } catch { /* sem body */ }
+    const alvoConsultorId: string | undefined = body?.consultor_id;
+    // Limite de arquivos novos processados por execução: evita estourar o
+    // tempo máximo da edge function. O restante entra na próxima rodada.
+    const maxArquivos: number = Number(body?.max_arquivos ?? 25);
+
     const { data: tokens } = await admin
       .from("consultor_google_tokens").select("*").eq("ativo", true);
+
+    // Sem consultor_id: dispara uma execução isolada por consultor (fan-out),
+    // pois processar todos em uma só invocação estoura o limite de tempo.
+    if (!alvoConsultorId) {
+      const url = `${Deno.env.get("SUPABASE_URL")}/functions/v1/google-drive-sync-diario`;
+      const disparos = await Promise.all(
+        (tokens ?? []).map(async (t: any) => {
+          try {
+            await fetch(url, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+              },
+              body: JSON.stringify({ consultor_id: t.consultor_id, max_arquivos: maxArquivos }),
+            });
+            return { consultor_id: t.consultor_id, disparado: true };
+          } catch (e) {
+            return { consultor_id: t.consultor_id, disparado: false, erro: String(e) };
+          }
+        }),
+      );
+      return new Response(JSON.stringify({ modo: "fan-out", disparos }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const { data: clientes } = await admin.from("clientes").select("id, nome");
     const { data: aliases } = await admin.from("cliente_aliases").select("cliente_id, alias");
@@ -101,7 +134,8 @@ Deno.serve(async (req) => {
 
     const resultados: any[] = [];
 
-    for (const row of (tokens || [])) {
+    for (const row of (tokens || []).filter((t: any) => t.consultor_id === alvoConsultorId)) {
+
       try {
         if (!row.pasta_meet_id) {
           resultados.push({ consultor_id: row.consultor_id, error: "pasta_meet_id ausente" });
@@ -109,20 +143,61 @@ Deno.serve(async (req) => {
         }
         const tk = await refreshAccess(admin, row);
 
-        const q = `'${tk.pasta_meet_id}' in parents and trashed=false and mimeType='application/vnd.google-apps.document'`;
-        const filesRes = await fetch(
-          "https://www.googleapis.com/drive/v3/files?q=" + encodeURIComponent(q) +
-          "&fields=files(id,name,createdTime)&orderBy=createdTime desc&pageSize=200",
-          { headers: { Authorization: `Bearer ${tk.access_token}` } }
+        // Lista arquivos do Drive com paginação completa.
+        const listarTudo = async (q: string) => {
+          const acc: any[] = [];
+          let pageToken: string | undefined;
+          do {
+            const url =
+              "https://www.googleapis.com/drive/v3/files?q=" + encodeURIComponent(q) +
+              "&fields=files(id,name,createdTime),nextPageToken&orderBy=createdTime desc&pageSize=200" +
+              "&supportsAllDrives=true&includeItemsFromAllDrives=true" +
+              (pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : "");
+            const res = await fetch(url, {
+              headers: { Authorization: `Bearer ${tk.access_token}` },
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(`Drive list falhou: ${JSON.stringify(data)}`);
+            acc.push(...(data.files ?? []));
+            pageToken = data.nextPageToken;
+          } while (pageToken);
+          return acc;
+        };
+
+        const docMime = "application/vnd.google-apps.document";
+
+        // 1) Arquivos diretamente na pasta configurada (Meet Recordings).
+        const qPasta =
+          `'${tk.pasta_meet_id}' in parents and trashed=false and mimeType='${docMime}'`;
+
+        // 2) O Google Meet passou a salvar notas/transcrições em subpastas por
+        // reunião. Busca também por nome em todo o Drive do usuário (últimos 180
+        // dias) para não perder esses arquivos.
+        const desde = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString();
+        const qNome =
+          `trashed=false and mimeType='${docMime}' and 'me' in owners and createdTime > '${desde}' ` +
+          `and (name contains 'Anotações do Gemini' or name contains 'Anotacoes do Gemini' or name contains 'Transcript')`;
+
+        const [porPasta, porNome] = await Promise.all([
+          listarTudo(qPasta),
+          listarTudo(qNome).catch(() => [] as any[]),
+        ]);
+
+        const porId = new Map<string, any>();
+        for (const f of [...porPasta, ...porNome]) porId.set(f.id, f);
+        const docs = Array.from(porId.values()).sort(
+          (a, b) => String(b.createdTime).localeCompare(String(a.createdTime)),
         );
-        const filesData = await filesRes.json();
-        const docs = filesData.files || [];
 
         const ids = docs.map((d: any) => d.id);
-        const { data: jaImp } = await admin
-          .from("reunioes_importadas_log")
-          .select("id, google_file_id, status, data_importacao")
-          .in("google_file_id", ids.length ? ids : ["__none__"]);
+        const jaImp: any[] = [];
+        for (let i = 0; i < ids.length; i += 100) {
+          const { data: parte } = await admin
+            .from("reunioes_importadas_log")
+            .select("id, google_file_id, status, data_importacao")
+            .in("google_file_id", ids.slice(i, i + 100));
+          jaImp.push(...(parte ?? []));
+        }
         // Only files actually imported (status='importado') should be skipped.
         // sem_match / erro logs are re-evaluated so newly-created aliases take effect.
         const importedSet = new Set(
@@ -133,10 +208,15 @@ Deno.serve(async (req) => {
         );
 
 
+
         let importados = 0; let pulados = 0; let erros = 0; let gestao = 0;
+        let processados = 0; let restantes = 0;
 
         for (const d of docs) {
           if (importedSet.has(d.id)) continue;
+          if (processados >= maxArquivos) { restantes++; continue; }
+          processados++;
+
 
           // Limpa entradas antigas (sem_match/erro), respeitando reservas recentes
           // de outra execução em andamento (status 'importando' há menos de 1h).
@@ -288,7 +368,7 @@ Deno.serve(async (req) => {
           .update({ ultima_sincronizacao: new Date().toISOString() })
           .eq("consultor_id", row.consultor_id);
 
-        resultados.push({ consultor_id: row.consultor_id, importados, pulados, erros, gestao });
+        resultados.push({ consultor_id: row.consultor_id, importados, pulados, erros, gestao, restantes });
       } catch (e: any) {
         console.error("Sync consultor failed", row.consultor_id, e.message);
         resultados.push({ consultor_id: row.consultor_id, error: e.message });
