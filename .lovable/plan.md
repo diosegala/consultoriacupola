@@ -1,27 +1,53 @@
-# Entrar com o Google e dispensar a conexão manual
+# Trazer a ferramenta da Agência de Marketing para dentro da plataforma de Consultoria
 
-Sim, é possível. Hoje existem duas coisas separadas: o login por e-mail/senha e a conexão com o Google feita na página "Minhas Integrações". Dá para unir as duas: a pessoa clica em "Entrar com Google", autoriza uma única vez o acesso às reuniões (Drive), à agenda e às planilhas, e o sistema já guarda essa autorização sozinho. Ninguém mais precisa passar pela página de integrações.
+## Objetivo
+Integrar a ferramenta da unidade de agência de marketing (hoje em Supabase separado, código feito no Claude Code) dentro desta plataforma, trazendo funcionalidades, dados históricos, integrações externas e usuários.
 
-## Como fica para o usuário
+## Recomendação de modelo: uma plataforma, uma base
 
-1. Na tela de acesso aparece o botão "Entrar com Google" (o acesso por e-mail e senha continua existindo).
-2. Na primeira vez, o Google mostra a tela de permissões (reuniões no Drive, agenda, planilhas e documentos).
-3. Depois de autorizar, a pessoa entra no sistema e a integração já está ativa — a sincronização diária das atas passa a funcionar sem nenhum passo extra.
-4. Em "Minhas Integrações" a página continua existindo, mas só para mostrar o status (conta conectada, pasta das reuniões, última sincronização) e para reconectar caso a autorização expire ou seja revogada.
+Recomendo **migrar tudo para dentro deste app e deste Supabase**, como uma nova seção "Agência" no menu:
+
+- Um login só, reaproveitando o sistema de usuários e permissões já existente (admin/diretor veem tudo; consultores veem sua carteira — estenderíamos com um papel para o time da agência).
+- Um banco só: os dados da agência passam a conviver com clientes e contratos, permitindo visões cruzadas (ex.: cliente de consultoria que também é cliente da agência).
+- Sem manutenção de dois projetos, dois bancos e duas rotinas de backup.
+- As integrações externas da agência (ex.: Meta Ads, Google Ads) são reconectadas aqui usando os mesmos padrões já adotados (Google OAuth por usuário, edge functions).
+
+A alternativa (manter dois bancos e só embutir telas) cria complexidade permanente de sincronização e login duplo — só vale a pena se houver um motivo forte para isolar os dados.
+
+## O que preciso que você me envie
+
+1. **O código da ferramenta** — o ideal é um arquivo .zip da pasta do projeto (arraste aqui no chat) ou o link de um repositório GitHub acessível. Inclua o arquivo `.env.example` ou a lista de nomes de variáveis de ambiente (sem os valores secretos).
+2. **O esquema do banco Supabase deles** — a pasta `supabase/migrations` (se existir) ou um export SQL do schema. No Supabase deles: SQL Editor → ou `supabase db dump`. Se não souber como, me avise que eu te guio.
+3. **Uma lista das integrações externas** que a ferramenta usa (Meta Ads? Google Ads? CVCRM? outras?), para eu verificar como reconectá-las aqui.
+
+Com isso em mãos, a análise de viabilidade acontece aqui mesmo, sem custo de configuração.
+
+## Etapas
+
+### Fase 1 — Análise de viabilidade (assim que receber os arquivos)
+- Leio o código e o esquema do banco da agência.
+- Mapeio: telas/funcionalidades, tabelas e dados, integrações externas, regras de acesso.
+- Entrego um relatório com: o que migra direto, o que precisa de adaptação, conflitos de nomes/estruturas com o banco atual, riscos e esforço estimado por item.
+
+### Fase 2 — Plano de migração detalhado
+- Desenho das novas tabelas neste Supabase (com prefixo ou schema que evite conflito, ex.: `agencia_*`), com RLS e GRANTs seguindo os padrões deste projeto.
+- Estratégia de migração dos dados históricos (script de export do Supabase deles → import aqui, com remapeamento de IDs de usuários/clientes).
+- Plano de usuários: criar contas do time da agência aqui e mapear os registros históricos para os novos IDs.
+- Plano de integrações: quais segredos/contas reconectar e como.
+
+### Fase 3 — Implementação (após sua aprovação do plano detalhado)
+- Criação das tabelas e políticas de acesso.
+- Nova seção "Agência" no app: menu, rotas, páginas adaptadas ao visual dark/Cupola.
+- Migração dos dados históricos com validação (contagens antes/depois).
+- Reconexão das integrações externas e testes.
+- Cadastro dos usuários da agência.
 
 ## Pontos de atenção
-
-- Só entram pessoas já cadastradas: o login com Google será aceito apenas se o e-mail da conta Google corresponder a um usuário existente e vinculado a um consultor. Contas desconhecidas são recusadas com mensagem clara.
-- A autorização de longo prazo (a que permite a sincronização automática rodar de madrugada) só é entregue pelo Google na primeira autorização. Quem já está conectado hoje não precisa fazer nada; para os demais, o primeiro login com Google resolve.
-- Quem preferir continuar com e-mail e senha pode seguir usando, e nesse caso ainda usará o botão de conectar o Google na página de integrações.
-- É preciso ajustar as configurações do projeto no Google (endereço de retorno da autenticação) e ativar o provedor Google no backend — faço isso e indico o que precisa ser colado no console do Google.
+- **Sem tempo de parada**: a ferramenta antiga continua no ar até a migração ser validada; só desligamos depois.
+- **Dados**: antes de importar qualquer coisa, validamos contagens e amostras juntos.
+- **Segredos**: chaves de API e tokens não vêm no código — cada integração será reconectada aqui com credenciais novas ou transferidas por você via interface segura.
 
 ## Detalhes técnicos
-
-- Ativar o provedor Google no Supabase Auth com o mesmo `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` já usados pelas edge functions; adicionar o redirect `https://<projeto>.supabase.co/auth/v1/callback` no console do Google.
-- `Auth.tsx`: botão "Entrar com Google" chamando `signInWithOAuth({ provider: 'google' })` com `scopes` iguais aos de `google-oauth-start` (drive.readonly, documents, spreadsheets, calendar.events, calendar.readonly, userinfo.email) e `queryParams: { access_type: 'offline', prompt: 'consent' }` para obter o refresh token.
-- Nova edge function `google-auth-sync-tokens`: recebe `provider_token` e `provider_refresh_token` da sessão logo após o retorno do OAuth, valida o usuário pelo JWT, resolve `consultor_user`, detecta a pasta Meet e faz upsert em `consultor_google_tokens` (mesma lógica de `google-oauth-callback`, sem troca de `code`).
-- Chamada dessa função num handler pós-login (`onAuthStateChange` com `SIGNED_IN` + presença de `provider_refresh_token`) — o refresh token só aparece nessa primeira sessão, então precisa ser enviado imediatamente.
-- Bloqueio de contas não cadastradas: trigger/verificação no primeiro login que faz `signOut` e mostra erro quando não há `consultor_user` para o `user_id` (ou e-mail não corresponde a consultor ativo).
-- `google-oauth-start` / `google-oauth-callback` / `GoogleCallback.tsx` permanecem como caminho de reconexão manual.
-- `MinhasIntegracoes.tsx`: o cartão de conexão passa a exibir "conectado via login Google" quando a origem for o login, mantendo o botão de reconectar.
+- Stack da ferramenta será confirmada na Fase 1 (React + Supabase, provavelmente; se houver tecnologias incompatíveis, o relatório indicará o esforço de adaptação).
+- RLS neste projeto usa `is_authorized_user()` e `is_admin_or_director()`; as tabelas da agência seguirão o mesmo padrão, com um papel adicional se o time da agência não for o mesmo da consultoria.
+- Toda `CREATE TABLE` virá acompanhada de `GRANT`s explícitos, conforme o padrão do projeto.
