@@ -1,53 +1,56 @@
-# Trazer a ferramenta da Agência de Marketing para dentro da plataforma de Consultoria
+# Trazer o CupolaOS (agência de marketing) para dentro da plataforma de Consultoria
 
-## Objetivo
-Integrar a ferramenta da unidade de agência de marketing (hoje em Supabase separado, código feito no Claude Code) dentro desta plataforma, trazendo funcionalidades, dados históricos, integrações externas e usuários.
+## Veredito: viável, com o mesmo modelo recomendado — uma plataforma, uma base
 
-## Recomendação de modelo: uma plataforma, uma base
+Analisei o código e o schema enviados. A ferramenta é tecnicamente **muito parecida com esta**: React 18, Vite, Tailwind, TypeScript, Supabase (mesmo SDK), Radix/shadcn, React Query. O código é bem organizado e documentado. A integração não exige reescrever do zero — é mais uma **mudança de endereço com adaptações** do que uma reconstrução.
 
-Recomendo **migrar tudo para dentro deste app e deste Supabase**, como uma nova seção "Agência" no menu:
+## O que encontrei no CupolaOS
 
-- Um login só, reaproveitando o sistema de usuários e permissões já existente (admin/diretor veem tudo; consultores veem sua carteira — estenderíamos com um papel para o time da agência).
-- Um banco só: os dados da agência passam a conviver com clientes e contratos, permitindo visões cruzadas (ex.: cliente de consultoria que também é cliente da agência).
-- Sem manutenção de dois projetos, dois bancos e duas rotinas de backup.
-- As integrações externas da agência (ex.: Meta Ads, Google Ads) são reconectadas aqui usando os mesmos padrões já adotados (Google OAuth por usuário, edge functions).
+- **60 tabelas** no banco, 26 delas ligadas a clientes (mesmo conceito de "carteira" que usamos).
+- **Frontend**: ~40 páginas — ficha de cliente, projetos, agentes de IA, criador de blog, redes sociais, cards de anúncios (Franciosi, Goes, Pantera, Porta8), inteligência de mercado, gestão.
+- **Servidor próprio no Cloudflare Worker** (`servidor/`): chamadas de IA (Anthropic/Gemini), agente de blog, leitura de RSS, extratores de imóveis, leitura de pastas do Drive.
+- **Integrações**: Anthropic, Gemini, Firecrawl, Google Drive (conta de serviço), RunRun.it.
+- **20 usuários**, login próprio do Supabase deles, com permissões por cargo/squad em RLS própria.
 
-A alternativa (manter dois bancos e só embutir telas) cria complexidade permanente de sincronização e login duplo — só vale a pena se houver um motivo forte para isolar os dados.
+## Conflitos a resolver (todos solucionáveis)
 
-## O que preciso que você me envie
-
-1. **O código da ferramenta** — o ideal é um arquivo .zip da pasta do projeto (arraste aqui no chat) ou o link de um repositório GitHub acessível. Inclua o arquivo `.env.example` ou a lista de nomes de variáveis de ambiente (sem os valores secretos).
-2. **O esquema do banco Supabase deles** — a pasta `supabase/migrations` (se existir) ou um export SQL do schema. No Supabase deles: SQL Editor → ou `supabase db dump`. Se não souber como, me avise que eu te guio.
-3. **Uma lista das integrações externas** que a ferramenta usa (Meta Ads? Google Ads? CVCRM? outras?), para eu verificar como reconectá-las aqui.
-
-Com isso em mãos, a análise de viabilidade acontece aqui mesmo, sem custo de configuração.
+1. **Nomes de tabelas batem**: `clientes`, `contratos`, `projetos`, `documentos`, `reunioes`, `okrs`, `auditoria` e `mensagens` existem nos dois bancos com estruturas diferentes. Solução: colocar tudo da agência num **schema separado `agencia`** no nosso banco — isolamento total, zero risco para a consultoria, e a RLS deles (bem escrita, com funções security definer) migra quase intacta para dentro desse schema.
+2. **Servidor Cloudflare Worker** → aqui o servidor é Supabase Edge Functions. As rotas do worker viram functions; as chamadas de IA passam pelo nosso gateway de IA (sem depender de chave da Anthropic/Google separada, ou mantendo as chaves deles como segredo — decidimos juntos).
+3. **Usuários**: as 20 pessoas terão contas aqui (mesmo e-mail, senha nova definida no primeiro acesso, reaproveitando nosso fluxo de primeiro login). A tabela `pessoas` deles vira `agencia.pessoas`, ligada ao nosso login.
+4. **Dados e arquivos**: precisamos de um dump SQL do banco de produção deles (o Giuliano roda `supabase db dump` — o schema do script já foi confirmado como igual) e da cópia dos arquivos do Storage.
+5. **Integrações externas**: Firecrawl tem conector pronto aqui; Anthropic/Gemini entram via nosso gateway; a conta de serviço do Drive entra como segredo; RunRun.it e RSS rodam nas functions.
 
 ## Etapas
 
-### Fase 1 — Análise de viabilidade (assim que receber os arquivos)
-- Leio o código e o esquema do banco da agência.
-- Mapeio: telas/funcionalidades, tabelas e dados, integrações externas, regras de acesso.
-- Entrego um relatório com: o que migra direto, o que precisa de adaptação, conflitos de nomes/estruturas com o banco atual, riscos e esforço estimado por item.
+### Fase 1 — Fundação (primeira entrega)
+- Criar o schema `agencia` com as 60 tabelas adaptadas (tipo de ID, datas) + RLS deles traduzida, com GRANTs no padrão do projeto.
+- Ajuste de pontes opcionais: um cliente da agência pode ser o mesmo da consultoria (tabela de vínculo) — avaliar depois.
 
-### Fase 2 — Plano de migração detalhado
-- Desenho das novas tabelas neste Supabase (com prefixo ou schema que evite conflito, ex.: `agencia_*`), com RLS e GRANTs seguindo os padrões deste projeto.
-- Estratégia de migração dos dados históricos (script de export do Supabase deles → import aqui, com remapeamento de IDs de usuários/clientes).
-- Plano de usuários: criar contas do time da agência aqui e mapear os registros históricos para os novos IDs.
-- Plano de integrações: quais segredos/contas reconectar e como.
+### Fase 2 — Frontend da Agência
+- Nova seção "Agência" no menu, com as páginas deles adaptadas ao visual dark da Cupola.
+- Autenticação e permissões ligadas ao nosso sistema (papéis da agência mapeados nos nossos: admin/diretor/usuário).
 
-### Fase 3 — Implementação (após sua aprovação do plano detalhado)
-- Criação das tabelas e políticas de acesso.
-- Nova seção "Agência" no app: menu, rotas, páginas adaptadas ao visual dark/Cupola.
-- Migração dos dados históricos com validação (contagens antes/depois).
-- Reconexão das integrações externas e testes.
-- Cadastro dos usuários da agência.
+### Fase 3 — Servidor e integrações
+- Portar o worker do Cloudflare para edge functions (agentes de IA, blog, RSS, extratores, Drive).
+- Reconectar integrações (Firecrawl via conector, chaves como segredos).
 
-## Pontos de atenção
-- **Sem tempo de parada**: a ferramenta antiga continua no ar até a migração ser validada; só desligamos depois.
-- **Dados**: antes de importar qualquer coisa, validamos contagens e amostras juntos.
-- **Segredos**: chaves de API e tokens não vêm no código — cada integração será reconectada aqui com credenciais novas ou transferidas por você via interface segura.
+### Fase 4 — Migração de dados e usuários
+- Dump do banco de produção → import no schema `agencia`, com validação de contagens linha a linha.
+- Copiar arquivos do Storage.
+- Criar os logins das 20 pessoas.
 
-## Detalhes técnicos
-- Stack da ferramenta será confirmada na Fase 1 (React + Supabase, provavelmente; se houver tecnologias incompatíveis, o relatório indicará o esforço de adaptação).
-- RLS neste projeto usa `is_authorized_user()` e `is_admin_or_director()`; as tabelas da agência seguirão o mesmo padrão, com um papel adicional se o time da agência não for o mesmo da consultoria.
-- Toda `CREATE TABLE` virá acompanhada de `GRANT`s explícitos, conforme o padrão do projeto.
+### Fase 5 — Validação e corte
+- O CupolaOS atual continua no ar até validarmos tudo juntos; só desligamos depois.
+- Checklist de aceite com o Giuliano (ele valida vendo a tela funcionar).
+
+## O que ainda preciso de você (não bloqueia a Fase 1)
+
+1. **Dump do banco de produção** — peça ao Giuliano: `supabase db dump` (schema + dados) ou Cloud → Export data. O schema já temos; falta o **dados**.
+2. **Acesso ao Storage** deles (lista de buckets e arquivos) para planejarmos a cópia.
+3. **Decisões suas** (posso recomendar, mas são suas): as chaves de IA seguem nosso gateway ou as chaves deles? A ordem de prioridade dos módulos (sugiro começar por ficha de cliente + agentes de IA, o coração do dia a dia deles)?
+
+## Riscos e mitigação
+
+- **Volume**: 60 tabelas + ~40 páginas + um worker de servidores é grande; por isso o trabalho é em fases, com o CupolaOS antigo no ar até o fim.
+- **Nomes conflitantes**: eliminados de cara pelo schema `agencia`.
+- **Custo de IA**: as chamadas passam a ser medidas pelo nosso gateway; monitoramos junto na Fase 3.
