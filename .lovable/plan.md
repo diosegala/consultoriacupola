@@ -15,7 +15,7 @@ Analisei o código e o schema enviados. A ferramenta é tecnicamente **muito par
 ## Conflitos a resolver (todos solucionáveis)
 
 1. **Nomes de tabelas batem**: `clientes`, `contratos`, `projetos`, `documentos`, `reunioes`, `okrs`, `auditoria` e `mensagens` existem nos dois bancos com estruturas diferentes. Solução: colocar tudo da agência num **schema separado `agencia`** no nosso banco — isolamento total, zero risco para a consultoria, e a RLS deles (bem escrita, com funções security definer) migra quase intacta para dentro desse schema.
-2. **Servidor Cloudflare Worker** → aqui o servidor é Supabase Edge Functions. As rotas do worker viram functions. **Decisão sua já registrada**: as chaves de IA são as deles (hoje Anthropic), gerenciadas numa aba própria em Configurações (ver seção "Chaves de IA" abaixo) — nada mais hardcoded.
+2. **Servidor Cloudflare Worker** → aqui o servidor é Supabase Edge Functions. As rotas do worker viram functions. **Decisão sua já registrada**: uma única chave de IA para as duas unidades — a do gateway de IA que a consultoria já usa — com monitoramento de uso e custo por unidade, agente, cliente e usuário (ver seção "Chaves de IA" abaixo). Nada hardcoded.
 3. **Usuários**: as 20 pessoas terão contas aqui (mesmo e-mail, senha nova definida no primeiro acesso, reaproveitando nosso fluxo de primeiro login). A tabela `pessoas` deles vira `agencia.pessoas`, ligada ao nosso login.
 4. **Dados e arquivos**: precisamos de um dump SQL do banco de produção deles (o Giuliano roda `supabase db dump` — o schema do script já foi confirmado como igual) e da cópia dos arquivos do Storage.
 5. **Integrações externas**: Firecrawl tem conector pronto aqui; Anthropic/Gemini entram via nosso gateway; a conta de serviço do Drive entra como segredo; RunRun.it e RSS rodam nas functions.
@@ -43,9 +43,10 @@ Ou seja: **não precisamos de um segundo projeto**. Um projeto paralelo criaria 
 - Nova seção "Agência" no menu, com as páginas deles adaptadas ao visual dark da Cupola.
 - Autenticação e permissões ligadas ao nosso sistema (papéis da agência mapeados nos nossos: admin/diretor/usuário).
 
-### Fase 3 — Servidor, integrações e chaves de IA
-- Portar o worker do Cloudflare para edge functions (agentes de IA, blog, RSS, extratores, Drive).
-- **Nova aba "Chaves de IA" em Configurações** (visível só para admin e diretor): cadastro e edição de chave por provedor (Anthropic agora, outras no futuro — estrutura já preparada), seleção do modelo padrão por provedor a partir de lista curada, e teste de conexão com a chave. As chaves são gravadas via edge function e **nunca voltam para o navegador** (a tela mostra só que existe uma chave cadastrada, com valor mascarado). As functions de IA leem a chave dessa configuração em vez de qualquer valor fixo no código.
+### Fase 3 — Servidor, integrações e IA
+- Portar o worker do Cloudflare para edge functions (agentes de IA, blog, RSS, extratores, Drive). Todas as chamadas de IA saem pela **chave única do gateway**, nenhuma chave fixa no código.
+- **Nova aba "Inteligência Artificial" em Configurações** (visível só para admin e diretor): seleção de modelo padrão por provedor a partir de lista curada e **painel de uso e custo de IA** com filtros por unidade de negócio (consultoria/agência), agente, cliente, usuário e período.
+- **Medição unificada de uso**: toda chamada de IA registra unidade, agente, cliente e usuário. A consultoria já grava uso hoje; estendemos com essas dimensões e o registro de uso da agência (`uso_de_ia`) converge para a mesma visão.
 - Reconectar integrações (Firecrawl via conector, conta de serviço do Drive como segredo, RunRun.it e RSS nas functions).
 
 ### Fase 4 — Migração de dados e usuários
