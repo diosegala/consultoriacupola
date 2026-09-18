@@ -43,9 +43,10 @@ Ou seja: **não precisamos de um segundo projeto**. Um projeto paralelo criaria 
 - Nova seção "Agência" no menu, com as páginas deles adaptadas ao visual dark da Cupola.
 - Autenticação e permissões ligadas ao nosso sistema (papéis da agência mapeados nos nossos: admin/diretor/usuário).
 
-### Fase 3 — Servidor e integrações
+### Fase 3 — Servidor, integrações e chaves de IA
 - Portar o worker do Cloudflare para edge functions (agentes de IA, blog, RSS, extratores, Drive).
-- Reconectar integrações (Firecrawl via conector, chaves como segredos).
+- **Nova aba "Chaves de IA" em Configurações** (visível só para admin e diretor): cadastro e edição de chave por provedor (Anthropic agora, outras no futuro — estrutura já preparada), seleção do modelo padrão por provedor a partir de lista curada, e teste de conexão com a chave. As chaves são gravadas via edge function e **nunca voltam para o navegador** (a tela mostra só que existe uma chave cadastrada, com valor mascarado). As functions de IA leem a chave dessa configuração em vez de qualquer valor fixo no código.
+- Reconectar integrações (Firecrawl via conector, conta de serviço do Drive como segredo, RunRun.it e RSS nas functions).
 
 ### Fase 4 — Migração de dados e usuários
 - Dump do banco de produção → import no schema `agencia`, com validação de contagens linha a linha.
@@ -61,7 +62,7 @@ Ou seja: **não precisamos de um segundo projeto**. Um projeto paralelo criaria 
 
 1. **Dump do banco de produção** — peça ao Giuliano: `supabase db dump` (schema + dados) ou Cloud → Export data. O schema já temos; falta o **dados**.
 2. **Acesso ao Storage** deles (lista de buckets e arquivos) para planejarmos a cópia.
-3. **Decisões suas** (posso recomendar, mas são suas): as chaves de IA seguem nosso gateway ou as chaves deles? A ordem de prioridade dos módulos (sugiro começar por ficha de cliente + agentes de IA, o coração do dia a dia deles)?
+3. ~~Decisões suas~~ — **resolvido**: as chaves de IA são as deles, gerenciadas na nova aba de Configurações (Anthropic primeiro, outros provedores depois). Sobra uma decisão: a ordem de prioridade dos módulos (sugiro começar por ficha de cliente + agentes de IA, o coração do dia a dia deles).
 
 ## Riscos e mitigação
 
