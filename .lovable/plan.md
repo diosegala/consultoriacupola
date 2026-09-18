@@ -63,7 +63,7 @@ Ou seja: **não precisamos de um segundo projeto**. Um projeto paralelo criaria 
 
 1. **Dump do banco de produção** — peça ao Giuliano: `supabase db dump` (schema + dados) ou Cloud → Export data. O schema já temos; falta o **dados**.
 2. **Acesso ao Storage** deles (lista de buckets e arquivos) para planejarmos a cópia.
-3. ~~Decisões suas~~ — **resolvido**: as chaves de IA são as deles, gerenciadas na nova aba de Configurações (Anthropic primeiro, outros provedores depois). Sobra uma decisão: a ordem de prioridade dos módulos (sugiro começar por ficha de cliente + agentes de IA, o coração do dia a dia deles).
+3. ~~Decisões suas~~ — **resolvido**: chave de IA única (a do gateway já usada pela consultoria), com monitoramento por unidade/agente/cliente/usuário. Sobra uma decisão: a ordem de prioridade dos módulos (sugiro começar por ficha de cliente + agentes de IA, o coração do dia a dia deles).
 
 ## Chaves de IA — a decisão e o que ela significa
 
