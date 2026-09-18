@@ -67,13 +67,13 @@ Ou seja: **não precisamos de um segundo projeto**. Um projeto paralelo criaria 
 
 ## Chaves de IA — a decisão e o que ela significa
 
-- **Modelo escolhido**: chaves próprias do time da agência, gerenciadas na aba "Chaves de IA" em Configurações (admin/diretor). A fatura de IA continua na conta Anthropic deles; nenhum custo de IA da agência cai nos créditos deste workspace.
-- **Nada hardcoded**: as chaves que hoje estão no código do CupolaOS saem do código e passam a viver numa tabela de configuração, acessível apenas por edge function com validação de admin/diretor. O navegador nunca recebe o valor da chave — só um indicador de "configurada".
-- **Seleção de modelo por provedor**: cada provedor tem uma lista curada de modelos disponíveis e um modelo padrão selecionável na aba. Começamos só com Anthropic; a estrutura (provedor → chave → modelos) já nasce pronta para Google, OpenAI etc.
-- **Fallback de segurança**: se nenhuma chave estiver configurada, os agentes avisam na tela que falta configurar (em vez de falhar silenciosamente).
+- **Modelo escolhido**: **uma única chave para consultoria e agência** — a do gateway de IA que a consultoria já usa. Nenhuma chave de Anthropic/Google separada, nada hardcoded. O custo de IA das duas unidades entra nos créditos deste workspace.
+- **Monitoramento vira peça central**: como o gasto é único, cada chamada de IA é etiquetada com **unidade de negócio, agente, cliente e usuário**, e a nova aba em Configurações mostra o custo recortado por cada uma dessas dimensões — você responde "quanto a agência gastou com o agente de blog para o cliente X neste mês" na hora.
+- **Seleção de modelo por provedor**: a aba também permite escolher o modelo padrão por provedor dentro da lista curada. Os agentes da agência hoje rodam em Anthropic; no gateway usaremos os modelos equivalentes disponíveis, adaptando os prompts. Se um dia a Anthropic for requisito real (diferença de qualidade comprovada), a aba já comporta chave por provedor como extensão.
+- **A tabela de uso da agência (`uso_de_ia`) migra junto**, para o histórico de gasto deles não se perder.
 
 ## Riscos e mitigação
 
 - **Volume**: 60 tabelas + ~40 páginas + um worker de servidores é grande; por isso o trabalho é em fases, com o CupolaOS antigo no ar até o fim.
 - **Nomes conflitantes**: eliminados de cara pelo schema `agencia`.
-- **Custo de IA**: fica na conta Anthropic deles, com a tabela de uso de IA deles (`uso_de_ia`) migrada junto — dá para acompanhar o gasto por agente dentro da própria ferramenta.
+- **Custo de IA**: chave única com medição por unidade/agente/cliente/usuário desde o primeiro dia — sem surpresa de fatura e com visibilidade por unidade de negócio.
