@@ -15,7 +15,7 @@ Analisei o código e o schema enviados. A ferramenta é tecnicamente **muito par
 ## Conflitos a resolver (todos solucionáveis)
 
 1. **Nomes de tabelas batem**: `clientes`, `contratos`, `projetos`, `documentos`, `reunioes`, `okrs`, `auditoria` e `mensagens` existem nos dois bancos com estruturas diferentes. Solução: colocar tudo da agência num **schema separado `agencia`** no nosso banco — isolamento total, zero risco para a consultoria, e a RLS deles (bem escrita, com funções security definer) migra quase intacta para dentro desse schema.
-2. **Servidor Cloudflare Worker** → aqui o servidor é Supabase Edge Functions. As rotas do worker viram functions; as chamadas de IA passam pelo nosso gateway de IA (sem depender de chave da Anthropic/Google separada, ou mantendo as chaves deles como segredo — decidimos juntos).
+2. **Servidor Cloudflare Worker** → aqui o servidor é Supabase Edge Functions. As rotas do worker viram functions. **Decisão sua já registrada**: as chaves de IA são as deles (hoje Anthropic), gerenciadas numa aba própria em Configurações (ver seção "Chaves de IA" abaixo) — nada mais hardcoded.
 3. **Usuários**: as 20 pessoas terão contas aqui (mesmo e-mail, senha nova definida no primeiro acesso, reaproveitando nosso fluxo de primeiro login). A tabela `pessoas` deles vira `agencia.pessoas`, ligada ao nosso login.
 4. **Dados e arquivos**: precisamos de um dump SQL do banco de produção deles (o Giuliano roda `supabase db dump` — o schema do script já foi confirmado como igual) e da cópia dos arquivos do Storage.
 5. **Integrações externas**: Firecrawl tem conector pronto aqui; Anthropic/Gemini entram via nosso gateway; a conta de serviço do Drive entra como segredo; RunRun.it e RSS rodam nas functions.
@@ -43,9 +43,10 @@ Ou seja: **não precisamos de um segundo projeto**. Um projeto paralelo criaria 
 - Nova seção "Agência" no menu, com as páginas deles adaptadas ao visual dark da Cupola.
 - Autenticação e permissões ligadas ao nosso sistema (papéis da agência mapeados nos nossos: admin/diretor/usuário).
 
-### Fase 3 — Servidor e integrações
+### Fase 3 — Servidor, integrações e chaves de IA
 - Portar o worker do Cloudflare para edge functions (agentes de IA, blog, RSS, extratores, Drive).
-- Reconectar integrações (Firecrawl via conector, chaves como segredos).
+- **Nova aba "Chaves de IA" em Configurações** (visível só para admin e diretor): cadastro e edição de chave por provedor (Anthropic agora, outras no futuro — estrutura já preparada), seleção do modelo padrão por provedor a partir de lista curada, e teste de conexão com a chave. As chaves são gravadas via edge function e **nunca voltam para o navegador** (a tela mostra só que existe uma chave cadastrada, com valor mascarado). As functions de IA leem a chave dessa configuração em vez de qualquer valor fixo no código.
+- Reconectar integrações (Firecrawl via conector, conta de serviço do Drive como segredo, RunRun.it e RSS nas functions).
 
 ### Fase 4 — Migração de dados e usuários
 - Dump do banco de produção → import no schema `agencia`, com validação de contagens linha a linha.
@@ -61,10 +62,17 @@ Ou seja: **não precisamos de um segundo projeto**. Um projeto paralelo criaria 
 
 1. **Dump do banco de produção** — peça ao Giuliano: `supabase db dump` (schema + dados) ou Cloud → Export data. O schema já temos; falta o **dados**.
 2. **Acesso ao Storage** deles (lista de buckets e arquivos) para planejarmos a cópia.
-3. **Decisões suas** (posso recomendar, mas são suas): as chaves de IA seguem nosso gateway ou as chaves deles? A ordem de prioridade dos módulos (sugiro começar por ficha de cliente + agentes de IA, o coração do dia a dia deles)?
+3. ~~Decisões suas~~ — **resolvido**: as chaves de IA são as deles, gerenciadas na nova aba de Configurações (Anthropic primeiro, outros provedores depois). Sobra uma decisão: a ordem de prioridade dos módulos (sugiro começar por ficha de cliente + agentes de IA, o coração do dia a dia deles).
+
+## Chaves de IA — a decisão e o que ela significa
+
+- **Modelo escolhido**: chaves próprias do time da agência, gerenciadas na aba "Chaves de IA" em Configurações (admin/diretor). A fatura de IA continua na conta Anthropic deles; nenhum custo de IA da agência cai nos créditos deste workspace.
+- **Nada hardcoded**: as chaves que hoje estão no código do CupolaOS saem do código e passam a viver numa tabela de configuração, acessível apenas por edge function com validação de admin/diretor. O navegador nunca recebe o valor da chave — só um indicador de "configurada".
+- **Seleção de modelo por provedor**: cada provedor tem uma lista curada de modelos disponíveis e um modelo padrão selecionável na aba. Começamos só com Anthropic; a estrutura (provedor → chave → modelos) já nasce pronta para Google, OpenAI etc.
+- **Fallback de segurança**: se nenhuma chave estiver configurada, os agentes avisam na tela que falta configurar (em vez de falhar silenciosamente).
 
 ## Riscos e mitigação
 
 - **Volume**: 60 tabelas + ~40 páginas + um worker de servidores é grande; por isso o trabalho é em fases, com o CupolaOS antigo no ar até o fim.
 - **Nomes conflitantes**: eliminados de cara pelo schema `agencia`.
-- **Custo de IA**: as chamadas passam a ser medidas pelo nosso gateway; monitoramos junto na Fase 3.
+- **Custo de IA**: fica na conta Anthropic deles, com a tabela de uso de IA deles (`uso_de_ia`) migrada junto — dá para acompanhar o gasto por agente dentro da própria ferramenta.
