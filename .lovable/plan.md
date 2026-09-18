@@ -52,9 +52,10 @@ Ou seja: **não precisamos de um segundo projeto**. Um projeto paralelo criaria 
 - Copiar arquivos do Storage.
 - Criar os logins das 20 pessoas.
 
-### Fase 5 — Validação e corte
-- O CupolaOS atual continua no ar até validarmos tudo juntos; só desligamos depois.
+### Fase 5 — Validação e corte (o "Pull Request")
+- Validamos consultoria + agência rodando juntas **no ambiente de desenvolvimento**, com dados reais da agência.
 - Checklist de aceite com o Giuliano (ele valida vendo a tela funcionar).
+- Só então **publicamos** — o equivalente ao merge: produção recebe tudo de uma vez. O CupolaOS antigo no Cloudflare continua no ar como plano B até confirmarmos que está tudo certo, e desligamos por último.
 
 ## O que ainda preciso de você (não bloqueia a Fase 1)
 
