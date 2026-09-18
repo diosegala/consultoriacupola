@@ -15,7 +15,7 @@ Analisei o código e o schema enviados. A ferramenta é tecnicamente **muito par
 ## Conflitos a resolver (todos solucionáveis)
 
 1. **Nomes de tabelas batem**: `clientes`, `contratos`, `projetos`, `documentos`, `reunioes`, `okrs`, `auditoria` e `mensagens` existem nos dois bancos com estruturas diferentes. Solução: colocar tudo da agência num **schema separado `agencia`** no nosso banco — isolamento total, zero risco para a consultoria, e a RLS deles (bem escrita, com funções security definer) migra quase intacta para dentro desse schema.
-2. **Servidor Cloudflare Worker** → aqui o servidor é Supabase Edge Functions. As rotas do worker viram functions; as chamadas de IA passam pelo nosso gateway de IA (sem depender de chave da Anthropic/Google separada, ou mantendo as chaves deles como segredo — decidimos juntos).
+2. **Servidor Cloudflare Worker** → aqui o servidor é Supabase Edge Functions. As rotas do worker viram functions. **Decisão sua já registrada**: as chaves de IA são as deles (hoje Anthropic), gerenciadas numa aba própria em Configurações (ver seção "Chaves de IA" abaixo) — nada mais hardcoded.
 3. **Usuários**: as 20 pessoas terão contas aqui (mesmo e-mail, senha nova definida no primeiro acesso, reaproveitando nosso fluxo de primeiro login). A tabela `pessoas` deles vira `agencia.pessoas`, ligada ao nosso login.
 4. **Dados e arquivos**: precisamos de um dump SQL do banco de produção deles (o Giuliano roda `supabase db dump` — o schema do script já foi confirmado como igual) e da cópia dos arquivos do Storage.
 5. **Integrações externas**: Firecrawl tem conector pronto aqui; Anthropic/Gemini entram via nosso gateway; a conta de serviço do Drive entra como segredo; RunRun.it e RSS rodam nas functions.
