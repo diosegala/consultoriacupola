@@ -46,6 +46,12 @@ const adminMenuItems = [
   { to: '/configuracoes', icon: Settings, label: 'Configurações' },
 ];
 
+const agenciaMenuItems = [
+  { to: '/agencia/contas', icon: Building2, label: 'Contas' },
+  { to: '/agencia/agentes', icon: Bot, label: 'Agentes' },
+  { to: '/agencia/equipe', icon: Users, label: 'Time' },
+];
+
 const consultorMenuItems = [
   { to: '/meu-painel', icon: LayoutDashboard, label: 'Meu Painel' },
   { to: '/clientes', icon: Users, label: 'Meus Clientes' },
