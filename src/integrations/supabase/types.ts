@@ -207,6 +207,9 @@ export type Database = {
       }
       ai_usage_logs: {
         Row: {
+          agencia_cliente_id: string | null
+          agencia_pessoa_id: string | null
+          agente_slug: string | null
           agente_tipo: string | null
           cliente_id: string | null
           consultor_id: string | null
@@ -218,10 +221,15 @@ export type Database = {
           model: string | null
           output_tokens: number
           provider: string
+          sessao_id: string | null
           status: string
+          unidade: string
           user_id: string | null
         }
         Insert: {
+          agencia_cliente_id?: string | null
+          agencia_pessoa_id?: string | null
+          agente_slug?: string | null
           agente_tipo?: string | null
           cliente_id?: string | null
           consultor_id?: string | null
@@ -233,10 +241,15 @@ export type Database = {
           model?: string | null
           output_tokens?: number
           provider: string
+          sessao_id?: string | null
           status?: string
+          unidade?: string
           user_id?: string | null
         }
         Update: {
+          agencia_cliente_id?: string | null
+          agencia_pessoa_id?: string | null
+          agente_slug?: string | null
           agente_tipo?: string | null
           cliente_id?: string | null
           consultor_id?: string | null
@@ -248,7 +261,9 @@ export type Database = {
           model?: string | null
           output_tokens?: number
           provider?: string
+          sessao_id?: string | null
           status?: string
+          unidade?: string
           user_id?: string | null
         }
         Relationships: [
