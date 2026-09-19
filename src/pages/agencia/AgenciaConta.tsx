@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Building2 } from 'lucide-react';
+import { ArrowLeft, Building2, Sparkles } from 'lucide-react';
+import { FichaAutomaticaDialog } from '@/components/agencia/FichaAutomaticaDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -30,6 +32,7 @@ export default function AgenciaConta() {
   const { data: entregaveis } = useAgenciaEntregaveis(cliente?.id);
   const { data: conhecimento } = useAgenciaConhecimento(cliente?.id);
   const { data: projetos } = useAgenciaProjetos();
+  const [fichaAberta, setFichaAberta] = useState(false);
 
   if (isLoading) return <Skeleton className="h-64 w-full" />;
   if (!cliente) {
@@ -56,17 +59,29 @@ export default function AgenciaConta() {
         </Button>
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="rounded-lg bg-primary/10 p-2">
-          <Building2 className="h-5 w-5 text-primary" />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="rounded-lg bg-primary/10 p-2">
+            <Building2 className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold">{cliente.nome}</h1>
+            <p className="text-sm text-muted-foreground">
+              {[cliente.cidade, cliente.sigla].filter(Boolean).join(' · ')}
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold">{cliente.nome}</h1>
-          <p className="text-sm text-muted-foreground">
-            {[cliente.cidade, cliente.sigla].filter(Boolean).join(' · ')}
-          </p>
-        </div>
+        <Button variant="outline" size="sm" onClick={() => setFichaAberta(true)}>
+          <Sparkles className="mr-2 h-4 w-4" />
+          Preencher ficha com o material
+        </Button>
       </div>
+
+      <FichaAutomaticaDialog
+        clienteId={cliente.id}
+        aberto={fichaAberta}
+        onOpenChange={setFichaAberta}
+      />
 
       <Tabs defaultValue="perfil">
         <TabsList>
