@@ -32,6 +32,7 @@ export default function AgenciaConta() {
   const { data: entregaveis } = useAgenciaEntregaveis(cliente?.id);
   const { data: conhecimento } = useAgenciaConhecimento(cliente?.id);
   const { data: projetos } = useAgenciaProjetos();
+  const [fichaAberta, setFichaAberta] = useState(false);
 
   if (isLoading) return <Skeleton className="h-64 w-full" />;
   if (!cliente) {
