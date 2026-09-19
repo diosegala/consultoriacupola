@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
 
     // Histórico da sessão (últimas 30 mensagens).
     const { data: historico } = await ag
-      .from("mensagens").select("papel, conteudo").eq("sessao_id", sessaoId)
+      .from("mensagens").select("papel, conteudo").eq("sessao_id", sessaoId).in("papel", ["pessoa", "agente"])
       .order("criada_em", { ascending: true }).limit(30);
 
     // Contexto do cliente, quando a conversa é por conta.
@@ -106,11 +106,8 @@ Deno.serve(async (req) => {
 
     const input = [
       ...(historico ?? []).map((m: { papel: string; conteudo: string }) => ({
-        role: m.papel === "assistente" || m.papel === "assistant" ? "assistant" : "user",
-        content: [{
-          type: m.papel === "assistente" || m.papel === "assistant" ? "output_text" : "input_text",
-          text: m.conteudo,
-        }],
+        role: m.papel === "agente" ? "assistant" : "user",
+        content: [{ type: m.papel === "agente" ? "output_text" : "input_text", text: m.conteudo }],
       })),
       { role: "user", content: [{ type: "input_text", text: pergunta }] },
     ];
@@ -177,7 +174,7 @@ Deno.serve(async (req) => {
     const agora = new Date().toISOString();
     await ag.from("mensagens").insert([
       { id: novoId(), sessao_id: sessaoId, papel: "pessoa", conteudo: pergunta, criada_em: agora },
-      { id: novoId(), sessao_id: sessaoId, papel: "assistente", conteudo: texto, criada_em: new Date(Date.now() + 1).toISOString() },
+      { id: novoId(), sessao_id: sessaoId, papel: "agente", conteudo: texto, criada_em: new Date(Date.now() + 1).toISOString() },
     ]);
     await ag.from("sessoes").update({ atualizada_em: agora }).eq("id", sessaoId);
 
