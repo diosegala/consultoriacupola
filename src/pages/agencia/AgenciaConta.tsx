@@ -59,17 +59,29 @@ export default function AgenciaConta() {
         </Button>
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="rounded-lg bg-primary/10 p-2">
-          <Building2 className="h-5 w-5 text-primary" />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="rounded-lg bg-primary/10 p-2">
+            <Building2 className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold">{cliente.nome}</h1>
+            <p className="text-sm text-muted-foreground">
+              {[cliente.cidade, cliente.sigla].filter(Boolean).join(' · ')}
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold">{cliente.nome}</h1>
-          <p className="text-sm text-muted-foreground">
-            {[cliente.cidade, cliente.sigla].filter(Boolean).join(' · ')}
-          </p>
-        </div>
+        <Button variant="outline" size="sm" onClick={() => setFichaAberta(true)}>
+          <Sparkles className="mr-2 h-4 w-4" />
+          Preencher ficha com o material
+        </Button>
       </div>
+
+      <FichaAutomaticaDialog
+        clienteId={cliente.id}
+        aberto={fichaAberta}
+        onOpenChange={setFichaAberta}
+      />
 
       <Tabs defaultValue="perfil">
         <TabsList>
