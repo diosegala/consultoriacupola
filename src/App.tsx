@@ -34,6 +34,10 @@ import Agentes from "./pages/Agentes";
 import Inteligencia from "./pages/Inteligencia";
 import PesquisaReunioes from "./pages/PesquisaReunioes";
 import Mensagens from "./pages/Mensagens";
+import AgenciaClientes from "./pages/agencia/AgenciaClientes";
+import AgenciaConta from "./pages/agencia/AgenciaConta";
+import AgenciaAgentes from "./pages/agencia/AgenciaAgentes";
+import AgenciaEquipe from "./pages/agencia/AgenciaEquipe";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 
 const queryClient = new QueryClient({
