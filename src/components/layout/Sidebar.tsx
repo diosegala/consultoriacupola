@@ -132,6 +132,35 @@ export function Sidebar() {
             </NavLink>
           );
         })}
+
+        {temAgencia && (
+          <div className="pt-4 mt-2 border-t border-sidebar-border space-y-1">
+            {!collapsed && (
+              <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Agência
+              </p>
+            )}
+            {agenciaMenuItems.map((item) => {
+              const isActive = location.pathname.startsWith(item.to);
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2 rounded-md transition-colors",
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent",
+                    collapsed && "justify-center"
+                  )}
+                >
+                  <item.icon className="h-5 w-5 flex-shrink-0" />
+                  {!collapsed && <span>{item.label}</span>}
+                </NavLink>
+              );
+            })}
+          </div>
+        )}
       </nav>
 
       {/* User section */}
