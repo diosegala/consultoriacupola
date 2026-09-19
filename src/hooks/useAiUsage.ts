@@ -15,6 +15,8 @@ export interface AiUsageRow {
   consultor_id: string | null;
   user_id: string | null;
   status: string;
+  unidade?: string | null;
+  agente_slug?: string | null;
   clientes?: { nome: string } | null;
   consultores?: { nome: string } | null;
 }
@@ -27,18 +29,22 @@ export interface AiUsageAggregates {
   porCliente: Array<{ id: string; nome: string; cost_usd: number; calls: number }>;
   porConsultor: Array<{ id: string; nome: string; cost_usd: number; calls: number }>;
   porAgente: Array<{ tipo: string; cost_usd: number; calls: number }>;
+  porUnidade: Array<{ unidade: string; cost_usd: number; calls: number }>;
   recentes: AiUsageRow[];
 }
 
-export function useAiUsage(periodo: 'mes' | 'tudo' = 'mes') {
+export function useAiUsage(periodo: 'mes' | 'tudo' = 'mes', unidade: 'todas' | 'consultoria' | 'agencia' = 'todas') {
   return useQuery({
-    queryKey: ['ai-usage', periodo],
+    queryKey: ['ai-usage', periodo, unidade],
     queryFn: async (): Promise<AiUsageAggregates> => {
       let q = supabase
         .from('ai_usage_logs' as any)
-        .select('id, created_at, provider, model, agente_tipo, input_tokens, output_tokens, cost_usd, cliente_id, consultor_id, user_id, status, clientes(nome), consultores(nome)')
+        .select('id, created_at, provider, model, agente_tipo, input_tokens, output_tokens, cost_usd, cliente_id, consultor_id, user_id, status, unidade, agente_slug, clientes(nome), consultores(nome)')
         .order('created_at', { ascending: false })
         .limit(500);
+      if (unidade !== 'todas') {
+        q = q.eq('unidade', unidade);
+      }
       if (periodo === 'mes') {
         q = q.gte('created_at', startOfMonth(new Date()).toISOString());
       }
@@ -49,6 +55,7 @@ export function useAiUsage(periodo: 'mes' | 'tudo' = 'mes') {
       const porClienteMap = new Map<string, { nome: string; cost_usd: number; calls: number }>();
       const porConsultorMap = new Map<string, { nome: string; cost_usd: number; calls: number }>();
       const porAgenteMap = new Map<string, { cost_usd: number; calls: number }>();
+      const porUnidadeMap = new Map<string, { cost_usd: number; calls: number }>();
       let totalUsd = 0, totalCalls = 0, totalIn = 0, totalOut = 0;
 
       for (const r of rows) {
@@ -68,6 +75,12 @@ export function useAiUsage(periodo: 'mes' | 'tudo' = 'mes') {
           cur.cost_usd += cost; cur.calls += 1;
           porConsultorMap.set(r.consultor_id, cur);
         }
+        {
+          const chave = r.unidade ?? 'consultoria';
+          const cur = porUnidadeMap.get(chave) ?? { cost_usd: 0, calls: 0 };
+          cur.cost_usd += cost; cur.calls += 1;
+          porUnidadeMap.set(chave, cur);
+        }
         if (r.agente_tipo) {
           const cur = porAgenteMap.get(r.agente_tipo) ?? { cost_usd: 0, calls: 0 };
           cur.cost_usd += cost; cur.calls += 1;
@@ -85,6 +98,10 @@ export function useAiUsage(periodo: 'mes' | 'tudo' = 'mes') {
         .map(([tipo, v]) => ({ tipo, ...v }))
         .sort((a, b) => b.cost_usd - a.cost_usd);
 
+      const porUnidade = Array.from(porUnidadeMap.entries())
+        .map(([unidade, v]) => ({ unidade, ...v }))
+        .sort((a, b) => b.cost_usd - a.cost_usd);
+
       return {
         totalUsd,
         totalCalls,
@@ -93,6 +110,7 @@ export function useAiUsage(periodo: 'mes' | 'tudo' = 'mes') {
         porCliente,
         porConsultor,
         porAgente,
+        porUnidade,
         recentes: rows.slice(0, 20),
       };
     },

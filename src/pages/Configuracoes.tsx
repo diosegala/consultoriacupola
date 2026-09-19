@@ -38,6 +38,7 @@ import { PoliticaRiscoChurnCard } from '@/components/configuracoes/PoliticaRisco
 import { DiretrizesAgentesCard } from '@/components/configuracoes/DiretrizesAgentesCard';
 import { useMyConsultorId } from '@/hooks/useDisc';
 import { AcessosLogCard } from '@/components/configuracoes/AcessosLogCard';
+import { AiUsageSection } from '@/components/dashboard/AiUsageSection';
 
 export default function Configuracoes() {
   const { toast } = useToast();
@@ -419,7 +420,14 @@ export default function Configuracoes() {
           {isAdmin && <TabsTrigger value="etapas">Etapas do Kanban</TabsTrigger>}
           {(isAdmin || isDirector) && <TabsTrigger value="politicas">Políticas</TabsTrigger>}
           {isAdmin && <TabsTrigger value="oraculo">Oráculo</TabsTrigger>}
+          {(isAdmin || isDirector) && <TabsTrigger value="ia">Inteligência Artificial</TabsTrigger>}
         </TabsList>
+
+        {(isAdmin || isDirector) && (
+          <TabsContent value="ia" className="mt-6">
+            <AiUsageSection />
+          </TabsContent>
+        )}
 
         {(isAdmin || isDirector) && (
           <TabsContent value="politicas" className="mt-6">

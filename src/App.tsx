@@ -37,6 +37,7 @@ import Mensagens from "./pages/Mensagens";
 import AgenciaClientes from "./pages/agencia/AgenciaClientes";
 import AgenciaConta from "./pages/agencia/AgenciaConta";
 import AgenciaAgentes from "./pages/agencia/AgenciaAgentes";
+import AgenciaAgenteConversa from "./pages/agencia/AgenciaAgenteConversa";
 import AgenciaEquipe from "./pages/agencia/AgenciaEquipe";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 
@@ -91,6 +92,7 @@ const App = () => (
               <Route path="/agencia/contas" element={<AgenciaClientes />} />
               <Route path="/agencia/contas/:slug" element={<AgenciaConta />} />
               <Route path="/agencia/agentes" element={<AgenciaAgentes />} />
+              <Route path="/agencia/agentes/:slug" element={<AgenciaAgenteConversa />} />
               <Route path="/agencia/equipe" element={<AgenciaEquipe />} />
             </Route>
             <Route path="*" element={<NotFound />} />
