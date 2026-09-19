@@ -4,7 +4,7 @@ Plano aprovado em .lovable/plan/trazer-o-cupolaos-agência-de-marketing-para-den
 
 ## Fases
 - [x] Fase 1 — Fundação: schema `agencia` (60 tabelas) + RLS (129 políticas) + GRANTs + buckets (conhecimento, retratos) + seed (12 espaços, 3 squads, 21 pessoas, 26 agentes, 7 fontes, 1 produto) + schema exposto via PostgREST
-- [ ] Fase 2 — Frontend: seção "Agência" no menu, páginas adaptadas ao dark theme, auth/permissões no nosso sistema (PRÓXIMA — começar pela ficha de cliente + agentes de IA)
+- [~] Fase 2 — Frontend: seção "Agência" no menu (Contas, Agentes, Time) com rotas /agencia/*, acesso liberado a quem tem ficha ativa em agencia.pessoas, GRANTs para authenticated no schema agencia. Falta: criação/edição de contas, projetos, blog/redes, admin e gestão
 - [ ] Fase 3 — Servidor e IA: worker → edge functions; aba "Inteligência Artificial" em Configurações (modelo por provedor + painel de uso/custo por unidade, agente, cliente, usuário); integrações (Firecrawl, Drive, RunRun.it, RSS)
 - [ ] Fase 4 — Migração de dados e usuários (bloqueada: aguardando dump do banco de produção do CupolaOS + acesso ao Storage — pedir ao Giuliano)
 - [ ] Fase 5 — Validação com Giuliano e publicação (corte)

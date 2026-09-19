@@ -17,11 +17,13 @@ import {
   Bot,
   Brain,
   Search,
-  MessageSquare
+  MessageSquare,
+  Building2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChatBadge } from '@/components/chat/useChatBadge';
+import { useTemAcessoAgencia } from '@/hooks/agencia/useAgencia';
 import cupolaLogoBranca from '@/assets/cupola-logo-branca.png';
 import cupolaIcon from '@/assets/cupola-icon.png';
 import { Button } from '@/components/ui/button';
@@ -46,6 +48,12 @@ const adminMenuItems = [
   { to: '/configuracoes', icon: Settings, label: 'Configurações' },
 ];
 
+const agenciaMenuItems = [
+  { to: '/agencia/contas', icon: Building2, label: 'Contas' },
+  { to: '/agencia/agentes', icon: Bot, label: 'Agentes' },
+  { to: '/agencia/equipe', icon: Users, label: 'Time' },
+];
+
 const consultorMenuItems = [
   { to: '/meu-painel', icon: LayoutDashboard, label: 'Meu Painel' },
   { to: '/clientes', icon: Users, label: 'Meus Clientes' },
@@ -67,6 +75,7 @@ export function Sidebar() {
   const { total: chatNaoLidas } = useChatBadge();
 
   const menuItems = isConsultor ? consultorMenuItems : adminMenuItems;
+  const { temAcesso: temAgencia } = useTemAcessoAgencia();
 
   return (
     <aside 
@@ -123,6 +132,35 @@ export function Sidebar() {
             </NavLink>
           );
         })}
+
+        {temAgencia && (
+          <div className="pt-4 mt-2 border-t border-sidebar-border space-y-1">
+            {!collapsed && (
+              <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Agência
+              </p>
+            )}
+            {agenciaMenuItems.map((item) => {
+              const isActive = location.pathname.startsWith(item.to);
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2 rounded-md transition-colors",
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent",
+                    collapsed && "justify-center"
+                  )}
+                >
+                  <item.icon className="h-5 w-5 flex-shrink-0" />
+                  {!collapsed && <span>{item.label}</span>}
+                </NavLink>
+              );
+            })}
+          </div>
+        )}
       </nav>
 
       {/* User section */}
