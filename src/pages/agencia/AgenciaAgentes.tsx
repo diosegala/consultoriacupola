@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Bot, Search } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -66,7 +67,8 @@ export default function AgenciaAgentes() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {lista.map((a) => (
-            <Card key={a.id} className="h-full">
+            <Link key={a.id} to={`/agencia/agentes/${a.slug}`} className="block">
+            <Card className="h-full transition-colors hover:border-primary/50">
               <CardContent className="space-y-2 p-5">
                 <div className="flex items-start justify-between gap-2">
                   <h2 className="font-semibold leading-tight">{a.nome}</h2>
@@ -81,12 +83,13 @@ export default function AgenciaAgentes() {
                 </p>
               </CardContent>
             </Card>
+            </Link>
           ))}
         </div>
       )}
 
       <p className="text-xs text-muted-foreground">
-        Por enquanto este é o catálogo. A execução dos agentes entra na próxima etapa.
+        Clique em um agente para conversar com ele.
       </p>
     </div>
   );
