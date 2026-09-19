@@ -22,6 +22,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChatBadge } from '@/components/chat/useChatBadge';
+import { useTemAcessoAgencia } from '@/hooks/agencia/useAgencia';
 import cupolaLogoBranca from '@/assets/cupola-logo-branca.png';
 import cupolaIcon from '@/assets/cupola-icon.png';
 import { Button } from '@/components/ui/button';
