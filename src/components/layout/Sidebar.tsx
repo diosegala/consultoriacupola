@@ -75,6 +75,7 @@ export function Sidebar() {
   const { total: chatNaoLidas } = useChatBadge();
 
   const menuItems = isConsultor ? consultorMenuItems : adminMenuItems;
+  const { temAcesso: temAgencia } = useTemAcessoAgencia();
 
   return (
     <aside 
