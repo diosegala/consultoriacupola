@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Building2 } from 'lucide-react';
+import { ArrowLeft, Building2, Sparkles } from 'lucide-react';
+import { FichaAutomaticaDialog } from '@/components/agencia/FichaAutomaticaDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
