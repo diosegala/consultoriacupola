@@ -422,7 +422,7 @@ Deno.serve(async (req) => {
         texto_imagem: textoImagem || null,
         slides,
         stories,
-        estado: "escrito",
+        estado: "escolhido",
         atualizado_em: new Date().toISOString(),
       })
       .eq("id", temaId);
