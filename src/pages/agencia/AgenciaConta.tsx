@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Building2, Sparkles, Megaphone } from 'lucide-react';
+import { ArrowLeft, Building2, Sparkles, Megaphone, FileText } from 'lucide-react';
 import { FichaAutomaticaDialog } from '@/components/agencia/FichaAutomaticaDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -80,6 +80,12 @@ export default function AgenciaConta() {
             <Link to={`/agencia/contas/${cliente.slug}/redes`}>
               <Megaphone className="mr-2 h-4 w-4" />
               Conteúdo de redes
+            </Link>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link to={`/agencia/contas/${cliente.slug}/blog`}>
+              <FileText className="mr-2 h-4 w-4" />
+              Blog
             </Link>
           </Button>
         </div>
