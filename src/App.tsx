@@ -36,6 +36,7 @@ import PesquisaReunioes from "./pages/PesquisaReunioes";
 import Mensagens from "./pages/Mensagens";
 import AgenciaClientes from "./pages/agencia/AgenciaClientes";
 import AgenciaConta from "./pages/agencia/AgenciaConta";
+import AgenciaContaRedes from "./pages/agencia/AgenciaContaRedes";
 import AgenciaAgentes from "./pages/agencia/AgenciaAgentes";
 import AgenciaAgenteConversa from "./pages/agencia/AgenciaAgenteConversa";
 import AgenciaEquipe from "./pages/agencia/AgenciaEquipe";
@@ -91,6 +92,7 @@ const App = () => (
               <Route path="/integracoes" element={<MinhasIntegracoes />} />
               <Route path="/agencia/contas" element={<AgenciaClientes />} />
               <Route path="/agencia/contas/:slug" element={<AgenciaConta />} />
+              <Route path="/agencia/contas/:slug/redes" element={<AgenciaContaRedes />} />
               <Route path="/agencia/agentes" element={<AgenciaAgentes />} />
               <Route path="/agencia/agentes/:slug" element={<AgenciaAgenteConversa />} />
               <Route path="/agencia/equipe" element={<AgenciaEquipe />} />
