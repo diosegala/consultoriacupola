@@ -54,8 +54,8 @@ function TemaCard({
               <p className="mt-1 text-sm text-muted-foreground">{tema.justificativa}</p>
             )}
           </div>
-          <Badge variant={tema.estado === 'escrito' ? 'default' : 'outline'}>
-            {tema.estado === 'escrito' ? 'texto pronto' : 'sugerido'}
+          <Badge variant={tema.legenda ? 'default' : 'outline'}>
+            {tema.legenda ? 'texto pronto' : 'sugerido'}
           </Badge>
         </div>
 
