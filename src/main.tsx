@@ -10,5 +10,6 @@ if (!rootElement) {
 }
 
 document.documentElement.classList.add("dark");
+document.body.classList.add("font-sans", "bg-background", "text-foreground", "antialiased");
 
 createRoot(rootElement).render(<App />);
