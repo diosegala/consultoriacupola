@@ -420,6 +420,13 @@ export default function MinhasIntegracoes() {
           )}
         </Card>
       )}
+
+      {isAdmin && (
+        <div className="pt-4 border-t border-border">
+          <IntegracoesAgenciaCard />
+        </div>
+      )}
     </div>
+
   );
 }
