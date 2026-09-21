@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
     fd.append("model", modelo);
     const r = await fetch("https://ai.gateway.lovable.dev/v1/audio/transcriptions", {
       method: "POST",
-      headers: { "Lovable-API-Key": key, "X-Lovable-AIG-SDK": "fetch" },
+      headers: { Authorization: `Bearer ${key}` },
       body: fd,
     });
     out[modelo] = { status: r.status, body: (await r.text()).slice(0, 300) };
