@@ -89,12 +89,12 @@ export function TempoInvestidoSection({ consultorId, from, to }: { consultorId?:
             <div style={{ height: 280 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={stats.porTipo}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="label" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} label={{ value: 'minutos', angle: -90, position: 'insideLeft', fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
-                  <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="label" stroke="var(--muted-foreground)" fontSize={12} />
+                  <YAxis stroke="var(--muted-foreground)" fontSize={12} label={{ value: 'minutos', angle: -90, position: 'insideLeft', fill: 'var(--muted-foreground)', fontSize: 11 }} />
+                  <Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)' }} />
                   <Legend />
-                  <Bar dataKey="preparacao_min" name="Preparação (min)" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="preparacao_min" name="Preparação (min)" fill="var(--primary)" radius={[6, 6, 0, 0]} />
                   <Bar dataKey="ia_min" name="IA (min)" fill="#7c3aed" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>

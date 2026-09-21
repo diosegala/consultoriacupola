@@ -96,22 +96,22 @@ export function MinhaPerformanceTab({ consultorId, clienteId }: MinhaPerformance
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData} margin={{ top: 8, right: 16, bottom: 0, left: -16 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="data" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                <YAxis domain={[0, 10]} stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="data" stroke="var(--muted-foreground)" fontSize={12} />
+                <YAxis domain={[0, 10]} stroke="var(--muted-foreground)" fontSize={12} />
                 <Tooltip
                   contentStyle={{
-                    background: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
+                    background: 'var(--card)',
+                    border: '1px solid var(--border)',
                     borderRadius: 8,
                     fontSize: 12,
                   }}
                 />
-                <ReferenceLine y={media} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
+                <ReferenceLine y={media} stroke="var(--muted-foreground)" strokeDasharray="3 3" />
                 <Line
                   type="monotone"
                   dataKey="score"
-                  stroke="hsl(var(--primary))"
+                  stroke="var(--primary)"
                   strokeWidth={2}
                   dot={{ r: 4 }}
                 />

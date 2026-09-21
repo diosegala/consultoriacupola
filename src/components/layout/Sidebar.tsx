@@ -25,7 +25,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChatBadge } from '@/components/chat/useChatBadge';
 import { useTemAcessoAgencia } from '@/hooks/agencia/useAgencia';
-import cupolaLogoBranca from '@/assets/cupola-logo-branca.png';
+import cupolaLogo from '@/design-system/design-system-hub-ba3841/assets/cupola-logo.svg.asset.json';
 import cupolaIcon from '@/assets/cupola-icon.png';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
@@ -94,7 +94,7 @@ export function Sidebar() {
       {/* Logo */}
       <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
       {!collapsed ? (
-          <img src={cupolaLogoBranca} alt="Cupola Consultoria" className="h-8 object-contain" />
+          <img src={cupolaLogo.url} alt="Cupola Consultoria" className="h-8 object-contain" />
         ) : (
           <img src={cupolaIcon} alt="Cupola" className="h-6 object-contain mx-auto" />
         )}

@@ -341,33 +341,33 @@ export default function Dashboard() {
           ) : (
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={mrrHistorico || []}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis 
                   dataKey="mes" 
-                  stroke="hsl(var(--muted-foreground))"
+                  stroke="var(--muted-foreground)"
                   fontSize={12}
                 />
                 <YAxis 
-                  stroke="hsl(var(--muted-foreground))"
+                  stroke="var(--muted-foreground)"
                   fontSize={12}
                   tickFormatter={(value) => formatCurrency(value)}
                 />
                 <Tooltip 
                   formatter={(value: number, name: string) => [formatCurrency(value), name === 'mrr_projetado' ? 'MRR Projetado' : 'MRR']}
                   contentStyle={{
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
+                    backgroundColor: 'var(--card)',
+                    border: '1px solid var(--border)',
                     borderRadius: '8px'
                   }}
-                  labelStyle={{ color: 'hsl(var(--foreground))' }}
+                  labelStyle={{ color: 'var(--foreground)' }}
                 />
                 <Line 
                   type="monotone" 
                   dataKey="mrr" 
                   name="MRR"
-                  stroke="hsl(var(--primary))" 
+                  stroke="var(--primary)" 
                   strokeWidth={2}
-                  dot={{ fill: 'hsl(var(--primary))' }}
+                  dot={{ fill: 'var(--primary)' }}
                   connectNulls={false}
                 />
                 {mesesFuturos > 0 && (
@@ -375,10 +375,10 @@ export default function Dashboard() {
                     type="monotone" 
                     dataKey="mrr_projetado" 
                     name="MRR Projetado"
-                    stroke="hsl(var(--primary))" 
+                    stroke="var(--primary)" 
                     strokeWidth={2}
                     strokeDasharray="6 4"
-                    dot={{ fill: 'hsl(var(--primary))', strokeDasharray: '' }}
+                    dot={{ fill: 'var(--primary)', strokeDasharray: '' }}
                     connectNulls={false}
                   />
                 )}
@@ -401,37 +401,37 @@ export default function Dashboard() {
           ) : (
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={contratosHistorico || []}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis 
                   dataKey="mes" 
-                  stroke="hsl(var(--muted-foreground))"
+                  stroke="var(--muted-foreground)"
                   fontSize={12}
                 />
                 <YAxis 
-                  stroke="hsl(var(--muted-foreground))"
+                  stroke="var(--muted-foreground)"
                   fontSize={12}
                   allowDecimals={false}
                 />
                 <Tooltip 
                   contentStyle={{
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
+                    backgroundColor: 'var(--card)',
+                    border: '1px solid var(--border)',
                     borderRadius: '8px'
                   }}
-                  labelStyle={{ color: 'hsl(var(--foreground))' }}
+                  labelStyle={{ color: 'var(--foreground)' }}
                 />
                 <Legend />
                 <Bar 
                   dataKey="encerrados" 
                   name="Encerrados" 
-                  fill="hsl(var(--destructive))" 
+                  fill="var(--destructive)" 
                   stackId="contratos"
                   radius={[0, 0, 0, 0]}
                 />
                 <Bar 
                   dataKey="novos" 
                   name="Novos" 
-                  fill="hsl(var(--primary))" 
+                  fill="var(--primary)" 
                   stackId="contratos"
                   radius={[4, 4, 0, 0]}
                 />
@@ -457,30 +457,30 @@ export default function Dashboard() {
           ) : (
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={despesasViagensMensal || []}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis 
                   dataKey="mes" 
-                  stroke="hsl(var(--muted-foreground))"
+                  stroke="var(--muted-foreground)"
                   fontSize={12}
                 />
                 <YAxis 
-                  stroke="hsl(var(--muted-foreground))"
+                  stroke="var(--muted-foreground)"
                   fontSize={12}
                   tickFormatter={(value) => formatCurrency(value)}
                 />
                 <Tooltip 
                   formatter={(value: number) => [formatCurrency(value), 'Despesas']}
                   contentStyle={{
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
+                    backgroundColor: 'var(--card)',
+                    border: '1px solid var(--border)',
                     borderRadius: '8px'
                   }}
-                  labelStyle={{ color: 'hsl(var(--foreground))' }}
+                  labelStyle={{ color: 'var(--foreground)' }}
                 />
                 <Bar 
                   dataKey="total" 
                   name="Despesas" 
-                  fill="hsl(var(--primary))" 
+                  fill="var(--primary)" 
                   radius={[4, 4, 0, 0]}
                 />
               </BarChart>
@@ -502,45 +502,45 @@ export default function Dashboard() {
           ) : engajamentoClientes && engajamentoClientes.length > 0 ? (
             <ResponsiveContainer width="100%" height={Math.max(200, engajamentoClientes.length * 45)}>
               <BarChart data={engajamentoClientes} layout="vertical" margin={{ left: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
                 <XAxis 
                   type="number" 
                   domain={[0, 10]}
-                  stroke="hsl(var(--muted-foreground))"
+                  stroke="var(--muted-foreground)"
                   fontSize={12}
                 />
                 <YAxis 
                   type="category" 
                   dataKey="cliente_nome" 
                   width={150}
-                  stroke="hsl(var(--muted-foreground))"
+                  stroke="var(--muted-foreground)"
                   fontSize={12}
-                  tick={{ fill: 'hsl(var(--foreground))' }}
+                  tick={{ fill: 'var(--foreground)' }}
                 />
                 <Tooltip 
                   formatter={(value: number) => [value.toFixed(1), 'Score']}
                   contentStyle={{
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
+                    backgroundColor: 'var(--card)',
+                    border: '1px solid var(--border)',
                     borderRadius: '8px'
                   }}
-                  labelStyle={{ color: 'hsl(var(--foreground))' }}
+                  labelStyle={{ color: 'var(--foreground)' }}
                 />
                 <Bar 
                   dataKey="score_medio" 
                   name="Score" 
                   radius={[0, 4, 4, 0]}
-                  fill="hsl(var(--primary))"
+                  fill="var(--primary)"
                 >
                   {engajamentoClientes.map((entry, index) => (
                     <Cell 
                       key={`cell-${index}`}
                       fill={
                         entry.score_medio >= 8 
-                          ? 'hsl(142, 71%, 45%)' 
+                          ? 'var(--success)' 
                           : entry.score_medio >= 6 
-                            ? 'hsl(48, 96%, 53%)' 
-                            : 'hsl(0, 84%, 60%)'
+                            ? 'var(--warning)' 
+                            : 'var(--destructive)'
                       }
                     />
                   ))}
