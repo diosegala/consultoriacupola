@@ -1,0 +1,1266 @@
+{
+  "meta": {
+    "name": "Design System Hub",
+    "package": "@ws-bai6mkcfqq0mtq8dgdqz/80c9337f-d0f2-4118-a8be-7360bdf25920",
+    "version": "1.0.0",
+    "framework": "react",
+    "css_framework": "tailwind",
+    "starter_template": "custom_design_system_tailwind",
+    "theme_files": [
+      "src/styles.css"
+    ],
+    "source_type": "local",
+    "source_manifest": {
+      "#enrichment": "3747b11b686d21dec1410ff3b6f7502386879789acb352f22014bf58f3e7fb8f",
+      ".gitignore": "6d9e901a692b46a83707c245fb03bc91",
+      ".lovable/plan/plano-cupolaos-design-system-2026-09-21.md": "97260b71cfbe91ff82944dd245d2054e",
+      ".lovable/project.json": "f0b93142d2903a5a1f5e90f25900ce10",
+      ".prettierignore": "7279a476f196a2da5f7edd18db568dc6",
+      ".prettierrc": "185ef0234746ab738ac1ab6cec5e2bd9",
+      "AGENTS.md": "3da3c4cd15b686e79a248c25735d6aaf",
+      "README.md": "15ccc2c959c0bff2136261ce044c418f",
+      "bunfig.toml": "89115995d9de72fdfc894e16b1e75297",
+      "components.json": "30d3d035361ce807021f5c54620962e9",
+      "eslint.config.js": "345bdd57e188e0e4525edcd00e5003f5",
+      "package.json": "692effdeffb7cd6173cfbafe6b034d43",
+      "public/favicon.svg": "bb994d1978e0994cc247eccfa6e5810a",
+      "public/robots.txt": "f9dff89adf98833e676de2205921996a",
+      "src/assets/cupola-landscape.webp.asset.json": "0549a805141aca7ca1d84110756c3791",
+      "src/assets/cupola-logo.svg.asset.json": "ed57df777ad31797aae9bb19b493313c",
+      "src/assets/cupola-mark.svg.asset.json": "f1bd464cd223d0e672d1404ae35d6596",
+      "src/components/ai-elements/conversation.tsx": "48083a673c3eff6a19de5b8d02cb72e4",
+      "src/components/ai-elements/message.tsx": "a87c253d43874fb6093e150beaaa2739",
+      "src/components/ai-elements/prompt-input.tsx": "237aec636897e83b9ab2e099d543c877",
+      "src/components/ai-elements/shimmer.tsx": "9b4dfa502365893376725bcc06e74ada",
+      "src/components/cupola-catalog.tsx": "73186906cdb2909cf23e8c6ba9c0f092",
+      "src/components/ui/accordion.tsx": "55f9dda62b4e3913c9b23e5015a86aef",
+      "src/components/ui/alert-dialog.tsx": "96350e949e9b7b674545430a410ab89c",
+      "src/components/ui/alert.tsx": "f993d7e96b1e25ce50e68ed97e11d2a8",
+      "src/components/ui/aspect-ratio.tsx": "c5c364545e1b25a94e9e752cd67ad048",
+      "src/components/ui/avatar.tsx": "72989cd32f72c4122802540ef32525a5",
+      "src/components/ui/badge.tsx": "81cade001fc4260f9943e18dcd79449b",
+      "src/components/ui/breadcrumb.tsx": "bb9ac254f12662b20d5d50b84308bf3a",
+      "src/components/ui/button-group.tsx": "964036f9f529f5720fb805cf3b3ed0a8",
+      "src/components/ui/button.tsx": "f7a5102d0cde43e7b5892e91bc612c43",
+      "src/components/ui/calendar.tsx": "d849cc610e2683271f3f1c47d093cf30",
+      "src/components/ui/card.tsx": "d6c48ea36221b9cdc3576d305d12d5d5",
+      "src/components/ui/carousel.tsx": "e324c68ae00cd5aed49317638abd429a",
+      "src/components/ui/chart.tsx": "6a3baf94f2e89f1f97d4d7a28f3622d2",
+      "src/components/ui/checkbox.tsx": "f78aac270ca482c8c2cb907ef6260462",
+      "src/components/ui/collapsible.tsx": "767631bbc344945c236f185f4078d71d",
+      "src/components/ui/command.tsx": "014782599cc838b021ec68b07ad4ea02",
+      "src/components/ui/context-menu.tsx": "3ba8244ea23df34a1dba92f3a1230dad",
+      "src/components/ui/dialog.tsx": "ef4fe8e7de8675730afe3d633b260e09",
+      "src/components/ui/drawer.tsx": "8be333e8fd8e42576b1b5f72f07f4337",
+      "src/components/ui/dropdown-menu.tsx": "28d6e98d3c7811fc0514bfa69416f087",
+      "src/components/ui/form.tsx": "1b0aa6302b9017ea2a1307c22a1d2983",
+      "src/components/ui/hover-card.tsx": "1442794c5ca2a78d69e4e613b315ed3d",
+      "src/components/ui/input-group.tsx": "9981d455c5aaa88a564bd59ddfaf8f26",
+      "src/components/ui/input-otp.tsx": "65625f2f1c4d731a760aeed7b54459d1",
+      "src/components/ui/input.tsx": "1d4cc52a4cd8afb3e18e45bda942bb8a",
+      "src/components/ui/label.tsx": "7e35df4ca8edd0835efd97ca7937ef92",
+      "src/components/ui/menubar.tsx": "3c4121a1e78d3f424a7295381a8997d3",
+      "src/components/ui/navigation-menu.tsx": "e85351147a02b29577ff83d188b63c24",
+      "src/components/ui/pagination.tsx": "fac6cdbb4bbf78b273d85cd36d6cbb49",
+      "src/components/ui/popover.tsx": "f18aa1da2144f25ee60795c539c51bcd",
+      "src/components/ui/progress.tsx": "55c462e5c9dd678dcf2c0c510b014ac4",
+      "src/components/ui/radio-group.tsx": "0e1ace237a5da3197e3eb1e6683faba9",
+      "src/components/ui/resizable.tsx": "d9fcb9203c749fcab4e125a99bb12a86",
+      "src/components/ui/scroll-area.tsx": "87b65d3eb26f2b02ff35a7acea585ba5",
+      "src/components/ui/select.tsx": "31ea1bbd6671833b010b2e852c8a55d0",
+      "src/components/ui/separator.tsx": "433d163c4ffa00b59398a0c293198b5e",
+      "src/components/ui/sheet.tsx": "0221fbf97b69611b47fcbc10bb27669a",
+      "src/components/ui/sidebar.tsx": "83c1623eb50ebc370d7b1b84a542e369",
+      "src/components/ui/skeleton.tsx": "41b182e6e2fc3805960d41e767d4a972",
+      "src/components/ui/slider.tsx": "4752f1bfa26426988d325599e01c335b",
+      "src/components/ui/sonner.tsx": "97f59f60be3413196d095fcbf7383216",
+      "src/components/ui/spinner.tsx": "4799669575bae50e8c2b5a1764cb8c89",
+      "src/components/ui/switch.tsx": "82f5d8b0c59bb7ff305caa9f502e79ff",
+      "src/components/ui/table.tsx": "7cc889989d53894b659903c73aded96e",
+      "src/components/ui/tabs.tsx": "56e725558c2ce72c18243bf51717f385",
+      "src/components/ui/textarea.tsx": "c7aad96fb9545210d53135a96c76ed6b",
+      "src/components/ui/toggle-group.tsx": "ac26383acf721d116ca8e3ab5c5355d5",
+      "src/components/ui/toggle.tsx": "ee8c5adac74e7242b85b544db1a8fbad",
+      "src/components/ui/tooltip.tsx": "67d71db5a1ab935695d1def497f5b8a6",
+      "src/hooks/use-mobile.tsx": "c0a0bdd4638c391a1dd06ac82074e60b",
+      "src/lib/error-capture.ts": "f630d9686a9a989170f22eff4de7b30d",
+      "src/lib/error-page.ts": "8da0ddd7569bac2676b9a5c8edff8a36",
+      "src/lib/lovable-error-reporting.ts": "0367e03b7d71917510e4dc1cdae172ec",
+      "src/lib/utils.ts": "d9837f38cc05303254571985e3164050",
+      "src/routeTree.gen.ts": "6c278a80c7c7d379a9edc475e4c8309f",
+      "src/router.tsx": "8f905e713b0eba7fa8148b7995a708c9",
+      "src/routes/README.md": "b3a2f259b66fd1a11f54b6d5ac83bf57",
+      "src/routes/__root.tsx": "a432cf7543dfc347c02c9c73ca777e50",
+      "src/routes/index.tsx": "68bc21b36f4eb3790e29d0ba4f434a70",
+      "src/server.ts": "c7bbc49bb70e318af618d92775ee0f27",
+      "src/start.ts": "0502f82c58afce5012b4c102e6fe2437",
+      "src/styles.css": "7ae86f217ed27561d8427089a8d249b7",
+      "tsconfig.json": "e84e5c7fe88e3c5a4d54f55a816d42c1",
+      "vite.config.ts": "d67e8217e5f31b87c276b6357c9aedcf"
+    },
+    "pipeline_version": 8
+  },
+  "tokens": {
+    "color": [
+      {
+        "name": "--background",
+        "raw": "oklch(0.973 0.006 120)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--foreground",
+        "raw": "oklch(0.35 0.035 190)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--card",
+        "raw": "oklch(1 0 0)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--card-foreground",
+        "raw": "oklch(0.129 0.042 264.695)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--popover",
+        "raw": "oklch(1 0 0)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--popover-foreground",
+        "raw": "oklch(0.129 0.042 264.695)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--primary",
+        "raw": "oklch(0.285 0.065 165)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--primary-foreground",
+        "raw": "oklch(0.98 0.01 120)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--secondary",
+        "raw": "oklch(0.94 0.02 125)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--secondary-foreground",
+        "raw": "oklch(0.285 0.065 165)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--muted",
+        "raw": "oklch(0.95 0.008 150)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--muted-foreground",
+        "raw": "oklch(0.54 0.025 190)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--accent",
+        "raw": "oklch(0.94 0.03 125)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--accent-foreground",
+        "raw": "oklch(0.285 0.065 165)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--destructive",
+        "raw": "oklch(0.577 0.245 27.325)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--destructive-foreground",
+        "raw": "oklch(0.984 0.003 247.858)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--border",
+        "raw": "oklch(0.89 0.015 145)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--input",
+        "raw": "oklch(0.89 0.015 145)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--ring",
+        "raw": "oklch(0.75 0.19 130)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--brand",
+        "raw": "oklch(0.91 0.25 126)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--glass",
+        "raw": "oklch(1 0 0 / 18%)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--success",
+        "raw": "oklch(0.48 0.08 165)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--warning",
+        "raw": "oklch(0.52 0.1 80)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--info",
+        "raw": "oklch(0.45 0.08 225)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--chart-1",
+        "raw": "oklch(0.646 0.222 41.116)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--chart-2",
+        "raw": "oklch(0.6 0.118 184.704)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--chart-3",
+        "raw": "oklch(0.398 0.07 227.392)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--chart-4",
+        "raw": "oklch(0.828 0.189 84.429)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--chart-5",
+        "raw": "oklch(0.769 0.188 70.08)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--sidebar",
+        "raw": "oklch(0.984 0.003 247.858)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--sidebar-foreground",
+        "raw": "oklch(0.129 0.042 264.695)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--sidebar-primary",
+        "raw": "oklch(0.208 0.042 265.755)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--sidebar-primary-foreground",
+        "raw": "oklch(0.984 0.003 247.858)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--sidebar-accent",
+        "raw": "oklch(0.968 0.007 247.896)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--sidebar-accent-foreground",
+        "raw": "oklch(0.208 0.042 265.755)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--sidebar-border",
+        "raw": "oklch(0.929 0.013 255.508)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--sidebar-ring",
+        "raw": "oklch(0.704 0.04 256.788)",
+        "source": "src/styles.css"
+      }
+    ],
+    "typography": [
+      {
+        "name": "--font-sans",
+        "raw": "\"Manrope\", \"Helvetica Neue\", sans-serif",
+        "source": "src/styles.css"
+      }
+    ],
+    "radius": [
+      {
+        "name": "--radius-sm",
+        "raw": "calc(var(--radius) - 4px)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--radius-md",
+        "raw": "calc(var(--radius) - 2px)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--radius-xl",
+        "raw": "calc(var(--radius) + 4px)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--radius-2xl",
+        "raw": "calc(var(--radius) + 8px)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--radius-3xl",
+        "raw": "calc(var(--radius) + 12px)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--radius-4xl",
+        "raw": "calc(var(--radius) + 16px)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--radius",
+        "raw": "0.75rem",
+        "source": "src/styles.css"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Conversation",
+      "file": "src/components/ai-elements/conversation",
+      "import_path": ""
+    },
+    {
+      "name": "ConversationContent",
+      "file": "src/components/ai-elements/conversation",
+      "import_path": ""
+    },
+    {
+      "name": "ConversationEmptyState",
+      "file": "src/components/ai-elements/conversation",
+      "import_path": "",
+      "props": [
+        {
+          "name": "title",
+          "type": "string",
+          "default": "No messages yet"
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "default": "Start a conversation to see messages here"
+        },
+        {
+          "name": "icon",
+          "type": "any"
+        }
+      ]
+    },
+    {
+      "name": "ConversationScrollButton",
+      "file": "src/components/ai-elements/conversation",
+      "import_path": ""
+    },
+    {
+      "name": "ConversationDownload",
+      "file": "src/components/ai-elements/conversation",
+      "import_path": "",
+      "props": [
+        {
+          "name": "messages",
+          "type": "any",
+          "required": true
+        },
+        {
+          "name": "filename",
+          "type": "string",
+          "default": "conversation.md"
+        },
+        {
+          "name": "formatMessage",
+          "type": "function"
+        }
+      ]
+    },
+    {
+      "name": "Message",
+      "file": "src/components/ai-elements/message",
+      "import_path": "",
+      "props": [
+        {
+          "name": "from",
+          "type": "any",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "MessageContent",
+      "file": "src/components/ai-elements/message",
+      "import_path": ""
+    },
+    {
+      "name": "MessageActions",
+      "file": "src/components/ai-elements/message",
+      "import_path": ""
+    },
+    {
+      "name": "MessageAction",
+      "file": "src/components/ai-elements/message",
+      "import_path": "",
+      "props": [
+        {
+          "name": "tooltip",
+          "type": "string"
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "default": "Previous branch"
+        }
+      ]
+    },
+    {
+      "name": "MessageBranch",
+      "file": "src/components/ai-elements/message",
+      "import_path": "",
+      "props": [
+        {
+          "name": "defaultBranch",
+          "type": "number",
+          "default": "0"
+        },
+        {
+          "name": "onBranchChange",
+          "type": "function"
+        }
+      ]
+    },
+    {
+      "name": "MessageBranchContent",
+      "file": "src/components/ai-elements/message",
+      "import_path": ""
+    },
+    {
+      "name": "MessageBranchSelector",
+      "file": "src/components/ai-elements/message",
+      "import_path": ""
+    },
+    {
+      "name": "MessageBranchPrevious",
+      "file": "src/components/ai-elements/message",
+      "import_path": ""
+    },
+    {
+      "name": "MessageBranchNext",
+      "file": "src/components/ai-elements/message",
+      "import_path": ""
+    },
+    {
+      "name": "MessageBranchPage",
+      "file": "src/components/ai-elements/message",
+      "import_path": ""
+    },
+    {
+      "name": "MessageToolbar",
+      "file": "src/components/ai-elements/message",
+      "import_path": ""
+    },
+    {
+      "name": "PromptInputProvider",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": ""
+    },
+    {
+      "name": "LocalReferencedSourcesContext",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": ""
+    },
+    {
+      "name": "PromptInputActionAddAttachments",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": "",
+      "props": [
+        {
+          "name": "label",
+          "type": "string",
+          "default": "Add photos or files"
+        }
+      ]
+    },
+    {
+      "name": "PromptInputActionAddScreenshot",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": "",
+      "props": [
+        {
+          "name": "label",
+          "type": "string",
+          "default": "Add photos or files"
+        }
+      ]
+    },
+    {
+      "name": "PromptInput",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": "",
+      "props": [
+        {
+          "name": "accept",
+          "type": "string"
+        },
+        {
+          "name": "multiple",
+          "type": "boolean"
+        },
+        {
+          "name": "globalDrop",
+          "type": "boolean"
+        },
+        {
+          "name": "syncHiddenInput",
+          "type": "boolean"
+        },
+        {
+          "name": "maxFiles",
+          "type": "number"
+        },
+        {
+          "name": "maxFileSize",
+          "type": "number"
+        },
+        {
+          "name": "onError",
+          "type": "function"
+        },
+        {
+          "name": "onSubmit",
+          "type": "function",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "PromptInputBody",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": ""
+    },
+    {
+      "name": "PromptInputTextarea",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": ""
+    },
+    {
+      "name": "PromptInputHeader",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": ""
+    },
+    {
+      "name": "PromptInputFooter",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": ""
+    },
+    {
+      "name": "PromptInputTools",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": ""
+    },
+    {
+      "name": "PromptInputButton",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": "",
+      "props": [
+        {
+          "name": "tooltip",
+          "type": "any"
+        }
+      ]
+    },
+    {
+      "name": "PromptInputActionMenu",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": ""
+    },
+    {
+      "name": "PromptInputActionMenuTrigger",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": ""
+    },
+    {
+      "name": "PromptInputActionMenuContent",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": ""
+    },
+    {
+      "name": "PromptInputActionMenuItem",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": ""
+    },
+    {
+      "name": "PromptInputSubmit",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": "",
+      "props": [
+        {
+          "name": "status",
+          "type": "any"
+        },
+        {
+          "name": "onStop",
+          "type": "function"
+        }
+      ]
+    },
+    {
+      "name": "PromptInputSelect",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": ""
+    },
+    {
+      "name": "PromptInputSelectTrigger",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": ""
+    },
+    {
+      "name": "PromptInputSelectContent",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": ""
+    },
+    {
+      "name": "PromptInputSelectItem",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": ""
+    },
+    {
+      "name": "PromptInputSelectValue",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": ""
+    },
+    {
+      "name": "PromptInputHoverCard",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": ""
+    },
+    {
+      "name": "PromptInputHoverCardTrigger",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": ""
+    },
+    {
+      "name": "PromptInputHoverCardContent",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": ""
+    },
+    {
+      "name": "PromptInputTabsList",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": ""
+    },
+    {
+      "name": "PromptInputTab",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": ""
+    },
+    {
+      "name": "PromptInputTabLabel",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": ""
+    },
+    {
+      "name": "PromptInputTabBody",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": ""
+    },
+    {
+      "name": "PromptInputTabItem",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": ""
+    },
+    {
+      "name": "PromptInputCommand",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": ""
+    },
+    {
+      "name": "PromptInputCommandInput",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": ""
+    },
+    {
+      "name": "PromptInputCommandList",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": ""
+    },
+    {
+      "name": "PromptInputCommandEmpty",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": ""
+    },
+    {
+      "name": "PromptInputCommandGroup",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": ""
+    },
+    {
+      "name": "PromptInputCommandItem",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": ""
+    },
+    {
+      "name": "PromptInputCommandSeparator",
+      "file": "src/components/ai-elements/prompt-input",
+      "import_path": ""
+    },
+    {
+      "name": "Shimmer",
+      "file": "src/components/ai-elements/shimmer",
+      "import_path": ""
+    },
+    {
+      "name": "CupolaCatalog",
+      "file": "src/components/cupola-catalog",
+      "import_path": ""
+    },
+    {
+      "name": "ButtonGroup",
+      "file": "src/components/ui/button-group",
+      "import_path": "",
+      "props": [
+        {
+          "name": "orientation",
+          "type": "enum",
+          "values": [
+            "horizontal",
+            "vertical"
+          ],
+          "default": "horizontal"
+        }
+      ]
+    },
+    {
+      "name": "ButtonGroupSeparator",
+      "file": "src/components/ui/button-group",
+      "import_path": ""
+    },
+    {
+      "name": "ButtonGroupText",
+      "file": "src/components/ui/button-group",
+      "import_path": ""
+    },
+    {
+      "name": "Button",
+      "file": "src/components/ui/button",
+      "import_path": "",
+      "props": [
+        {
+          "name": "variant",
+          "type": "enum",
+          "values": [
+            "default",
+            "destructive",
+            "outline",
+            "secondary",
+            "ghost",
+            "link"
+          ],
+          "default": "default"
+        },
+        {
+          "name": "size",
+          "type": "enum",
+          "values": [
+            "default",
+            "sm",
+            "lg",
+            "icon",
+            "icon-sm"
+          ],
+          "default": "default"
+        },
+        {
+          "name": "asChild",
+          "type": "boolean",
+          "default": "false"
+        }
+      ]
+    },
+    {
+      "name": "Checkbox",
+      "file": "src/components/ui/checkbox",
+      "import_path": ""
+    },
+    {
+      "name": "Command",
+      "file": "src/components/ui/command",
+      "import_path": ""
+    },
+    {
+      "name": "CommandDialog",
+      "file": "src/components/ui/command",
+      "import_path": ""
+    },
+    {
+      "name": "CommandInput",
+      "file": "src/components/ui/command",
+      "import_path": ""
+    },
+    {
+      "name": "CommandList",
+      "file": "src/components/ui/command",
+      "import_path": ""
+    },
+    {
+      "name": "CommandEmpty",
+      "file": "src/components/ui/command",
+      "import_path": ""
+    },
+    {
+      "name": "CommandGroup",
+      "file": "src/components/ui/command",
+      "import_path": ""
+    },
+    {
+      "name": "CommandItem",
+      "file": "src/components/ui/command",
+      "import_path": ""
+    },
+    {
+      "name": "CommandShortcut",
+      "file": "src/components/ui/command",
+      "import_path": ""
+    },
+    {
+      "name": "CommandSeparator",
+      "file": "src/components/ui/command",
+      "import_path": ""
+    },
+    {
+      "name": "Dialog",
+      "file": "src/components/ui/dialog",
+      "import_path": ""
+    },
+    {
+      "name": "DialogPortal",
+      "file": "src/components/ui/dialog",
+      "import_path": ""
+    },
+    {
+      "name": "DialogOverlay",
+      "file": "src/components/ui/dialog",
+      "import_path": ""
+    },
+    {
+      "name": "DialogTrigger",
+      "file": "src/components/ui/dialog",
+      "import_path": ""
+    },
+    {
+      "name": "DialogClose",
+      "file": "src/components/ui/dialog",
+      "import_path": ""
+    },
+    {
+      "name": "DialogContent",
+      "file": "src/components/ui/dialog",
+      "import_path": ""
+    },
+    {
+      "name": "DialogHeader",
+      "file": "src/components/ui/dialog",
+      "import_path": ""
+    },
+    {
+      "name": "DialogFooter",
+      "file": "src/components/ui/dialog",
+      "import_path": ""
+    },
+    {
+      "name": "DialogTitle",
+      "file": "src/components/ui/dialog",
+      "import_path": ""
+    },
+    {
+      "name": "DialogDescription",
+      "file": "src/components/ui/dialog",
+      "import_path": ""
+    },
+    {
+      "name": "DropdownMenu",
+      "file": "src/components/ui/dropdown-menu",
+      "import_path": ""
+    },
+    {
+      "name": "DropdownMenuTrigger",
+      "file": "src/components/ui/dropdown-menu",
+      "import_path": ""
+    },
+    {
+      "name": "DropdownMenuContent",
+      "file": "src/components/ui/dropdown-menu",
+      "import_path": ""
+    },
+    {
+      "name": "DropdownMenuItem",
+      "file": "src/components/ui/dropdown-menu",
+      "import_path": ""
+    },
+    {
+      "name": "DropdownMenuCheckboxItem",
+      "file": "src/components/ui/dropdown-menu",
+      "import_path": ""
+    },
+    {
+      "name": "DropdownMenuRadioItem",
+      "file": "src/components/ui/dropdown-menu",
+      "import_path": ""
+    },
+    {
+      "name": "DropdownMenuLabel",
+      "file": "src/components/ui/dropdown-menu",
+      "import_path": ""
+    },
+    {
+      "name": "DropdownMenuSeparator",
+      "file": "src/components/ui/dropdown-menu",
+      "import_path": ""
+    },
+    {
+      "name": "DropdownMenuShortcut",
+      "file": "src/components/ui/dropdown-menu",
+      "import_path": ""
+    },
+    {
+      "name": "DropdownMenuGroup",
+      "file": "src/components/ui/dropdown-menu",
+      "import_path": ""
+    },
+    {
+      "name": "DropdownMenuPortal",
+      "file": "src/components/ui/dropdown-menu",
+      "import_path": ""
+    },
+    {
+      "name": "DropdownMenuSub",
+      "file": "src/components/ui/dropdown-menu",
+      "import_path": ""
+    },
+    {
+      "name": "DropdownMenuSubContent",
+      "file": "src/components/ui/dropdown-menu",
+      "import_path": ""
+    },
+    {
+      "name": "DropdownMenuSubTrigger",
+      "file": "src/components/ui/dropdown-menu",
+      "import_path": ""
+    },
+    {
+      "name": "DropdownMenuRadioGroup",
+      "file": "src/components/ui/dropdown-menu",
+      "import_path": ""
+    },
+    {
+      "name": "HoverCard",
+      "file": "src/components/ui/hover-card",
+      "import_path": ""
+    },
+    {
+      "name": "HoverCardTrigger",
+      "file": "src/components/ui/hover-card",
+      "import_path": ""
+    },
+    {
+      "name": "HoverCardContent",
+      "file": "src/components/ui/hover-card",
+      "import_path": ""
+    },
+    {
+      "name": "InputGroup",
+      "file": "src/components/ui/input-group",
+      "import_path": ""
+    },
+    {
+      "name": "InputGroupAddon",
+      "file": "src/components/ui/input-group",
+      "import_path": "",
+      "props": [
+        {
+          "name": "align",
+          "type": "enum",
+          "values": [
+            "inline-start",
+            "inline-end",
+            "block-start",
+            "block-end"
+          ],
+          "default": "inline-start"
+        }
+      ]
+    },
+    {
+      "name": "InputGroupButton",
+      "file": "src/components/ui/input-group",
+      "import_path": "",
+      "props": [
+        {
+          "name": "size",
+          "type": "enum",
+          "values": [
+            "xs",
+            "sm",
+            "icon-xs",
+            "icon-sm"
+          ],
+          "default": "xs"
+        }
+      ]
+    },
+    {
+      "name": "InputGroupText",
+      "file": "src/components/ui/input-group",
+      "import_path": ""
+    },
+    {
+      "name": "InputGroupInput",
+      "file": "src/components/ui/input-group",
+      "import_path": ""
+    },
+    {
+      "name": "InputGroupTextarea",
+      "file": "src/components/ui/input-group",
+      "import_path": ""
+    },
+    {
+      "name": "Input",
+      "file": "src/components/ui/input",
+      "import_path": ""
+    },
+    {
+      "name": "Label",
+      "file": "src/components/ui/label",
+      "import_path": ""
+    },
+    {
+      "name": "Progress",
+      "file": "src/components/ui/progress",
+      "import_path": ""
+    },
+    {
+      "name": "RadioGroup",
+      "file": "src/components/ui/radio-group",
+      "import_path": ""
+    },
+    {
+      "name": "RadioGroupItem",
+      "file": "src/components/ui/radio-group",
+      "import_path": ""
+    },
+    {
+      "name": "Select",
+      "file": "src/components/ui/select",
+      "import_path": ""
+    },
+    {
+      "name": "SelectGroup",
+      "file": "src/components/ui/select",
+      "import_path": ""
+    },
+    {
+      "name": "SelectValue",
+      "file": "src/components/ui/select",
+      "import_path": ""
+    },
+    {
+      "name": "SelectTrigger",
+      "file": "src/components/ui/select",
+      "import_path": ""
+    },
+    {
+      "name": "SelectContent",
+      "file": "src/components/ui/select",
+      "import_path": ""
+    },
+    {
+      "name": "SelectLabel",
+      "file": "src/components/ui/select",
+      "import_path": ""
+    },
+    {
+      "name": "SelectItem",
+      "file": "src/components/ui/select",
+      "import_path": ""
+    },
+    {
+      "name": "SelectSeparator",
+      "file": "src/components/ui/select",
+      "import_path": ""
+    },
+    {
+      "name": "SelectScrollUpButton",
+      "file": "src/components/ui/select",
+      "import_path": ""
+    },
+    {
+      "name": "SelectScrollDownButton",
+      "file": "src/components/ui/select",
+      "import_path": ""
+    },
+    {
+      "name": "Separator",
+      "file": "src/components/ui/separator",
+      "import_path": ""
+    },
+    {
+      "name": "Sheet",
+      "file": "src/components/ui/sheet",
+      "import_path": "",
+      "props": [
+        {
+          "name": "side",
+          "type": "enum",
+          "values": [
+            "top",
+            "bottom",
+            "left",
+            "right"
+          ],
+          "default": "right"
+        }
+      ]
+    },
+    {
+      "name": "SheetPortal",
+      "file": "src/components/ui/sheet",
+      "import_path": ""
+    },
+    {
+      "name": "SheetOverlay",
+      "file": "src/components/ui/sheet",
+      "import_path": ""
+    },
+    {
+      "name": "SheetTrigger",
+      "file": "src/components/ui/sheet",
+      "import_path": ""
+    },
+    {
+      "name": "SheetClose",
+      "file": "src/components/ui/sheet",
+      "import_path": ""
+    },
+    {
+      "name": "SheetContent",
+      "file": "src/components/ui/sheet",
+      "import_path": ""
+    },
+    {
+      "name": "SheetHeader",
+      "file": "src/components/ui/sheet",
+      "import_path": ""
+    },
+    {
+      "name": "SheetFooter",
+      "file": "src/components/ui/sheet",
+      "import_path": ""
+    },
+    {
+      "name": "SheetTitle",
+      "file": "src/components/ui/sheet",
+      "import_path": ""
+    },
+    {
+      "name": "SheetDescription",
+      "file": "src/components/ui/sheet",
+      "import_path": ""
+    },
+    {
+      "name": "Slider",
+      "file": "src/components/ui/slider",
+      "import_path": ""
+    },
+    {
+      "name": "Spinner",
+      "file": "src/components/ui/spinner",
+      "import_path": ""
+    },
+    {
+      "name": "Switch",
+      "file": "src/components/ui/switch",
+      "import_path": ""
+    },
+    {
+      "name": "Tabs",
+      "file": "src/components/ui/tabs",
+      "import_path": ""
+    },
+    {
+      "name": "TabsList",
+      "file": "src/components/ui/tabs",
+      "import_path": ""
+    },
+    {
+      "name": "TabsTrigger",
+      "file": "src/components/ui/tabs",
+      "import_path": ""
+    },
+    {
+      "name": "TabsContent",
+      "file": "src/components/ui/tabs",
+      "import_path": ""
+    },
+    {
+      "name": "Textarea",
+      "file": "src/components/ui/textarea",
+      "import_path": ""
+    },
+    {
+      "name": "Tooltip",
+      "file": "src/components/ui/tooltip",
+      "import_path": ""
+    },
+    {
+      "name": "TooltipTrigger",
+      "file": "src/components/ui/tooltip",
+      "import_path": ""
+    },
+    {
+      "name": "TooltipContent",
+      "file": "src/components/ui/tooltip",
+      "import_path": ""
+    },
+    {
+      "name": "TooltipProvider",
+      "file": "src/components/ui/tooltip",
+      "import_path": ""
+    }
+  ],
+  "assets": [
+    {
+      "file": "src/assets/cupola-landscape.webp.asset.json",
+      "kind": "image",
+      "format": "webp",
+      "pointer": true
+    },
+    {
+      "file": "src/assets/cupola-logo.svg.asset.json",
+      "kind": "logo",
+      "format": "svg",
+      "pointer": true
+    },
+    {
+      "file": "src/assets/cupola-mark.svg.asset.json",
+      "kind": "image",
+      "format": "svg",
+      "pointer": true
+    }
+  ]
+}
