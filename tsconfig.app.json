@@ -31,5 +31,9 @@
   },
   "include": [
     "src"
+  ],
+  "exclude": [
+    "src/design-system/design-system-hub-ba3841/components/ai-elements/prompt-input.tsx",
+    "src/design-system/design-system-hub-ba3841/lib/error-capture.ts"
   ]
 }
