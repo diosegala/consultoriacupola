@@ -2,9 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Button, Input, Label } from '@/design-system/design-system-hub-ba3841';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 import { useToast } from '@/hooks/use-toast';
@@ -93,7 +91,6 @@ export default function Auth() {
                 placeholder="seu@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="bg-input border-border"
               />
               {errors.email && (
                 <p className="text-sm text-destructive">{errors.email}</p>
@@ -107,7 +104,6 @@ export default function Auth() {
                 placeholder="••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="bg-input border-border"
               />
               {errors.password && (
                 <p className="text-sm text-destructive">{errors.password}</p>
@@ -115,7 +111,7 @@ export default function Auth() {
             </div>
             <Button 
               type="submit" 
-              className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+              className="w-full"
               disabled={loading}
             >
               {loading ? 'Entrando...' : 'Entrar'}
@@ -123,7 +119,7 @@ export default function Auth() {
             <Button
               type="button"
               variant="link"
-              className="w-full text-muted-foreground"
+              className="w-full"
               onClick={async () => {
                     if (!email) {
                       toast({ title: 'Informe o email', description: 'Preencha o campo de email para receber o link de redefinição.', variant: 'destructive' });
