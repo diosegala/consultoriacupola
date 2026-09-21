@@ -70,4 +70,5 @@ System-only notifications (no emails). No data/report exports. Hard deletes use 
 - [Edge Functions Security](mem://technical/edge-functions-security) — Admin RLS + Zod on critical functions
 - [Pipedrive Webhook Automation](mem://integrations/pipedrive-webhook-automation) — Auto-creates client/contract on Deal Won
 - [Pipedrive Webhook Security](mem://integrations/pipedrive-webhook-security) — HTTP Basic Auth + Zod
+- [Integrações pelo admin](mem://integrations/integracoes-pelo-admin) — Firecrawl, RunRun.it e Drive da agência conectados na tela, nunca por conector do Lovable
 - [Pipedrive V2 Compatibility](mem://integrations/pipedrive-v2-compatibility) — Handles 'data'/'current' and 'change'->'won' mappings
