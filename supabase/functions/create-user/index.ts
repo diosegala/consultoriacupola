@@ -60,8 +60,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (role !== "consultor" && role !== "director") {
-      return new Response(JSON.stringify({ error: "Papel inválido. Use 'consultor' ou 'director'." }), {
+    if (role !== "consultor" && role !== "director" && role !== "agencia") {
+      return new Response(JSON.stringify({ error: "Papel inválido. Use 'consultor', 'director' ou 'agencia'." }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -134,8 +134,30 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Quem entra pela agência já tem ficha em agencia.pessoas: liga o login à ficha
+    // pelo e-mail, para a pessoa enxergar a seção Agência no primeiro acesso.
+    let fichaAgenciaVinculada = false;
+    if (role === "agencia") {
+      const { data: ficha } = await adminClient
+        .schema("agencia")
+        .from("pessoas")
+        .select("id, auth_id")
+        .ilike("email", email)
+        .maybeSingle();
+      if (ficha && !ficha.auth_id) {
+        const { error: linkErr } = await adminClient
+          .schema("agencia")
+          .from("pessoas")
+          .update({ auth_id: userId, ativa: true })
+          .eq("id", ficha.id);
+        fichaAgenciaVinculada = !linkErr;
+      } else if (ficha?.auth_id === userId) {
+        fichaAgenciaVinculada = true;
+      }
+    }
+
     return new Response(
-      JSON.stringify({ success: true, user_id: userId }),
+      JSON.stringify({ success: true, user_id: userId, ficha_agencia: fichaAgenciaVinculada }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
