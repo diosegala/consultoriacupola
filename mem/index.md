@@ -62,6 +62,8 @@ System-only notifications (no emails). No data/report exports. Hard deletes use 
 - [AI Agent Management](mem://features/ai-agent-management) — Admin config for prompts, ref docs, Gemini/GPT-4o
 - [AI Engine Integration](mem://technical/ai-engine-integration) — Gemini fallback logic + GPT-4o secret handling
 
+- [Produção visual de redes](mem://features/producao-visual-redes) — Imagem com aprovação, editor, versões e exportação 4:5, 1:1 e 9:16
+
 ### Auth & Integrations
 - [RBAC Roles Access](mem://auth/rbac-roles-access) — Admin/director vs consultant access rules
 - [Acesso Agência](mem://auth/acesso-agencia) — Papel `agencia`: só telas da Agência + chat; ligação automática com `agencia.pessoas`
