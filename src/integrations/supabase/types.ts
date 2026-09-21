@@ -2789,6 +2789,7 @@ export type Database = {
         Args: { _conversa_id: string; _user_id: string }
         Returns: boolean
       }
+      pode_usar_chat: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "director" | "consultor" | "agencia"
