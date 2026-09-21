@@ -72,12 +72,17 @@ const consultorMenuItems = [
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
-  const { signOut, user, isConsultor } = useAuth();
+  const { signOut, user, isConsultor, isAgencia } = useAuth();
   const location = useLocation();
   const { total: chatNaoLidas } = useChatBadge();
 
-  const menuItems = isConsultor ? consultorMenuItems : adminMenuItems;
-  const { temAcesso: temAgencia } = useTemAcessoAgencia();
+  const menuItems = isAgencia
+    ? [{ to: '/mensagens', icon: MessageSquare, label: 'Mensagens' }]
+    : isConsultor
+      ? consultorMenuItems
+      : adminMenuItems;
+  const { temAcesso: temAgenciaFicha } = useTemAcessoAgencia();
+  const temAgencia = isAgencia || temAgenciaFicha;
 
   return (
     <aside 
