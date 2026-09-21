@@ -123,6 +123,12 @@ export default function MinhasIntegracoes() {
             </p>
           </CardContent>
         </Card>
+
+        {isAdmin && (
+          <div className="pt-6">
+            <IntegracoesAgenciaCard />
+          </div>
+        )}
       </div>
     );
   }
