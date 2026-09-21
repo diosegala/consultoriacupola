@@ -39,9 +39,18 @@ export function AppLayout() {
     return <Navigate to="/trocar-senha" replace />;
   }
 
+  const currentPath = location.pathname;
+
+  // Acesso "Agência": só as telas da Agência e o chat interno
+  if (userRole === 'agencia') {
+    const permitido = currentPath.startsWith('/agencia') || currentPath.startsWith('/mensagens');
+    if (!permitido) {
+      return <Navigate to="/agencia/contas" replace />;
+    }
+  }
+
   // Consultors accessing restricted routes get redirected to /projetos
   const isConsultor = userRole === 'consultor';
-  const currentPath = location.pathname;
   if (isConsultor && RESTRICTED_FOR_CONSULTOR.some(p => currentPath === p || (p !== '/' && currentPath.startsWith(p)))) {
     return <Navigate to="/projetos" replace />;
   }
