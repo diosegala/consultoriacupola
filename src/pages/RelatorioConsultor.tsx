@@ -175,13 +175,13 @@ export default function RelatorioConsultor() {
             <CardContent style={{ height: 320 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={data.evolucao_mensal} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="label" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                  <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} allowDecimals={false} />
-                  <YAxis yAxisId="right" orientation="right" stroke="hsl(var(--muted-foreground))" fontSize={12} domain={[0, 10]} />
-                  <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="label" stroke="var(--muted-foreground)" fontSize={12} />
+                  <YAxis yAxisId="left" stroke="var(--muted-foreground)" fontSize={12} allowDecimals={false} />
+                  <YAxis yAxisId="right" orientation="right" stroke="var(--muted-foreground)" fontSize={12} domain={[0, 10]} />
+                  <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)" }} />
                   <Legend />
-                  <Line yAxisId="left" type="monotone" dataKey="reunioes" name="Reuniões" stroke="hsl(var(--primary))" strokeWidth={2} />
+                  <Line yAxisId="left" type="monotone" dataKey="reunioes" name="Reuniões" stroke="var(--primary)" strokeWidth={2} />
                   <Line yAxisId="right" type="monotone" dataKey="score_medio" name="Score médio" stroke="#7c3aed" strokeWidth={2} connectNulls />
                 </LineChart>
               </ResponsiveContainer>
@@ -197,11 +197,11 @@ export default function RelatorioConsultor() {
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={data.documentos_por_tipo}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="label" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} allowDecimals={false} />
-                    <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} />
-                    <Bar dataKey="total" name="Quantidade" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                    <XAxis dataKey="label" stroke="var(--muted-foreground)" fontSize={12} />
+                    <YAxis stroke="var(--muted-foreground)" fontSize={12} allowDecimals={false} />
+                    <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)" }} />
+                    <Bar dataKey="total" name="Quantidade" fill="var(--primary)" radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               )}

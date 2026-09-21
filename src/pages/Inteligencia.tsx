@@ -35,9 +35,9 @@ type Insight = {
 type Operacao = 'vendas' | 'aluguel' | 'ambas';
 
 const OPERACOES: { value: Operacao; label: string; icon: typeof Building2; chartColor: string; badgeClass: string }[] = [
-  { value: 'vendas', label: 'Vendas', icon: Building2, chartColor: 'hsl(var(--primary))', badgeClass: 'border-primary/40 text-primary' },
-  { value: 'aluguel', label: 'Locação', icon: Key, chartColor: 'hsl(var(--chart-2, 199 89% 55%))', badgeClass: 'border-sky-500/40 text-sky-400' },
-  { value: 'ambas', label: 'Transversal', icon: Layers, chartColor: 'hsl(var(--muted-foreground))', badgeClass: 'border-muted-foreground/40 text-muted-foreground' },
+  { value: 'vendas', label: 'Vendas', icon: Building2, chartColor: 'var(--primary)', badgeClass: 'border-primary/40 text-primary' },
+  { value: 'aluguel', label: 'Locação', icon: Key, chartColor: 'var(--chart-2)', badgeClass: 'border-info/40 text-info' },
+  { value: 'ambas', label: 'Transversal', icon: Layers, chartColor: 'var(--muted-foreground)', badgeClass: 'border-muted-foreground/40 text-muted-foreground' },
 ];
 
 function opMeta(op?: string) {
@@ -272,10 +272,10 @@ function DoresChart({ dores }: { dores: any[] }) {
         <ResponsiveContainer width="100%" height={Math.max(180, data.length * 34)}>
           <BarChart data={data} layout="vertical" margin={{ left: 8, right: 24 }}>
             <XAxis type="number" hide />
-            <YAxis type="category" dataKey="tema" width={200} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+            <YAxis type="category" dataKey="tema" width={200} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
             <Tooltip
-              cursor={{ fill: 'hsl(var(--muted) / 0.3)' }}
-              contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }}
+              cursor={{ fill: 'var(--muted)' }}
+              contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}
             />
             <Bar dataKey="clientes" radius={[0, 4, 4, 0]} barSize={16}>
               {data.map((d, i) => <Cell key={i} fill={d.cor} />)}
