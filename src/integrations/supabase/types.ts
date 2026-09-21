@@ -1172,6 +1172,36 @@ export type Database = {
         }
         Relationships: []
       }
+      integracoes_credenciais: {
+        Row: {
+          ativo: boolean
+          atualizado_em: string
+          atualizado_por: string | null
+          chave: string
+          credenciais: Json
+          id: string
+          observacao: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          atualizado_em?: string
+          atualizado_por?: string | null
+          chave: string
+          credenciais?: Json
+          id?: string
+          observacao?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          atualizado_em?: string
+          atualizado_por?: string | null
+          chave?: string
+          credenciais?: Json
+          id?: string
+          observacao?: string | null
+        }
+        Relationships: []
+      }
       interacoes_cliente: {
         Row: {
           canal: Database["public"]["Enums"]["canal_interacao"]
