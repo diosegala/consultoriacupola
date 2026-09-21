@@ -35,6 +35,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { DiscProfileCard } from '@/components/disc/DiscProfileCard';
 import { PoliticaRiscoChurnCard } from '@/components/configuracoes/PoliticaRiscoChurnCard';
+import IntegracoesAgenciaCard from '@/components/configuracoes/IntegracoesAgenciaCard';
 import { DiretrizesAgentesCard } from '@/components/configuracoes/DiretrizesAgentesCard';
 import { useMyConsultorId } from '@/hooks/useDisc';
 import { AcessosLogCard } from '@/components/configuracoes/AcessosLogCard';
