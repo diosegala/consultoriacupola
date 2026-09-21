@@ -1,4 +1,6 @@
 # Project Memory
+<!-- ver também: [Integrações pelo admin](mem://integrations/integracoes-pelo-admin) -->
+
 
 ## Core
 Dark theme (bg #000000, cards #121212), Cupola green (#B0F90A). Inter font. Desktop-first.
