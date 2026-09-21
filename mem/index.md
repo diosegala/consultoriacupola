@@ -1,5 +1,5 @@
 # Project Memory
-<!-- ver também: [Integrações pelo admin](mem://integrations/integracoes-pelo-admin) -->
+
 
 
 ## Core
