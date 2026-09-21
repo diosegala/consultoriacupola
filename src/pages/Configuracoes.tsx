@@ -422,6 +422,7 @@ export default function Configuracoes() {
           {(isAdmin || isDirector) && <TabsTrigger value="politicas">Políticas</TabsTrigger>}
           {isAdmin && <TabsTrigger value="oraculo">Oráculo</TabsTrigger>}
           {(isAdmin || isDirector) && <TabsTrigger value="ia">Inteligência Artificial</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="integracoes">Integrações</TabsTrigger>}
         </TabsList>
 
         {(isAdmin || isDirector) && (
@@ -429,6 +430,13 @@ export default function Configuracoes() {
             <AiUsageSection />
           </TabsContent>
         )}
+
+        {isAdmin && (
+          <TabsContent value="integracoes" className="mt-6">
+            <IntegracoesAgenciaCard />
+          </TabsContent>
+        )}
+
 
         {(isAdmin || isDirector) && (
           <TabsContent value="politicas" className="mt-6">
