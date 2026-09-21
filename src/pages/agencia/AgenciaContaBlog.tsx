@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, FileText, Loader2, Plus, Trash2, Wand2 } from 'lucide-react';
+import { ArrowLeft, FileText, Loader2, Plus, ShieldCheck, Trash2, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAgenciaCliente } from '@/hooks/agencia/useAgencia';
 import { useBlogAcoes, useBlogPost, useBlogPosts, type BlogPost, type PassoBlog } from '@/hooks/agencia/useAgenciaBlog';
 import { toast } from '@/hooks/use-toast';
+import { conferir as conferirForma, type Ressalva } from '@/lib/agencia/blogConferencia';
 
 const PASSOS: { id: PassoBlog; nome: string }[] = [
   { id: 'estrutura', nome: 'Estrutura (H1 e títulos)' },
@@ -40,10 +41,12 @@ export default function AgenciaContaBlog() {
   const { data: posts } = useBlogPosts(cliente?.id);
   const [postId, setPostId] = useState<string | undefined>();
   const { data: post } = useBlogPost(postId);
-  const { criarPost, salvarCampos, gerarPasso, apagarPost, gerando, validar } = useBlogAcoes(cliente?.id);
+  const { criarPost, salvarCampos, gerarPasso, conferirTexto, apagarPost, gerando, validar } = useBlogAcoes(cliente?.id);
 
   const [novoTema, setNovoTema] = useState('');
   const [rascunho, setRascunho] = useState<Partial<BlogPost>>({});
+  const [conferindo, setConferindo] = useState(false);
+  const [laudo, setLaudo] = useState<{ afirmacoes: { trecho: string; porque: string }[]; ressalvas: Ressalva[] } | null>(null);
 
   useEffect(() => {
     if (post) {
@@ -68,6 +71,26 @@ export default function AgenciaContaBlog() {
   const salvarBriefing = async () => {
     if (!postId) return;
     if (await salvarCampos(postId, rascunho)) toast({ title: 'Briefing salvo' });
+  };
+
+  const conferir = async () => {
+    if (!post) return;
+    setConferindo(true);
+    try {
+      const r = await conferirTexto(post.id);
+      if (!r) return;
+      const faq = (post.faq ?? []).map((f) => `### ${f.pergunta}\n${f.resposta}`).join('\n\n');
+      const ressalvas = conferirForma({
+        material: r.material,
+        introducao: post.introducao ?? '',
+        desenvolvimento: post.desenvolvimento ?? '',
+        faq,
+        encerramento: post.encerramento ?? '',
+      });
+      setLaudo({ afirmacoes: r.afirmacoes, ressalvas });
+    } finally {
+      setConferindo(false);
+    }
   };
 
   const copiar = async () => {
@@ -300,6 +323,56 @@ export default function AgenciaContaBlog() {
                 </Card>
               );
             })}
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                <div>
+                  <CardTitle className="text-base">Conferência do texto</CardTitle>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Aponta o que o revisor precisa olhar: o que o material não sustenta e as regras de forma.
+                  </p>
+                </div>
+                <Button size="sm" variant="outline" disabled={conferindo} onClick={conferir}>
+                  {conferindo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
+                  Conferir
+                </Button>
+              </CardHeader>
+              {laudo && (
+                <CardContent className="space-y-4 text-sm">
+                  <div>
+                    <p className="mb-2 font-medium">Afirmações sem apoio no material</p>
+                    {laudo.afirmacoes.length === 0 ? (
+                      <p className="text-muted-foreground">Nada apontado — tudo o que o texto afirma aparece no material.</p>
+                    ) : (
+                      laudo.afirmacoes.map((a, i) => (
+                        <p key={i} className="mb-1">
+                          <span className="font-medium">“{a.trecho}”</span>
+                          <span className="text-muted-foreground"> — {a.porque}</span>
+                        </p>
+                      ))
+                    )}
+                  </div>
+                  <div>
+                    <p className="mb-2 font-medium">Regras de forma</p>
+                    {laudo.ressalvas.length === 0 ? (
+                      <p className="text-muted-foreground">Nenhuma ressalva de forma.</p>
+                    ) : (
+                      laudo.ressalvas.map((r, i) => (
+                        <div key={i} className="mb-2">
+                          <p>{r.o_que}</p>
+                          <ul className="ml-4 list-disc text-muted-foreground">
+                            {r.onde.map((o, k) => <li key={k}>{o}</li>)}
+                          </ul>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    A conferência aponta onde olhar; quem decide o que publicar é você.
+                  </p>
+                </CardContent>
+              )}
+            </Card>
 
             <Button variant="outline" onClick={copiar}>Copiar o post inteiro</Button>
           </div>
