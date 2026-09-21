@@ -9,4 +9,6 @@ if (!rootElement) {
   throw new Error("Root element not found");
 }
 
+document.documentElement.classList.add("dark");
+
 createRoot(rootElement).render(<App />);
