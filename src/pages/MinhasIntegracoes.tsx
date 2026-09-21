@@ -20,6 +20,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import IntegracoesAgenciaCard from '@/components/configuracoes/IntegracoesAgenciaCard';
 
 export default function MinhasIntegracoes() {
   const { toast } = useToast();
