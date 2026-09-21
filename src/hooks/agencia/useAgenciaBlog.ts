@@ -137,6 +137,25 @@ export function useBlogAcoes(clienteId?: string) {
     }
   };
 
+  /** Conferência do texto: a leitura da IA + o material para a régua mecânica. */
+  const conferirTexto = async (
+    postId: string,
+  ): Promise<{ afirmacoes: { trecho: string; porque: string }[]; material: string } | null> => {
+    try {
+      const { data, error } = await supabase.functions.invoke('agencia-blog-conferencia', {
+        body: { post_id: postId },
+      });
+      if (error) throw error;
+      if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
+      const r = data as { afirmacoes?: { trecho: string; porque: string }[]; material?: string };
+      return { afirmacoes: r.afirmacoes ?? [], material: r.material ?? '' };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Erro inesperado.';
+      toast({ title: 'Não deu para conferir agora', description: msg, variant: 'destructive' });
+      return null;
+    }
+  };
+
   const apagarPost = async (postId: string) => {
     const { error } = await agencia().from('blog_posts').delete().eq('id', postId);
     if (error) {
@@ -147,5 +166,5 @@ export function useBlogAcoes(clienteId?: string) {
     return true;
   };
 
-  return { criarPost, salvarCampos, gerarPasso, apagarPost, gerando, validar };
+  return { criarPost, salvarCampos, gerarPasso, conferirTexto, apagarPost, gerando, validar };
 }

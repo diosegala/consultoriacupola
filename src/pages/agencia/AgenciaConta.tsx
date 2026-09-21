@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Building2, Sparkles, Megaphone, FileText } from 'lucide-react';
+import { ArrowLeft, Building2, Sparkles, Megaphone, FileText, Mic } from 'lucide-react';
 import { FichaAutomaticaDialog } from '@/components/agencia/FichaAutomaticaDialog';
+import { RecadoFaladoDialog } from '@/components/agencia/RecadoFaladoDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -33,6 +34,7 @@ export default function AgenciaConta() {
   const { data: conhecimento } = useAgenciaConhecimento(cliente?.id);
   const { data: projetos } = useAgenciaProjetos();
   const [fichaAberta, setFichaAberta] = useState(false);
+  const [recadoAberto, setRecadoAberto] = useState(false);
 
   if (isLoading) return <Skeleton className="h-64 w-full" />;
   if (!cliente) {
@@ -76,6 +78,10 @@ export default function AgenciaConta() {
             <Sparkles className="mr-2 h-4 w-4" />
             Preencher ficha com o material
           </Button>
+          <Button variant="outline" size="sm" onClick={() => setRecadoAberto(true)}>
+            <Mic className="mr-2 h-4 w-4" />
+            Recado falado
+          </Button>
           <Button variant="outline" size="sm" asChild>
             <Link to={`/agencia/contas/${cliente.slug}/redes`}>
               <Megaphone className="mr-2 h-4 w-4" />
@@ -95,6 +101,12 @@ export default function AgenciaConta() {
         clienteId={cliente.id}
         aberto={fichaAberta}
         onOpenChange={setFichaAberta}
+      />
+
+      <RecadoFaladoDialog
+        clienteId={cliente.id}
+        aberto={recadoAberto}
+        onOpenChange={setRecadoAberto}
       />
 
       <Tabs defaultValue="perfil">

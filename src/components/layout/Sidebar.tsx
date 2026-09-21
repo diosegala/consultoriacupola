@@ -18,7 +18,8 @@ import {
   Brain,
   Search,
   MessageSquare,
-  Building2
+  Building2,
+  Newspaper
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -51,6 +52,7 @@ const adminMenuItems = [
 const agenciaMenuItems = [
   { to: '/agencia/contas', icon: Building2, label: 'Contas' },
   { to: '/agencia/agentes', icon: Bot, label: 'Agentes' },
+  { to: '/agencia/mercado', icon: Newspaper, label: 'Mercado' },
   { to: '/agencia/equipe', icon: Users, label: 'Time' },
 ];
 

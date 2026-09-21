@@ -41,6 +41,7 @@ import AgenciaContaBlog from "./pages/agencia/AgenciaContaBlog";
 import AgenciaAgentes from "./pages/agencia/AgenciaAgentes";
 import AgenciaAgenteConversa from "./pages/agencia/AgenciaAgenteConversa";
 import AgenciaEquipe from "./pages/agencia/AgenciaEquipe";
+import AgenciaMercado from "./pages/agencia/AgenciaMercado";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 
 const queryClient = new QueryClient({
@@ -98,6 +99,7 @@ const App = () => (
               <Route path="/agencia/agentes" element={<AgenciaAgentes />} />
               <Route path="/agencia/agentes/:slug" element={<AgenciaAgenteConversa />} />
               <Route path="/agencia/equipe" element={<AgenciaEquipe />} />
+              <Route path="/agencia/mercado" element={<AgenciaMercado />} />
             </Route>
             <Route path="*" element={<NotFound />} />
             <Route path="/consultores/:id/relatorio" element={<RelatorioConsultor />} />
