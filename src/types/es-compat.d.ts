@@ -1,5 +1,5 @@
 interface String {
-  replaceAll(searchValue: string | RegExp, replaceValue: string): string;
+  replaceAll(searchValue: unknown, replaceValue: string): string;
 }
 
 interface Error {
