@@ -60,8 +60,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (role !== "consultor" && role !== "director") {
-      return new Response(JSON.stringify({ error: "Papel inválido. Use 'consultor' ou 'director'." }), {
+    if (role !== "consultor" && role !== "director" && role !== "agencia") {
+      return new Response(JSON.stringify({ error: "Papel inválido. Use 'consultor', 'director' ou 'agencia'." }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

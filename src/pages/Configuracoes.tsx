@@ -98,7 +98,7 @@ export default function Configuracoes() {
   const [createUserDialogOpen, setCreateUserDialogOpen] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
-  const [newUserRole, setNewUserRole] = useState<'' | 'consultor' | 'director'>('');
+  const [newUserRole, setNewUserRole] = useState<'' | 'consultor' | 'director' | 'agencia'>('');
   const [creatingUser, setCreatingUser] = useState(false);
 
   // Oráculo (Notion sync)
@@ -364,7 +364,7 @@ export default function Configuracoes() {
       toast({ title: 'Erro', description: 'Email e senha são obrigatórios', variant: 'destructive' });
       return;
     }
-    if (newUserRole !== 'consultor' && newUserRole !== 'director') {
+    if (newUserRole !== 'consultor' && newUserRole !== 'director' && newUserRole !== 'agencia') {
       toast({ title: 'Erro', description: 'Selecione o papel do usuário', variant: 'destructive' });
       return;
     }
@@ -521,7 +521,7 @@ export default function Configuracoes() {
                           <TableCell className="font-medium text-foreground">{role.email}</TableCell>
                           <TableCell>
                             <Badge className={role.role === 'admin' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}>
-                              {role.role === 'admin' ? 'Admin' : role.role === 'director' ? 'Diretor' : 'Consultor'}
+                              {role.role === 'admin' ? 'Admin' : role.role === 'director' ? 'Diretor' : role.role === 'agencia' ? 'Agência' : 'Consultor'}
                             </Badge>
                           </TableCell>
                           <TableCell>
@@ -1020,20 +1020,24 @@ export default function Configuracoes() {
             </div>
             <div className="space-y-2">
               <Label className="text-foreground">Papel *</Label>
-              <Select value={newUserRole} onValueChange={(v) => setNewUserRole(v as 'consultor' | 'director')}>
+              <Select value={newUserRole} onValueChange={(v) => setNewUserRole(v as 'consultor' | 'director' | 'agencia')}>
                 <SelectTrigger className="bg-input border-border">
                   <SelectValue placeholder="Selecione o papel" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="consultor">Consultor</SelectItem>
                   <SelectItem value="director">Diretor</SelectItem>
+                  <SelectItem value="agencia">Agência</SelectItem>
                 </SelectContent>
               </Select>
+              {newUserRole === 'agencia' && (
+                <p className="text-xs text-muted-foreground">Vê apenas as telas da Agência e as Mensagens.</p>
+              )}
             </div>
             {newUserEmail && newUserRole && (
               <div className="rounded-md border border-border bg-secondary/40 p-3 text-sm text-foreground">
                 Será criado <strong>{newUserEmail}</strong> como{' '}
-                <strong>{newUserRole === 'director' ? 'Diretor' : 'Consultor'}</strong>.
+                <strong>{newUserRole === 'director' ? 'Diretor' : newUserRole === 'agencia' ? 'Agência' : 'Consultor'}</strong>.
               </div>
             )}
           </div>
