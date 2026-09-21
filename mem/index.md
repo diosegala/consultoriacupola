@@ -64,6 +64,7 @@ System-only notifications (no emails). No data/report exports. Hard deletes use 
 
 ### Auth & Integrations
 - [RBAC Roles Access](mem://auth/rbac-roles-access) — Admin/director vs consultant access rules
+- [Acesso Agência](mem://auth/acesso-agencia) — Papel `agencia`: só telas da Agência + chat; ligação automática com `agencia.pessoas`
 - [User Management UI](mem://auth/user-management-ui) — Admin mapping auth -> consultant with temp passwords
 - [Password Management](mem://auth/password-management) — Reset via /reset-password
 - [Onboarding Security](mem://auth/onboarding-security) — force_password_change flag on first login
