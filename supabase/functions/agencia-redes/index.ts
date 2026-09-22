@@ -13,6 +13,7 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 const MODELO = "openai/gpt-6-astra";
+const MODELO_IMAGEM = "openai/gpt-image-2.5-sunburst";
 
 const TOTAL_DE_TEMAS = 20;
 const LIMITE_DO_CARD = 150;
@@ -241,12 +242,14 @@ Deno.serve(async (req) => {
     if (!pessoa || pessoa.ativa === false) return json({ error: "Você não tem acesso à Agência." }, 403);
 
     const body = (await req.json().catch(() => ({}))) as {
-      acao?: "temas" | "peca";
+      acao?: "temas" | "peca" | "arte";
       cliente_id?: string;
       mes?: string;
       tema_id?: string;
       formato?: "card" | "carrossel";
       instrucoes?: string;
+      formato_arte?: "feed_4_5" | "quadrado_1_1" | "stories_9_16";
+      instrucoes_arte?: string;
     };
 
     const clienteId = (body.cliente_id ?? "").trim();
@@ -259,6 +262,112 @@ Deno.serve(async (req) => {
       .eq("id", clienteId)
       .maybeSingle();
     if (!conta) return json({ error: "Conta não encontrada." }, 404);
+
+    // ---------------- imagem-base de uma arte ----------------
+    if (body.acao === "arte") {
+      const temaId = (body.tema_id ?? "").trim();
+      if (!temaId) return json({ error: "Informe o tema." }, 400);
+      const { data: tema } = await ag
+        .from("redes_conteudo_temas")
+        .select("id, titulo, justificativa, formato, texto_imagem, slides")
+        .eq("id", temaId)
+        .eq("cliente_id", clienteId)
+        .maybeSingle();
+      if (!tema) return json({ error: "Tema não encontrado." }, 404);
+
+      const { data: identidade } = await ag
+        .from("cliente_identidade")
+        .select("cores, tipografia, guia")
+        .eq("cliente_id", clienteId)
+        .maybeSingle();
+      const formatoArte = body.formato_arte === "quadrado_1_1" || body.formato_arte === "stories_9_16"
+        ? body.formato_arte
+        : "feed_4_5";
+      const tamanho = formatoArte === "quadrado_1_1" ? "1024x1024" : formatoArte === "stories_9_16" ? "1024x1824" : "1024x1280";
+      const textos = tema.formato === "carrossel" && Array.isArray(tema.slides)
+        ? tema.slides.map((slide: { texto?: string }) => slide.texto).filter(Boolean).join(" | ")
+        : tema.texto_imagem ?? "";
+      const prompt = [
+        `Crie uma fotografia ou ilustração editorial sofisticada para uma peça de rede social da marca ${conta.nome}.`,
+        `Assunto: ${tema.titulo}. ${tema.justificativa ?? ""}`,
+        `Contexto da marca: ${conta.resumo ?? ""} ${conta.posicionamento ?? ""} ${conta.publico_alvo ?? ""}`,
+        `Identidade visual: cores ${JSON.stringify(identidade?.cores ?? [])}; orientações ${identidade?.guia ?? "não informadas"}.`,
+        `A composição precisa reservar uma área visual limpa e com contraste para o editor aplicar depois este conteúdo: ${textos}.`,
+        `Formato final: ${formatoArte}. Não inclua letras, palavras, logotipos, marcas d'água, molduras ou texto dentro da imagem.`,
+        (body.instrucoes_arte ?? "").trim() ? `Direção adicional: ${body.instrucoes_arte!.trim()}` : "",
+      ].filter(Boolean).join("\n");
+
+      const chamarImagem = () => fetch("https://ai.gateway.lovable.dev/v1/images/generations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${lovableKey}` },
+        body: JSON.stringify({ model: MODELO_IMAGEM, prompt, size: tamanho, quality: "high", stream: body.stream !== false, ...(body.stream !== false ? { partial_images: 1 } : {}) }),
+      });
+      let imagem = await chamarImagem();
+      if ((imagem.status === 429 || imagem.status >= 500) && body.stream === false) {
+        const espera = Number(imagem.headers.get("Retry-After") ?? "1");
+        await new Promise((resolve) => setTimeout(resolve, Math.max(1, Math.min(espera, 5)) * 1000));
+        imagem = await chamarImagem();
+      }
+      if (!imagem.ok) {
+        const falha = await imagem.json().catch(() => ({}));
+        const mensagem = falha?.error?.message ?? falha?.message ?? "Não foi possível gerar a imagem.";
+        await logAiUsage({
+          admin, provider: "lovable", model: MODELO_IMAGEM, agente_tipo: "redes-arte", unidade: "agencia",
+          agente_slug: "redes-conteudo", agencia_cliente_id: clienteId, agencia_pessoa_id: pessoa.id,
+          user_id: user.id, status: "error", error_message: mensagem,
+        });
+        return json({ error: mensagem }, imagem.status);
+      }
+
+      if (body.stream === false) {
+        const resultado = await imagem.json();
+        await logAiUsage({
+          admin, provider: "lovable", model: MODELO_IMAGEM, agente_tipo: "redes-arte", unidade: "agencia",
+          agente_slug: "redes-conteudo", agencia_cliente_id: clienteId, agencia_pessoa_id: pessoa.id,
+          user_id: user.id, status: "success",
+          usage: { input_tokens: resultado.usage?.input_tokens, output_tokens: resultado.usage?.output_tokens },
+        });
+        return new Response(JSON.stringify(resultado), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (!imagem.body) return json({ error: "A IA não abriu o fluxo da imagem." }, 502);
+      let buffer = "";
+      let terminou = false;
+      let erroFluxo = "";
+      let uso: { input_tokens?: number; output_tokens?: number } | undefined;
+      const transform = new TransformStream<Uint8Array, Uint8Array>({
+        transform(chunk, controller) {
+          controller.enqueue(chunk);
+          buffer += new TextDecoder().decode(chunk, { stream: true });
+          const eventos = buffer.split("\n\n");
+          buffer = eventos.pop() ?? "";
+          for (const evento of eventos) {
+            const linha = evento.split("\n").find((item) => item.startsWith("data:"));
+            if (!linha) continue;
+            try {
+              const payload = JSON.parse(linha.slice(5).trim());
+              if (payload.type === "image_generation.completed") {
+                terminou = true;
+                uso = payload.usage;
+              }
+              if (payload.type === "error") erroFluxo = payload.error?.message ?? "A geração da imagem falhou.";
+            } catch { /* evento parcial */ }
+          }
+        },
+        async flush() {
+          await logAiUsage({
+            admin, provider: "lovable", model: MODELO_IMAGEM, agente_tipo: "redes-arte", unidade: "agencia",
+            agente_slug: "redes-conteudo", agencia_cliente_id: clienteId, agencia_pessoa_id: pessoa.id,
+            user_id: user.id, status: terminou ? "success" : "error", error_message: terminou ? undefined : erroFluxo || "Fluxo encerrado sem imagem final.",
+            usage: uso,
+          });
+        },
+      });
+      return new Response(imagem.body.pipeThrough(transform), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
+      });
+    }
 
     const { data: briefing } = await ag
       .from("redes_conteudo_meses")
