@@ -49,6 +49,22 @@ export function useIdentidadeVisual(clienteId?: string) {
   });
 }
 
+export function useSalvarIdentidade(clienteId?: string) {
+  const client = useQueryClient();
+  return async (identidade: Pick<IdentidadeVisual, 'cores' | 'tipografia' | 'guia'>) => {
+    if (!clienteId) return;
+    const { error } = await agencia().from('cliente_identidade').upsert({
+      cliente_id: clienteId,
+      cores: identidade.cores,
+      tipografia: identidade.tipografia,
+      guia: identidade.guia,
+      atualizado_em: new Date().toISOString(),
+    }, { onConflict: 'cliente_id' });
+    if (error) throw error;
+    await client.invalidateQueries({ queryKey: ['agencia', 'identidade-visual', clienteId] });
+  };
+}
+
 export function useArtesTema(temaId?: string) {
   return useQuery({
     queryKey: ['agencia', 'redes-artes', temaId],
@@ -108,6 +124,13 @@ export function useSalvarArte() {
     await client.invalidateQueries({ queryKey: ['agencia', 'redes-artes', input.temaId] });
     return data as RedesArte;
   };
+}
+
+export async function aprovarImagem(temaId: string, arteId: string) {
+  const { error: limpar } = await agencia().from('redes_artes').update({ aprovada: false }).eq('tema_id', temaId).eq('tipo', 'imagem_opcao');
+  if (limpar) throw limpar;
+  const { error } = await agencia().from('redes_artes').update({ aprovada: true, atualizado_em: new Date().toISOString() }).eq('id', arteId);
+  if (error) throw error;
 }
 
 export async function assinarArte(path: string) {

@@ -250,6 +250,7 @@ Deno.serve(async (req) => {
       instrucoes?: string;
       formato_arte?: "feed_4_5" | "quadrado_1_1" | "stories_9_16";
       instrucoes_arte?: string;
+      stream?: boolean;
     };
 
     const clienteId = (body.cliente_id ?? "").trim();
