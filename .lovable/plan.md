@@ -1,4 +1,4 @@
-# Corrigir a cor principal para o verde Cupola
+# Adicionar temas claro e escuro com a identidade Cupola
 
 ## O que foi confirmado
 - O aplicativo ativa permanentemente o modo escuro.
@@ -6,14 +6,18 @@
 - As telas usam corretamente os tokens semânticos (`primary`, `ring` e `sidebar-primary`); portanto, a origem do azul está nos valores escuros desses tokens, não em cada botão individual.
 
 ## O que será alterado
-- Manter o visual escuro atual e definir, na camada de tema do aplicativo, os equivalentes escuros de `primary`, `ring`, `brand` e `sidebar-primary` com o verde Cupola.
-- Ajustar os respectivos contrastes para preservar a leitura de textos e ícones.
+- Adicionar um botão de sol/lua no canto superior direito, ao lado das notificações, com descrição ao passar o cursor.
+- Permitir alternar imediatamente entre tema claro e tema escuro em todas as páginas.
+- Salvar a escolha neste navegador; para quem ainda não escolheu, preservar o tema escuro atual como padrão.
+- Usar o verde Cupola em ações, seleções, foco e destaques nos dois temas, corrigindo os tokens escuros que hoje aparecem azuis.
+- Ajustar os contrastes de texto, superfícies e ícones nos dois temas.
 - Remover usos azuis pontuais apenas quando representarem a ação principal; cores informativas e gráficos continuarão semanticamente distintas.
 - Não editar os arquivos gerenciados do design system anexado.
 
 ## Validação
-- Conferir Contratos, menu lateral, botões, campos e estados selecionados em tela.
-- Verificar contraste, consistência visual e ausência de erros de compilação.
+- Conferir a troca de tema em Contratos e em outra página interna, incluindo a permanência da escolha após recarregar.
+- Verificar menu lateral, botões, campos, estados selecionados e notificações nos dois temas.
+- Validar contraste, ausência de sobreposições e compilação.
 
 ## Nota técnica
-A correção será aplicada depois do tema anexado, na camada própria do projeto, para que futuras atualizações do design system não apaguem a identidade verde.
+A seleção usará o suporte de tema já instalado no projeto. Os ajustes de identidade serão aplicados na camada própria do aplicativo, depois do tema anexado, para não editar arquivos gerenciados nem perder a correção em futuras atualizações.
