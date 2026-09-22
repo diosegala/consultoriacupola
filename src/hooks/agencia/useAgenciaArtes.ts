@@ -65,6 +65,24 @@ export function useSalvarIdentidade(clienteId?: string) {
   };
 }
 
+export function useEnviarLogo(clienteId?: string) {
+  const client = useQueryClient();
+  return async (arquivo: File) => {
+    if (!clienteId) return;
+    const extensao = arquivo.name.split('.').pop()?.toLowerCase() ?? 'png';
+    const id = crypto.randomUUID();
+    const caminho = `${clienteId}/marca/${id}.${extensao}`;
+    const { error: uploadError } = await supabase.storage.from('conhecimento').upload(caminho, arquivo, { contentType: arquivo.type });
+    if (uploadError) throw uploadError;
+    const { error } = await agencia().from('cliente_marca_arquivo').insert({
+      id, cliente_id: clienteId, nome: arquivo.name, papel: 'logo', caminho,
+      tipo_arquivo: arquivo.type, tamanho: arquivo.size,
+    });
+    if (error) throw error;
+    await client.invalidateQueries({ queryKey: ['agencia', 'identidade-visual', clienteId] });
+  };
+}
+
 export function useArtesTema(temaId?: string) {
   return useQuery({
     queryKey: ['agencia', 'redes-artes', temaId],

@@ -9,7 +9,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import {
   aprovarImagem, assinarArte, gerarImagemArte, type FormatoArte, type RedesArte,
-  useArtesTema, useIdentidadeVisual, useSalvarArte, useSalvarIdentidade,
+  useArtesTema, useEnviarLogo, useIdentidadeVisual, useSalvarArte, useSalvarIdentidade,
 } from '@/hooks/agencia/useAgenciaArtes';
 import type { RedesTema } from '@/hooks/agencia/useAgenciaRedes';
 
@@ -55,7 +55,7 @@ function quebrarTexto(context: CanvasRenderingContext2D, texto: string, maximo: 
   return linhas;
 }
 
-async function compor(url: string, texto: string, formato: FormatoArte, zoom: number, x: number, y: number, alinhamento: 'esquerda' | 'centro', cor: string) {
+async function compor(url: string, logoUrl: string, texto: string, formato: FormatoArte, zoom: number, x: number, y: number, alinhamento: 'esquerda' | 'centro', cor: string) {
   const { largura, altura } = FORMATOS[formato];
   const canvas = document.createElement('canvas');
   canvas.width = largura;
@@ -77,10 +77,16 @@ async function compor(url: string, texto: string, formato: FormatoArte, zoom: nu
   const bloco = linhas.length * alturaLinha;
   const centroX = alinhamento === 'centro' ? largura / 2 : margem;
   const inicioY = altura * 0.68 - bloco / 2;
-  context.fillStyle = 'rgba(0,0,0,0.68)';
+  context.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--background').trim();
   context.fillRect(0, inicioY - margem, largura, bloco + margem * 2);
   context.fillStyle = cor;
   linhas.forEach((linha, indice) => context.fillText(linha, centroX, inicioY + indice * alturaLinha));
+  if (logoUrl) {
+    const logo = await carregarImagem(logoUrl);
+    const logoLargura = largura * 0.18;
+    const logoAltura = logo.height * logoLargura / logo.width;
+    context.drawImage(logo, largura - margem - logoLargura, margem, logoLargura, logoAltura);
+  }
   return await new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Não foi possível exportar a arte.')), 'image/png'));
 }
 
@@ -89,6 +95,7 @@ export function RedesArteDialog({ tema, clienteId, mes, open, onOpenChange }: { 
   const { data: artes, refetch } = useArtesTema(tema.id);
   const salvarArte = useSalvarArte();
   const salvarIdentidade = useSalvarIdentidade(clienteId);
+  const enviarLogo = useEnviarLogo(clienteId);
   const [formato, setFormato] = useState<FormatoArte>('feed_4_5');
   const [instrucao, setInstrucao] = useState('');
   const [imagem, setImagem] = useState('');
@@ -96,6 +103,7 @@ export function RedesArteDialog({ tema, clienteId, mes, open, onOpenChange }: { 
   const [gerando, setGerando] = useState(false);
   const [aprovada, setAprovada] = useState<RedesArte | null>(null);
   const [urlAprovada, setUrlAprovada] = useState('');
+  const [logoUrl, setLogoUrl] = useState('');
   const [zoom, setZoom] = useState(1);
   const [x, setX] = useState(0);
   const [y, setY] = useState(0);
@@ -123,11 +131,16 @@ export function RedesArteDialog({ tema, clienteId, mes, open, onOpenChange }: { 
     setAprovada(escolhida);
     assinarArte(escolhida.caminho).then(setUrlAprovada).catch(() => undefined);
   }, [artes]);
+  useEffect(() => {
+    const caminho = identidade?.logos[0]?.caminho;
+    if (!caminho) { setLogoUrl(''); return; }
+    supabase.storage.from('conhecimento').createSignedUrl(caminho, 3600).then(({ data }) => setLogoUrl(data?.signedUrl ?? ''));
+  }, [identidade?.logos]);
 
   const incompleta = !cores.trim() || !fontes.trim() || !guia.trim() || !identidade?.logos.length;
   const corTexto = useMemo(() => {
     const primeira = cores.split(',').map((item) => item.trim()).find((item) => /^#[0-9a-f]{6}$/i.test(item));
-    return primeira ?? '#ffffff';
+    return primeira ?? getComputedStyle(document.documentElement).getPropertyValue('--foreground').trim();
   }, [cores]);
 
   const gerar = async () => {
@@ -166,7 +179,7 @@ export function RedesArteDialog({ tema, clienteId, mes, open, onOpenChange }: { 
     if (!aprovada || !urlAprovada) return;
     setSalvando(true);
     try {
-      const arquivos = await Promise.all(textos.map((texto) => compor(urlAprovada, texto, formato, zoom, x, y, alinhamento, corTexto)));
+      const arquivos = await Promise.all(textos.map((texto) => compor(urlAprovada, logoUrl, texto, formato, zoom, x, y, alinhamento, corTexto)));
       if (salvar) {
         for (let indice = 0; indice < arquivos.length; indice += 1) {
           const dataUrl = await new Promise<string>((resolve) => {
@@ -207,6 +220,7 @@ export function RedesArteDialog({ tema, clienteId, mes, open, onOpenChange }: { 
               <div><Label>Fontes</Label><Input value={fontes} onChange={(event) => setFontes(event.target.value)} placeholder="Manrope, Inter" /></div>
             </div>
             <div><Label>Orientações visuais</Label><Textarea value={guia} onChange={(event) => setGuia(event.target.value)} placeholder="Estilo fotográfico, elementos permitidos e proibidos." /></div>
+            <div><Label>Logotipo</Label><Input type="file" accept="image/png,image/jpeg,image/webp" onChange={async (event) => { const arquivo = event.target.files?.[0]; if (!arquivo) return; try { await enviarLogo(arquivo); toast.success('Logotipo salvo.'); } catch { toast.error('Não foi possível salvar o logotipo.'); } }} />{identidade?.logos[0] && <p className="mt-1 text-xs text-muted-foreground">{identidade.logos[0].nome}</p>}</div>
             <Button variant="outline" onClick={async () => { try { await salvarIdentidade({ cores: cores.split(',').map((item) => item.trim()).filter(Boolean), tipografia: fontes.split(',').map((item) => item.trim()).filter(Boolean), guia }); toast.success('Identidade visual salva.'); } catch { toast.error('Não foi possível salvar a identidade.'); } }}>Salvar identidade</Button>
           </section>
           <section className="space-y-3 border-t border-border pt-4">
