@@ -203,6 +203,7 @@ export function RedesArteDialog({ tema, clienteId, mes, open, onOpenChange }: { 
 
   const opcoes = artes?.filter((arte) => arte.tipo === 'imagem_opcao') ?? [];
   const finais = artes?.filter((arte) => arte.tipo === 'arte_final') ?? [];
+  const versoes = Array.from(new Map(finais.map((arte) => [arte.versao, arte])).values());
   const textoAtual = textos[slide] ?? '';
 
   return (
@@ -241,7 +242,7 @@ export function RedesArteDialog({ tema, clienteId, mes, open, onOpenChange }: { 
             <div ref={previaRef} className={`relative mx-auto w-full max-w-md overflow-hidden rounded-md border border-border bg-muted ${FORMATOS[formato].classe}`}><img src={urlAprovada} alt="Arte em edição" className="absolute h-full w-full object-cover" style={{ transform: `translate(${x / 2}%, ${y / 2}%) scale(${zoom})` }} /><div className="absolute inset-x-0 top-2/3 bg-background/80 p-6"><p className={`text-xl font-bold text-foreground ${alinhamento === 'centro' ? 'text-center' : 'text-left'}`}>{textoAtual}</p></div></div>
             <div className="flex flex-wrap gap-2"><Button onClick={() => exportar(true)} disabled={salvando}><Save />Salvar versão</Button><Button variant="outline" onClick={() => exportar(false)} disabled={salvando}><Download />{textos.length > 1 ? 'Baixar carrossel ZIP' : 'Baixar PNG'}</Button></div>
           </section>}
-          {finais.length > 0 && <section className="space-y-2 border-t border-border pt-4"><h3 className="flex items-center gap-2 font-medium"><History />Histórico</h3><p className="text-sm text-muted-foreground">{finais.length} arquivo(s) final(is) salvo(s), da versão {finais[0].versao}.</p></section>}
+          {versoes.length > 0 && <section className="space-y-3 border-t border-border pt-4"><h3 className="flex items-center gap-2 font-medium"><History />Histórico</h3><div className="flex flex-wrap gap-2">{versoes.map((arte) => <Button key={arte.id} variant="outline" onClick={() => { setFormato(arte.formato); setZoom(arte.composicao?.zoom ?? 1); setX(arte.composicao?.x ?? 0); setY(arte.composicao?.y ?? 0); setAlinhamento(arte.composicao?.alinhamento ?? 'esquerda'); const destaVersao = finais.filter((item) => item.versao === arte.versao).sort((a, b) => a.slide_indice - b.slide_indice); setTextos(destaVersao.map((item) => item.texto)); setSlide(0); toast.success(`Versão ${arte.versao} reaberta para ajustes.`); }}>Versão {arte.versao}</Button>)}</div></section>}
         </div>
         <DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button></DialogFooter>
       </DialogContent>
