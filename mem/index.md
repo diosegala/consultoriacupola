@@ -24,6 +24,7 @@ System-only notifications (no emails). No data/report exports. Hard deletes use 
 - [Contract Detail Interaction](mem://ui/contract-detail-interaction) — Modal with inline edit instead of redirect
 
 ### Clients & Contracts
+- [Permissões da Agência](mem://features/agencia-permissoes-funcionalidade) — Escrita em contas/pessoas/agentes vem de acessos_funcionalidade; admins e gestores ajustados em 22/09/2026
 - [Client Detail Structure](mem://features/client-detail-structure) — Tabs: Contrato, Onboarding, Atendimento, Ferramentas
 - [Client Management Rules](mem://features/client-management-rules) — Auto status transitions (New -> Active -> Closed)
 - [Contracts Consolidated View](mem://features/contracts-consolidated-view) — Global grid for active/inactive contracts
