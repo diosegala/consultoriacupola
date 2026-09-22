@@ -43,6 +43,7 @@ import AgenciaAgenteConversa from "./pages/agencia/AgenciaAgenteConversa";
 import AgenciaEquipe from "./pages/agencia/AgenciaEquipe";
 import AgenciaMercado from "./pages/agencia/AgenciaMercado";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
+import { ThemeProvider } from "next-themes";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -57,14 +58,15 @@ const queryClient = new QueryClient({
 });
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <ErrorBoundary>
-          <Routes>
+  <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} storageKey="cupola-theme">
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
+            <ErrorBoundary>
+            <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/trocar-senha" element={<TrocarSenha />} />
@@ -104,12 +106,13 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
             <Route path="/consultores/:id/relatorio" element={<RelatorioConsultor />} />
             <Route path="/clientes/:id/relatorio" element={<RelatorioCliente />} />
-          </Routes>
-          </ErrorBoundary>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+            </Routes>
+            </ErrorBoundary>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ThemeProvider>
 );
 
 export default App;

@@ -7,6 +7,7 @@ import { OraculoFloatingChat } from '@/components/oraculo/OraculoFloatingChat';
 import { ChatFloatingWidget } from '@/components/chat/ChatFloatingWidget';
 import { ErrorBoundary } from './ErrorBoundary';
 import { NotificationBell } from './NotificationBell';
+import { ThemeToggle } from './ThemeToggle';
 
 const RESTRICTED_FOR_CONSULTOR = ['/', '/contratos', '/consultores', '/configuracoes'];
 
@@ -60,7 +61,8 @@ export function AppLayout() {
       <Sidebar />
       <main className="flex-1 overflow-auto">
         <div className="sticky top-0 z-30 flex justify-end px-6 pt-4 pointer-events-none">
-          <div className="pointer-events-auto">
+          <div className="pointer-events-auto flex items-center gap-2">
+            <ThemeToggle />
             <NotificationBell />
           </div>
         </div>

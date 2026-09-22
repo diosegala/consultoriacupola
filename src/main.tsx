@@ -8,7 +8,6 @@ if (!rootElement) {
   throw new Error("Root element not found");
 }
 
-document.documentElement.classList.add("dark");
 document.body.classList.add("font-sans", "bg-background", "text-foreground", "antialiased");
 
 createRoot(rootElement).render(<App />);
