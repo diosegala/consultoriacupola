@@ -33,6 +33,7 @@ const PRECOS: Record<string, { entrada: number; saida: number }> = {
   "claude-opus-4-5": { entrada: 5, saida: 25 },
   "claude-haiku-4-5": { entrada: 1, saida: 5 },
   "openai/gpt-6-astra": { entrada: 1.25, saida: 10 },
+  "openai/gpt-image-2.5-sunburst": { entrada: 5, saida: 30 },
 };
 
 export function claudeCostUsd(inTok: number, outTok: number): number {
