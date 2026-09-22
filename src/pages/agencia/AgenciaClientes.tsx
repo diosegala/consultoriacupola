@@ -1,13 +1,16 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, Search, ArrowRight } from 'lucide-react';
+import { Building2, Search, ArrowRight, Plus } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/design-system/design-system-hub-ba3841';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ContaFormDialog } from '@/components/agencia/ContaFormDialog';
 import {
   useAgenciaClientes,
   useAgenciaContratos,
+  useAgenciaPessoa,
   type AgenciaContrato,
 } from '@/hooks/agencia/useAgencia';
 
@@ -26,7 +29,12 @@ const TIPO_LABEL: Record<string, string> = {
 export default function AgenciaClientes() {
   const { data: clientes, isLoading } = useAgenciaClientes();
   const { data: contratos } = useAgenciaContratos();
+  const { data: pessoa } = useAgenciaPessoa();
   const [busca, setBusca] = useState('');
+  const [formAberto, setFormAberto] = useState(false);
+
+  const podeGerenciar = pessoa?.papel === 'admin' || pessoa?.papel === 'gestor';
+  const existentes = (clientes ?? []).map((c) => c.id);
 
   const contratoPorCliente = useMemo(() => {
     const m = new Map<string, AgenciaContrato>();
@@ -47,17 +55,31 @@ export default function AgenciaClientes() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="rounded-lg bg-primary/10 p-2">
-          <Building2 className="h-5 w-5 text-primary" />
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="rounded-lg bg-primary/10 p-2">
+            <Building2 className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold">Contas da Agência</h1>
+            <p className="text-sm text-muted-foreground">
+              Carteira da unidade de marketing.
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold">Contas da Agência</h1>
-          <p className="text-sm text-muted-foreground">
-            Carteira da unidade de marketing.
-          </p>
-        </div>
+        {podeGerenciar && (
+          <Button onClick={() => setFormAberto(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nova conta
+          </Button>
+        )}
       </div>
+
+      <ContaFormDialog
+        aberto={formAberto}
+        onOpenChange={setFormAberto}
+        existentes={existentes}
+      />
 
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -78,8 +100,8 @@ export default function AgenciaClientes() {
       ) : lista.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-sm text-muted-foreground">
-            Nenhuma conta por aqui ainda. As contas aparecem depois da importação
-            dos dados da agência.
+            Nenhuma conta por aqui ainda.
+            {podeGerenciar && ' Use "Nova conta" para cadastrar a primeira.'}
           </CardContent>
         </Card>
       ) : (

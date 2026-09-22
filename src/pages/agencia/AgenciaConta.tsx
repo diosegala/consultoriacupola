@@ -1,19 +1,34 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Building2, Sparkles, Megaphone, FileText, Mic } from 'lucide-react';
+import {
+  ArrowLeft,
+  Building2,
+  Sparkles,
+  Megaphone,
+  FileText,
+  Mic,
+  Pencil,
+  Plus,
+} from 'lucide-react';
 import { FichaAutomaticaDialog } from '@/components/agencia/FichaAutomaticaDialog';
 import { RecadoFaladoDialog } from '@/components/agencia/RecadoFaladoDialog';
+import { ContaFormDialog } from '@/components/agencia/ContaFormDialog';
+import { ContratoFormDialog } from '@/components/agencia/ContratoFormDialog';
+import { ProjetoFormDialog } from '@/components/agencia/ProjetoFormDialog';
+import { Button } from '@/design-system/design-system-hub-ba3841';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   useAgenciaCliente,
   useAgenciaContratos,
   useAgenciaEntregaveis,
   useAgenciaConhecimento,
+  useAgenciaEspacos,
+  useAgenciaPessoa,
   useAgenciaProjetos,
+  type AgenciaProjeto,
 } from '@/hooks/agencia/useAgencia';
 
 function Campo({ rotulo, valor }: { rotulo: string; valor?: string | null }) {
@@ -33,8 +48,18 @@ export default function AgenciaConta() {
   const { data: entregaveis } = useAgenciaEntregaveis(cliente?.id);
   const { data: conhecimento } = useAgenciaConhecimento(cliente?.id);
   const { data: projetos } = useAgenciaProjetos();
+  const { data: espacos } = useAgenciaEspacos();
+  const { data: pessoa } = useAgenciaPessoa();
   const [fichaAberta, setFichaAberta] = useState(false);
   const [recadoAberto, setRecadoAberto] = useState(false);
+  const [contaAberta, setContaAberta] = useState(false);
+  const [contratoAberto, setContratoAberto] = useState(false);
+  const [projetoAlvo, setProjetoAlvo] = useState<{ aberto: boolean; projeto: AgenciaProjeto | null }>({
+    aberto: false,
+    projeto: null,
+  });
+
+  const podeGerenciar = pessoa?.papel === 'admin' || pessoa?.papel === 'gestor';
 
   if (isLoading) return <Skeleton className="h-64 w-full" />;
   if (!cliente) {
@@ -74,6 +99,12 @@ export default function AgenciaConta() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          {podeGerenciar && (
+            <Button variant="outline" size="sm" onClick={() => setContaAberta(true)}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Editar
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => setFichaAberta(true)}>
             <Sparkles className="mr-2 h-4 w-4" />
             Preencher ficha com o material
@@ -109,6 +140,36 @@ export default function AgenciaConta() {
         onOpenChange={setRecadoAberto}
       />
 
+      <ContaFormDialog
+        aberto={contaAberta}
+        onOpenChange={setContaAberta}
+        conta={cliente}
+        existentes={[cliente.id]}
+      />
+
+      {podeGerenciar && (
+        <ContratoFormDialog
+          aberto={contratoAberto}
+          onOpenChange={setContratoAberto}
+          clienteId={cliente.id}
+          contrato={contrato ?? null}
+        />
+      )}
+
+      {podeGerenciar && (
+        <ProjetoFormDialog
+          aberto={projetoAlvo.aberto}
+          onOpenChange={(aberto) => setProjetoAlvo({ aberto, projeto: aberto ? projetoAlvo.projeto : null })}
+          projeto={projetoAlvo.projeto}
+          clienteId={cliente.id}
+          clientes={cliente ? [cliente] : []}
+          espacos={(espacos ?? []).filter((e) => e.tipo !== 'pessoal')}
+          pessoaId={pessoa?.id ?? ''}
+          existentes={(projetos ?? []).map((p) => p.id)}
+        />
+      )}
+
+
       <Tabs defaultValue="perfil">
         <TabsList>
           <TabsTrigger value="perfil">Perfil</TabsTrigger>
@@ -141,8 +202,14 @@ export default function AgenciaConta() {
 
         <TabsContent value="contrato" className="mt-4 space-y-4">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-base">Contrato</CardTitle>
+              {podeGerenciar && (
+                <Button variant="outline" size="sm" onClick={() => setContratoAberto(true)}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  {contrato ? 'Editar contrato' : 'Cadastrar contrato'}
+                </Button>
+              )}
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-3">
               {contrato ? (
@@ -191,18 +258,32 @@ export default function AgenciaConta() {
 
         <TabsContent value="projetos" className="mt-4">
           <Card>
-            <CardContent className="space-y-2 p-6">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-base">Projetos</CardTitle>
+              {podeGerenciar && (
+                <Button size="sm" onClick={() => setProjetoAlvo({ aberto: true, projeto: null })}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Novo projeto
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent className="space-y-2">
               {projetosDaConta.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Nenhum projeto nesta conta.</p>
               ) : (
                 projetosDaConta.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between border-b border-border pb-2 last:border-0">
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => podeGerenciar && setProjetoAlvo({ aberto: true, projeto: p })}
+                    className="flex w-full items-center justify-between border-b border-border pb-2 text-left last:border-0"
+                  >
                     <div>
                       <p className="text-sm font-medium">{p.nome}</p>
                       {p.resumo && <p className="text-xs text-muted-foreground">{p.resumo}</p>}
                     </div>
                     {p.status && <Badge variant="outline">{p.status}</Badge>}
-                  </div>
+                  </button>
                 ))
               )}
             </CardContent>

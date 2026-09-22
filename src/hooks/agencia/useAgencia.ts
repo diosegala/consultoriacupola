@@ -13,6 +13,7 @@ export interface AgenciaPessoa {
   lider_id: string | null;
   papel: string | null;
   ativa: boolean | null;
+  espaco_de_trabalho_liberado: boolean | null;
   foto: string | null;
 }
 
@@ -159,16 +160,16 @@ export function useAgenciaProjetos() {
   });
 }
 
-export function useAgenciaAgentes() {
+export function useAgenciaAgentes(incluirOcultos = false) {
   return useQuery({
-    queryKey: ['agencia', 'agentes'],
+    queryKey: ['agencia', 'agentes', incluirOcultos],
     queryFn: async (): Promise<AgenciaAgente[]> => {
       const { data, error } = await agencia()
         .from('agentes')
         .select('*')
         .order('ordem', { ascending: true });
       if (error) throw error;
-      return ((data ?? []) as AgenciaAgente[]).filter((a) => !a.oculto);
+      return ((data ?? []) as AgenciaAgente[]).filter((a) => incluirOcultos || !a.oculto);
     },
   });
 }
@@ -184,13 +185,20 @@ export function useAgenciaPessoas() {
   });
 }
 
+export interface AgenciaEspaco {
+  id: string;
+  nome: string;
+  tipo: string | null;
+  cor: string | null;
+}
+
 export function useAgenciaEspacos() {
   return useQuery({
     queryKey: ['agencia', 'espacos'],
     queryFn: async () => {
       const { data, error } = await agencia().from('espacos').select('*').order('nome');
       if (error) throw error;
-      return (data ?? []) as Array<{ id: string; nome: string; tipo: string | null; cor: string | null }>;
+      return (data ?? []) as AgenciaEspaco[];
     },
   });
 }
