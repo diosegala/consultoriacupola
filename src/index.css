@@ -3,6 +3,15 @@
 
 @config "../tailwind.config.ts";
 
+:root,
+.dark {
+  --primary: var(--brand);
+  --primary-foreground: var(--secondary-foreground);
+  --ring: var(--brand);
+  --sidebar-primary: var(--brand);
+  --sidebar-primary-foreground: var(--secondary-foreground);
+}
+
 @layer base {
   * {
     @apply border-border;
