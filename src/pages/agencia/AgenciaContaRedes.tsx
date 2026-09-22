@@ -82,7 +82,7 @@ function TemaCard({
             value={instrucoes}
             onChange={(e) => setInstrucoes(e.target.value)}
             placeholder="Instruções para o texto (opcional)"
-            className="min-w-[200px] flex-1"
+            className="min-w-0 flex-1"
           />
           <Button size="sm" disabled={escrevendo} onClick={() => onEscrever(formato, instrucoes)}>
             <PenLine className="mr-2 h-4 w-4" />
