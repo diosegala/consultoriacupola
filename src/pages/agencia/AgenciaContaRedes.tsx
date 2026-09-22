@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Sparkles, PenLine, Copy } from 'lucide-react';
+import { ArrowLeft, Sparkles, PenLine, Copy, Palette } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { useAgenciaCliente } from '@/hooks/agencia/useAgencia';
 import { useRedesConteudo, useRedesMes, useRedesTemas, type RedesTema } from '@/hooks/agencia/useAgenciaRedes';
+import { RedesArteDialog } from '@/components/agencia/RedesArteDialog';
 
 function mesAtual() {
   const d = new Date();
@@ -29,13 +30,18 @@ function TemaCard({
   tema,
   escrevendo,
   onEscrever,
+  clienteId,
+  mes,
 }: {
   tema: RedesTema;
   escrevendo: boolean;
   onEscrever: (formato: 'card' | 'carrossel', instrucoes: string) => void;
+  clienteId: string;
+  mes: string;
 }) {
   const [formato, setFormato] = useState<'card' | 'carrossel'>((tema.formato as 'card' | 'carrossel') ?? 'card');
   const [instrucoes, setInstrucoes] = useState(tema.instrucoes ?? '');
+  const [arteAberta, setArteAberta] = useState(false);
   const slides = tema.slides ?? [];
 
   const textoCompleto = [
@@ -76,7 +82,7 @@ function TemaCard({
             value={instrucoes}
             onChange={(e) => setInstrucoes(e.target.value)}
             placeholder="Instruções para o texto (opcional)"
-            className="min-w-[200px] flex-1"
+            className="min-w-0 flex-1"
           />
           <Button size="sm" disabled={escrevendo} onClick={() => onEscrever(formato, instrucoes)}>
             <PenLine className="mr-2 h-4 w-4" />
@@ -113,8 +119,13 @@ function TemaCard({
               <Copy className="mr-2 h-4 w-4" />
               Copiar tudo
             </Button>
+            <Button size="sm" onClick={() => setArteAberta(true)}>
+              <Palette className="mr-2 h-4 w-4" />
+              Criar arte
+            </Button>
           </div>
         )}
+        <RedesArteDialog tema={tema} clienteId={clienteId} mes={mes} open={arteAberta} onOpenChange={setArteAberta} />
       </CardContent>
     </Card>
   );
@@ -234,6 +245,8 @@ export default function AgenciaContaRedes() {
               tema={t}
               escrevendo={escrevendo === t.id}
               onEscrever={(formato, instrucoes) => escreverPeca(t.id, formato, instrucoes)}
+              clienteId={cliente.id}
+              mes={mes}
             />
           ))}
         </div>
