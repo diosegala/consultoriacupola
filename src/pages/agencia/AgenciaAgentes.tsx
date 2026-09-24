@@ -116,12 +116,14 @@ export default function AgenciaAgentes() {
         </div>
       )}
 
-      <AgenteFormDialog
-        aberto={alvo.aberto && !!agenteAlvo}
-        onOpenChange={(aberto) => setAlvo({ aberto, id: aberto ? alvo.id : null })}
-        agente={agenteAlvo!}
-        espacos={espacos ?? []}
-      />
+      {agenteAlvo && (
+        <AgenteFormDialog
+          aberto={alvo.aberto}
+          onOpenChange={(aberto) => setAlvo({ aberto, id: aberto ? alvo.id : null })}
+          agente={agenteAlvo}
+          espacos={espacos ?? []}
+        />
+      )}
 
       <p className="text-xs text-muted-foreground">
         Clique em um agente para conversar com ele.
