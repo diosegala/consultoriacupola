@@ -1,1 +1,3 @@
 project_id = "gujsesjqersadunthqwm"
+[functions.tmp-importar-agencia]
+verify_jwt = false
