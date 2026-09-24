@@ -1,0 +1,5 @@
+alter table agencia.clientes add column if not exists arquivado boolean not null default false;
+alter table agencia.agentes add column if not exists cores text[] not null default '{}', add column if not exists capa text;
+alter table agencia.blog_ajustes add column if not exists perfil_estilo jsonb;
+alter table agencia.blog_posts add column if not exists categoria_blog text not null default '', add column if not exists orientacao_layout_cta text not null default '', add column if not exists html_final text not null default '', add column if not exists html_fonte text not null default '';
+alter table agencia.uso_de_ia add column if not exists trabalho text, add column if not exists trabalho_nome text, add column if not exists manual boolean not null default false, add column if not exists observacao text;
