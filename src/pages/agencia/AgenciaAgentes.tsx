@@ -37,6 +37,8 @@ function iconeDe(a: AgenciaAgente) {
 /** Cores por área: tokens chart do design system, na ordem das áreas. */
 const FUNDOS_AREA = ['bg-chart-1', 'bg-chart-2', 'bg-chart-3', 'bg-chart-4', 'bg-chart-5'];
 
+type AreaComFundo = AgenciaEspaco & { fundo: string };
+
 export default function AgenciaAgentes() {
   const { data: pessoa } = useAgenciaPessoa();
   const podeGerenciar = pessoa?.papel === 'admin' || pessoa?.papel === 'gestor';
