@@ -24,7 +24,8 @@ import {
   FolderKanban,
   History,
   Wand2,
-  Package
+  Package,
+  ShieldCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -65,6 +66,7 @@ const agenciaMenuItems = [
   { to: '/agencia/redes', icon: CalendarDays, label: 'Redes do mês' },
   { to: '/agencia/mercado', icon: Newspaper, label: 'Mercado' },
   { to: '/agencia/equipe', icon: Users, label: 'Time' },
+  { to: '/agencia/gestao', icon: ShieldCheck, label: 'Gestão' },
 ];
 
 const consultorMenuItems = [
