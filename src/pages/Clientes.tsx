@@ -472,7 +472,7 @@ export default function Clientes() {
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                <AlertTriangle className="h-4 w-4 text-warning" />
                               </TooltipTrigger>
                               <TooltipContent>
                                 Status divergente — etapa do Kanban "{cliente._projeto_etapa_nome}" indica
@@ -488,7 +488,7 @@ export default function Clientes() {
                     {(aliasesMap?.[cliente.id]?.length ?? 0) > 0 && (
                       <div className="flex flex-wrap gap-1">
                         {aliasesMap![cliente.id].map(a => (
-                          <Badge key={a} variant="outline" className="text-[10px] font-normal">
+                          <Badge key={a} variant="outline" className="text-xs font-normal">
                             {a}
                           </Badge>
                         ))}
@@ -570,7 +570,7 @@ export default function Clientes() {
                       {(aliasesMap?.[cliente.id]?.length ?? 0) > 0 && (
                         <div className="flex flex-wrap gap-1 pt-1">
                           {aliasesMap![cliente.id].map(a => (
-                            <Badge key={a} variant="outline" className="text-[10px] font-normal">
+                            <Badge key={a} variant="outline" className="text-xs font-normal">
                               {a}
                             </Badge>
                           ))}
@@ -712,7 +712,7 @@ export default function Clientes() {
                           {(aliasesMap?.[cliente.id]?.length ?? 0) > 0 && (
                             <div className="flex flex-wrap gap-1">
                               {aliasesMap![cliente.id].map(a => (
-                                <Badge key={a} variant="outline" className="text-[10px] font-normal">
+                                <Badge key={a} variant="outline" className="text-xs font-normal">
                                   {a}
                                 </Badge>
                               ))}
@@ -739,7 +739,7 @@ export default function Clientes() {
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                    <AlertTriangle className="h-4 w-4 text-warning" />
                                   </TooltipTrigger>
                                   <TooltipContent>
                                     Status divergente — etapa do Kanban "{cliente._projeto_etapa_nome}" indica
