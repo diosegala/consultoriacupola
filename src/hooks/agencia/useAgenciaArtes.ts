@@ -52,6 +52,36 @@ export function useLogoConta(clienteId?: string) {
   });
 }
 
+export function useLogosContas() {
+  return useQuery({
+    queryKey: ['agencia', 'logos-contas'],
+    queryFn: async (): Promise<Record<string, string>> => {
+      const { data, error } = await agencia()
+        .from('cliente_marca_arquivo')
+        .select('cliente_id, caminho')
+        .eq('papel', 'logo');
+      if (error) throw error;
+      const porCliente = new Map<string, string>();
+      (data ?? []).forEach((l: { cliente_id: string; caminho: string | null }) => {
+        if (l.caminho && !porCliente.has(l.cliente_id)) porCliente.set(l.cliente_id, l.caminho);
+      });
+      if (porCliente.size === 0) return {};
+      const caminhos = [...porCliente.values()];
+      const { data: assinadas, error: e2 } = await supabase.storage
+        .from('conhecimento')
+        .createSignedUrls(caminhos, 3600);
+      if (e2) throw e2;
+      const urlPorCaminho = new Map((assinadas ?? []).map((a) => [a.path, a.signedUrl]));
+      const resultado: Record<string, string> = {};
+      porCliente.forEach((caminho, id) => {
+        const url = urlPorCaminho.get(caminho);
+        if (url) resultado[id] = url;
+      });
+      return resultado;
+    },
+  });
+}
+
 export function useIdentidadeVisual(clienteId?: string) {
   return useQuery({
     queryKey: ['agencia', 'identidade-visual', clienteId],
