@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Sparkles, PenLine, Copy, Palette } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -134,7 +134,8 @@ function TemaCard({
 export default function AgenciaContaRedes() {
   const { slug } = useParams<{ slug: string }>();
   const { data: cliente, isLoading } = useAgenciaCliente(slug);
-  const [mes, setMes] = useState(mesAtual());
+  const [busca] = useSearchParams();
+  const [mes, setMes] = useState(busca.get('mes') || mesAtual());
 
   const { data: briefingSalvo } = useRedesMes(cliente?.id, mes);
   const { data: temas, isLoading: carregandoTemas } = useRedesTemas(cliente?.id, mes);
