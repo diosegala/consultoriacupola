@@ -48,6 +48,7 @@ import AgenciaSessoes from "./pages/agencia/AgenciaSessoes";
 import AgenciaSessao from "./pages/agencia/AgenciaSessao";
 import AgenciaSkills from "./pages/agencia/AgenciaSkills";
 import AgenciaProdutos from "./pages/agencia/AgenciaProdutos";
+import AgenciaNews from "./pages/agencia/AgenciaNews";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 import { ThemeProvider } from "next-themes";
 
@@ -105,7 +106,11 @@ const App = () => (
               <Route path="/agencia/contas/:slug/redes" element={<AgenciaContaRedes />} />
               <Route path="/agencia/contas/:slug/blog" element={<AgenciaContaBlog />} />
               <Route path="/agencia/agentes" element={<AgenciaAgentes />} />
+              <Route path="/agencia/agentes/news" element={<AgenciaNews />} />
               <Route path="/agencia/agentes/:slug" element={<AgenciaAgenteConversa />} />
+              <Route path="/agencia/news" element={<AgenciaNews />} />
+              <Route path="/agencia/news/:slug" element={<AgenciaNews />} />
+              <Route path="/agencia/news/:slug/:mes" element={<AgenciaNews />} />
               <Route path="/agencia/equipe" element={<AgenciaEquipe />} />
               <Route path="/agencia/mercado" element={<AgenciaMercado />} />
               <Route path="/agencia" element={<AgenciaInicio />} />

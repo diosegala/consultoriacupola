@@ -118,6 +118,8 @@ export const STATUS_CONTRATO: Record<string, string> = {
 
 /** Agentes que servem a uma conta e para onde cada um leva. */
 export function rotaDoAgente(agente: { slug: string }, contaSlug: string, clienteId: string) {
+  if (agente.slug === 'news') return `/agencia/news/${contaSlug}`;
+  if (agente.slug === 'criador-de-post-news') return `/agencia/contas/${contaSlug}/blog`;
   if (agente.slug.includes('redes')) return `/agencia/contas/${contaSlug}/redes`;
   if (agente.slug.includes('blog') && !agente.slug.includes('news')) return `/agencia/contas/${contaSlug}/blog`;
   return `/agencia/agentes/${agente.slug}?conta=${clienteId}`;
