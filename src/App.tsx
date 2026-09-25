@@ -42,6 +42,12 @@ import AgenciaAgentes from "./pages/agencia/AgenciaAgentes";
 import AgenciaAgenteConversa from "./pages/agencia/AgenciaAgenteConversa";
 import AgenciaEquipe from "./pages/agencia/AgenciaEquipe";
 import AgenciaMercado from "./pages/agencia/AgenciaMercado";
+import AgenciaInicio from "./pages/agencia/AgenciaInicio";
+import AgenciaProjetos from "./pages/agencia/AgenciaProjetos";
+import AgenciaSessoes from "./pages/agencia/AgenciaSessoes";
+import AgenciaSessao from "./pages/agencia/AgenciaSessao";
+import AgenciaSkills from "./pages/agencia/AgenciaSkills";
+import AgenciaProdutos from "./pages/agencia/AgenciaProdutos";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 import { ThemeProvider } from "next-themes";
 
@@ -102,6 +108,12 @@ const App = () => (
               <Route path="/agencia/agentes/:slug" element={<AgenciaAgenteConversa />} />
               <Route path="/agencia/equipe" element={<AgenciaEquipe />} />
               <Route path="/agencia/mercado" element={<AgenciaMercado />} />
+              <Route path="/agencia" element={<AgenciaInicio />} />
+              <Route path="/agencia/projetos" element={<AgenciaProjetos />} />
+              <Route path="/agencia/sessoes" element={<AgenciaSessoes />} />
+              <Route path="/agencia/sessoes/:id" element={<AgenciaSessao />} />
+              <Route path="/agencia/skills" element={<AgenciaSkills />} />
+              <Route path="/agencia/produtos" element={<AgenciaProdutos />} />
             </Route>
             <Route path="*" element={<NotFound />} />
             <Route path="/consultores/:id/relatorio" element={<RelatorioConsultor />} />
