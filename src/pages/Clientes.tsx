@@ -314,10 +314,41 @@ export default function Clientes() {
           <h1 className="text-2xl font-bold text-foreground">Clientes</h1>
           <p className="text-muted-foreground">Gerencie sua carteira de clientes</p>
         </div>
-        <Button onClick={() => navigate('/clientes/novo')} className="bg-primary text-primary-foreground hover:bg-primary/90">
-          <Plus className="h-4 w-4 mr-2" />
-          Novo Cliente
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1">
+            <Button
+              size="icon"
+              variant={modo === 'grade' ? 'default' : 'ghost'}
+              onClick={() => setModo('grade')}
+              aria-label="Ver em grade"
+              title="Ver em grade"
+            >
+              <LayoutGrid />
+            </Button>
+            <Button
+              size="icon"
+              variant={modo === 'lista' ? 'default' : 'ghost'}
+              onClick={() => setModo('lista')}
+              aria-label="Ver em lista"
+              title="Ver em lista"
+            >
+              <List />
+            </Button>
+            <Button
+              size="icon"
+              variant={modo === 'tabela' ? 'default' : 'ghost'}
+              onClick={() => setModo('tabela')}
+              aria-label="Ver em tabela"
+              title="Ver em tabela"
+            >
+              <TableIcon />
+            </Button>
+          </div>
+          <Button onClick={() => navigate('/clientes/novo')} className="bg-primary text-primary-foreground hover:bg-primary/90">
+            <Plus className="h-4 w-4 mr-2" />
+            Novo Cliente
+          </Button>
+        </div>
       </div>
 
       {/* Filtros */}
