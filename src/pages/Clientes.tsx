@@ -18,7 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Search, Plus, Trash2, Loader2, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle, Archive, ArchiveRestore, Tags, X } from 'lucide-react';
+import { Search, Plus, Trash2, Loader2, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle, Archive, ArchiveRestore, Tags, X, LayoutGrid, List, Table as TableIcon, ArrowRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { AliasesDialog } from '@/components/cliente/AliasesDialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -48,6 +48,14 @@ interface PersistedFilters {
   tipoFilter: string;
   sortField: string;
   sortDirection: string;
+  modo: string;
+}
+
+type ModoVisao = 'grade' | 'lista' | 'tabela';
+
+function iniciaisCliente(nome: string): string {
+  const partes = nome.trim().split(/\s+/);
+  return ((partes[0]?.[0] ?? '') + (partes.length > 1 ? partes[partes.length - 1][0] : '')).toUpperCase();
 }
 
 function loadFilters(): Partial<PersistedFilters> {
