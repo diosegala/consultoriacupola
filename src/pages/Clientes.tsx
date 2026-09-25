@@ -29,6 +29,7 @@ import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyConsultorId } from '@/hooks/useConsultorUser';
+import { cn } from '@/lib/utils';
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('pt-BR', {
