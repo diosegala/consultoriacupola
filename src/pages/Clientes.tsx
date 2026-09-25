@@ -442,7 +442,182 @@ export default function Clientes() {
         </CardContent>
       </Card>
 
+      {/* Grade */}
+      {modo === 'grade' && (
+        isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        ) : clientesFiltrados?.length === 0 ? (
+          <Card className="bg-card border-border">
+            <CardContent className="py-16 text-center text-sm text-muted-foreground">
+              Nenhum cliente encontrado
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {clientesFiltrados?.map(cliente => (
+              <Card
+                key={cliente.id}
+                className="group h-full cursor-pointer rounded-3xl bg-card border-border transition-colors hover:border-primary"
+                onClick={() => navigate(`/clientes/${cliente.id}`)}
+              >
+                <CardContent className="flex h-full flex-col gap-4 p-6">
+                  <div className="flex items-start justify-between gap-2">
+                    {seloCliente(cliente, 'md')}
+                    <div className="flex items-center gap-2">
+                      <StatusBadge status={cliente.status} />
+                      {cliente._projeto_status_cliente &&
+                        cliente._projeto_status_cliente !== cliente.status && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                Status divergente — etapa do Kanban "{cliente._projeto_etapa_nome}" indica
+                                <strong> {cliente._projeto_status_cliente}</strong>. Verifique o Kanban.
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <h2 className="text-xl font-semibold text-foreground">{cliente.nome}</h2>
+                    {(aliasesMap?.[cliente.id]?.length ?? 0) > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {aliasesMap![cliente.id].map(a => (
+                          <Badge key={a} variant="outline" className="text-[10px] font-normal">
+                            {a}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-sm text-muted-foreground">{cliente.cidade}/{cliente.uf}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {cliente.contrato_ativo?.tipo_consultoria?.nome || 'Sem contrato ativo'}
+                    </p>
+                  </div>
+                  <div className="space-y-2 border-t border-border pt-4 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Consultor</span>
+                      <span className="text-foreground">{cliente.consultor?.nome || '-'}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">MRR</span>
+                      <span className="text-foreground">
+                        {cliente.contrato_ativo
+                          ? formatCurrency(Number(cliente.contrato_ativo.remuneracao_mensal))
+                          : '-'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Fim do contrato</span>
+                      <span className="text-foreground">
+                        {cliente.contrato_ativo?.data_fim
+                          ? format(parseISO(cliente.contrato_ativo.data_fim), 'dd/MM/yyyy')
+                          : '-'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-auto flex items-center justify-between gap-4 pt-2">
+                    {acoesCliente(cliente)}
+                    <span className="flex items-center gap-1 text-sm font-medium text-foreground">
+                      Abrir
+                      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )
+      )}
+
+      {/* Lista */}
+      {modo === 'lista' && (
+        isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        ) : clientesFiltrados?.length === 0 ? (
+          <Card className="bg-card border-border">
+            <CardContent className="py-16 text-center text-sm text-muted-foreground">
+              Nenhum cliente encontrado
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {clientesFiltrados?.map(cliente => (
+              <Card
+                key={cliente.id}
+                className="group cursor-pointer rounded-3xl bg-card border-border transition-colors hover:border-primary"
+                onClick={() => navigate(`/clientes/${cliente.id}`)}
+              >
+                <CardContent className="flex flex-col gap-6 p-6 md:flex-row md:items-center">
+                  <div className="flex min-w-0 flex-1 items-start gap-4">
+                    {seloCliente(cliente, 'md')}
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="text-xl font-semibold text-foreground">{cliente.nome}</h2>
+                        <StatusBadge status={cliente.status} />
+                      </div>
+                      <p className="text-sm text-muted-foreground">{cliente.cidade}/{cliente.uf}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {cliente.contrato_ativo?.tipo_consultoria?.nome || 'Sem contrato ativo'}
+                      </p>
+                      {(aliasesMap?.[cliente.id]?.length ?? 0) > 0 && (
+                        <div className="flex flex-wrap gap-1 pt-1">
+                          {aliasesMap![cliente.id].map(a => (
+                            <Badge key={a} variant="outline" className="text-[10px] font-normal">
+                              {a}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-4 border-t border-border pt-4 md:w-96 md:border-l md:border-t-0 md:pl-8 md:pt-0">
+                    <div className="grid grid-cols-3 gap-2 text-sm">
+                      <div>
+                        <p className="text-muted-foreground">Consultor</p>
+                        <p className="text-foreground">{cliente.consultor?.nome || '-'}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">MRR</p>
+                        <p className="text-foreground">
+                          {cliente.contrato_ativo
+                            ? formatCurrency(Number(cliente.contrato_ativo.remuneracao_mensal))
+                            : '-'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Fim do contrato</p>
+                        <p className="text-foreground">
+                          {cliente.contrato_ativo?.data_fim
+                            ? format(parseISO(cliente.contrato_ativo.data_fim), 'dd/MM/yyyy')
+                            : '-'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      {acoesCliente(cliente)}
+                      <span className="flex items-center gap-1 text-sm font-medium text-foreground">
+                        Abrir
+                        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )
+      )}
+
       {/* Tabela */}
+      {modo === 'tabela' && (
       <Card className="bg-card border-border">
         <CardHeader>
           <CardTitle className="text-foreground">
