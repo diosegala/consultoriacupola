@@ -12,6 +12,7 @@ import { useAgenciaCliente } from '@/hooks/agencia/useAgencia';
 import { useBlogAcoes, useBlogPost, useBlogPosts, type BlogPost, type PassoBlog } from '@/hooks/agencia/useAgenciaBlog';
 import { toast } from '@/hooks/use-toast';
 import { conferir as conferirForma, type Ressalva } from '@/lib/agencia/blogConferencia';
+import { BlogFinalizacao } from '@/components/agencia/blog/BlogFinalizacao';
 
 const PASSOS: { id: PassoBlog; nome: string }[] = [
   { id: 'estrutura', nome: 'Estrutura (H1 e títulos)' },
@@ -41,7 +42,7 @@ export default function AgenciaContaBlog() {
   const { data: posts } = useBlogPosts(cliente?.id);
   const [postId, setPostId] = useState<string | undefined>();
   const { data: post } = useBlogPost(postId);
-  const { criarPost, salvarCampos, gerarPasso, conferirTexto, apagarPost, gerando, validar } = useBlogAcoes(cliente?.id);
+  const { criarPost, salvarCampos, gerarPasso, conferirTexto, apagarPost, refinar, gerando, validar } = useBlogAcoes(cliente?.id);
 
   const [novoTema, setNovoTema] = useState('');
   const [rascunho, setRascunho] = useState<Partial<BlogPost>>({});
@@ -373,6 +374,8 @@ export default function AgenciaContaBlog() {
                 </CardContent>
               )}
             </Card>
+
+            <BlogFinalizacao post={post} montarDasEtapas={() => textoCompleto(post)} salvarCampos={salvarCampos} refinar={refinar} />
 
             <Button variant="outline" onClick={copiar}>Copiar o post inteiro</Button>
           </div>
