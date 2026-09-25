@@ -163,6 +163,7 @@ export default function Clientes() {
   });
 
   const { data: aliasesMap } = useTodosAliases();
+  const { data: scoresMap } = useScoresEngajamento();
   const { data: consultores } = useConsultores();
   const { data: tiposConsultoria } = useTiposConsultoria();
   const arquivarCliente = useArquivarCliente();
