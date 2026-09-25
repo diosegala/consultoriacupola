@@ -50,7 +50,7 @@ const adminMenuItems = [
 ];
 
 const agenciaMenuItems = [
-  { to: '/agencia/contas', icon: Building2, label: 'Contas' },
+  { to: '/agencia/contas', icon: Building2, label: 'Clientes' },
   { to: '/agencia/agentes', icon: Bot, label: 'Agentes' },
   { to: '/agencia/mercado', icon: Newspaper, label: 'Mercado' },
   { to: '/agencia/equipe', icon: Users, label: 'Time' },
