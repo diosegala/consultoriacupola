@@ -2,21 +2,28 @@ import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Button } from '@/design-system/design-system-hub-ba3841';
-import { useAgenciaAgentes } from '@/hooks/agencia/useAgencia';
+import { useAgenciaAgentes, useAgenciaClientes, useTemAcessoAgencia } from '@/hooks/agencia/useAgencia';
 import { useAgenciaSessao, quandoFoi } from '@/hooks/agencia/useAgenciaBase';
 import { useAgenciaMensagens } from '@/hooks/agencia/useAgenciaConversa';
+import { ConversaAgencia } from '@/components/agencia/ConversaAgencia';
 import { Vazio } from '@/components/agencia/CabecalhoPagina';
 import { cn } from '@/lib/utils';
 
 export default function AgenciaSessao() {
   const { id } = useParams();
+  const { pessoa } = useTemAcessoAgencia();
   const { data: sessao, isLoading } = useAgenciaSessao(id);
-  const { data: mensagens = [] } = useAgenciaMensagens(id);
+  const { data: mensagens, isLoading: carregandoMensagens } = useAgenciaMensagens(id);
   const { data: agentes = [] } = useAgenciaAgentes(true);
+  const { data: clientes = [] } = useAgenciaClientes();
   const agente = agentes.find((a) => a.id === sessao?.agente_id);
+  const conta = clientes.find((c) => c.id === sessao?.cliente_id);
 
-  if (isLoading) return <Vazio>Carregando…</Vazio>;
+  if (isLoading || carregandoMensagens) return <Vazio>Carregando…</Vazio>;
   if (!sessao) return <Vazio>Sessão não encontrada.</Vazio>;
+
+  // Só quem começou a conversa continua nela; a equipe que acompanha o espaço só lê.
+  const minha = !!pessoa && sessao.pessoa_id === pessoa.id && !!agente;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -27,11 +34,21 @@ export default function AgenciaSessao() {
         <div className="min-w-0">
           <h1 className="truncate text-2xl font-bold text-foreground">{sessao.titulo}</h1>
           <p className="text-sm text-muted-foreground">
-            {agente?.nome ?? 'Agente'} · {quandoFoi(sessao.atualizada_em)}
+            {agente?.nome ?? 'Agente'}
+            {conta && ` · ${conta.nome}`} · {quandoFoi(sessao.atualizada_em)}
           </p>
         </div>
       </div>
-      {mensagens.length === 0 ? (
+      {minha ? (
+        <ConversaAgencia
+          agenteSlug={agente!.slug}
+          clienteId={sessao.cliente_id}
+          projetoId={sessao.projeto_id}
+          sessaoInicial={sessao.id}
+          mensagensIniciais={mensagens ?? []}
+          semReiniciar
+        />
+      ) : !mensagens?.length ? (
         <Vazio>Esta sessão não tem mensagens.</Vazio>
       ) : (
         <div className="space-y-3">

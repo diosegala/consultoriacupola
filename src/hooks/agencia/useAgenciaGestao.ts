@@ -151,3 +151,27 @@ export function useGestaoAcoes(pessoaId?: string) {
 
   return { salvarSquad, alternarVinculo, alternarAcessoAgente };
 }
+
+/** A camada da casa (essência e escrita) que entra em toda conversa com os agentes. */
+export function useCamadaCupola() {
+  return useQuery({
+    queryKey: ['agencia', 'gestao', 'contexto-cupola'],
+    queryFn: async () => {
+      const { data, error } = await agencia()
+        .from('contexto_camadas').select('essencia, escrita, atualizado_em, atualizado_por').eq('escopo', 'cupola').maybeSingle();
+      if (error) throw error;
+      return (data ?? null) as { essencia: string; escrita: string; atualizado_em: string; atualizado_por: string | null } | null;
+    },
+  });
+}
+
+/** Grava pela função do banco, que confere a liderança (ninguém escreve direto na tabela). */
+export function useSalvarCamadaCupola(pessoaId?: string) {
+  const client = useQueryClient();
+  return async (essencia: string, escrita: string) => {
+    const { error } = await agencia().rpc('salvar_camada_contexto', { p_escopo: 'cupola', p_essencia: essencia, p_escrita: escrita });
+    if (error) throw error;
+    await registrarAuditoria(pessoaId, 'contexto.alterado', 'cupola');
+    await client.invalidateQueries({ queryKey: ['agencia', 'gestao', 'contexto-cupola'] });
+  };
+}

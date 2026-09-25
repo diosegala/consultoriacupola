@@ -10,8 +10,11 @@ import {
   useAgenciaAgentes, useAgenciaClientes, useAgenciaEspacos, useAgenciaPessoa, useAgenciaPessoas,
 } from '@/hooks/agencia/useAgencia';
 import {
-  useAcessosAgente, useAuditoria, useGestaoAcoes, useSessoesDesde, useSquadsCompletos, useUsoIa, type Squad,
+  useAcessosAgente, useAuditoria, useCamadaCupola, useGestaoAcoes, useSalvarCamadaCupola, useSessoesDesde,
+  useSquadsCompletos, useUsoIa, type Squad,
 } from '@/hooks/agencia/useAgenciaGestao';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
 
 const ROTULOS: Record<string, string> = {
   'squad.criado': 'Squad criado',
@@ -22,6 +25,7 @@ const ROTULOS: Record<string, string> = {
   'squad.carteira.removido': 'Cliente saiu da carteira do squad',
   'agente.acesso.liberado': 'Agente liberado para área',
   'agente.acesso.removido': 'Agente retirado de área',
+  'contexto.alterado': 'Contexto da casa alterado',
   entrou: 'Entrou no sistema',
 };
 
@@ -307,6 +311,72 @@ function AbaMetricas() {
     </div>
   );
 }
+/**
+ * A camada da CUPOLA (Administração → Contexto no CupolaOS): o que a casa é, antes
+ * de qualquer conta. A essência entra em toda conversa; a escrita, em quem escreve.
+ */
+function AbaContexto({ pessoaId }: { pessoaId: string }) {
+  const { data, isLoading } = useCamadaCupola();
+  const salvar = useSalvarCamadaCupola(pessoaId);
+  const [rascunho, setRascunho] = useState<{ essencia: string; escrita: string } | null>(null);
+  const [salvando, setSalvando] = useState(false);
+  if (isLoading) return <Skeleton className="h-64 w-full" />;
+  const atual = rascunho ?? { essencia: data?.essencia ?? '', escrita: data?.escrita ?? '' };
+  const mudou = !!rascunho && (rascunho.essencia !== (data?.essencia ?? '') || rascunho.escrita !== (data?.escrita ?? ''));
+
+  return (
+    <div className="max-w-3xl space-y-5">
+      <p className="text-sm text-muted-foreground">
+        Este texto vai em <strong>toda conversa de todo agente</strong>, antes da conta. Mantenha curto: cada caractere é pago em cada pergunta de cada pessoa.
+        {data?.atualizado_em && <> Última mudança em {dataHora(data.atualizado_em)}.</>}
+      </p>
+      <div className="space-y-2">
+        <Label htmlFor="ctx-essencia">Essência da CUPOLA</Label>
+        <Textarea
+          id="ctx-essencia"
+          rows={6}
+          maxLength={10000}
+          value={atual.essencia}
+          onChange={(e) => setRascunho({ ...atual, essencia: e.target.value })}
+          placeholder="O que a CUPOLA é, e o que não é."
+        />
+        <p className="text-xs text-muted-foreground">{atual.essencia.length.toLocaleString('pt-BR')} de 10.000 caracteres. Sem ela, os agentes usam uma frase de emergência.</p>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="ctx-escrita">Como a CUPOLA escreve</Label>
+        <Textarea
+          id="ctx-escrita"
+          rows={10}
+          maxLength={20000}
+          value={atual.escrita}
+          onChange={(e) => setRascunho({ ...atual, escrita: e.target.value })}
+          placeholder="Tom de voz, pessoa gramatical, palavras que a casa não usa."
+        />
+        <p className="text-xs text-muted-foreground">{atual.escrita.length.toLocaleString('pt-BR')} de 20.000 caracteres.</p>
+      </div>
+      <div className="flex gap-2">
+        <Button
+          disabled={!mudou || salvando || !atual.essencia.trim()}
+          onClick={async () => {
+            setSalvando(true);
+            try {
+              await salvar(atual.essencia, atual.escrita);
+              setRascunho(null);
+              toast.success('Contexto da casa atualizado. Vale a partir da próxima pergunta.');
+            } catch (e) {
+              toast.error((e as { message?: string })?.message || 'Não foi possível salvar.');
+            } finally {
+              setSalvando(false);
+            }
+          }}
+        >
+          Salvar
+        </Button>
+        {mudou && <Button variant="outline" onClick={() => setRascunho(null)}>Descartar</Button>}
+      </div>
+    </div>
+  );
+}
 
 export default function AgenciaGestao() {
   const { data: pessoa, isLoading } = useAgenciaPessoa();
@@ -321,11 +391,13 @@ export default function AgenciaGestao() {
           <TabsTrigger value="acessos">Acesso a agentes</TabsTrigger>
           <TabsTrigger value="metricas">Métricas</TabsTrigger>
           <TabsTrigger value="auditoria">Auditoria</TabsTrigger>
+          <TabsTrigger value="contexto">Contexto</TabsTrigger>
         </TabsList>
         <TabsContent value="squads" className="mt-6"><AbaSquads pessoaId={pessoa.id} /></TabsContent>
         <TabsContent value="acessos" className="mt-6"><AbaAcessos pessoaId={pessoa.id} /></TabsContent>
         <TabsContent value="metricas" className="mt-6"><AbaMetricas /></TabsContent>
         <TabsContent value="auditoria" className="mt-6"><AbaAuditoria /></TabsContent>
+        <TabsContent value="contexto" className="mt-6"><AbaContexto pessoaId={pessoa.id} /></TabsContent>
       </Tabs>
     </div>
   );

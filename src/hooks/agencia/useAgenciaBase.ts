@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { agencia } from '@/integrations/supabase/agencia';
 
 export interface AgenciaSessao {
@@ -48,19 +48,45 @@ export interface AgenciaProduto {
   preco_referencia: number | null;
 }
 
-export function useAgenciaSessoes() {
+export function useAgenciaSessoes(arquivadas = false) {
   return useQuery({
-    queryKey: ['agencia', 'sessoes'],
+    queryKey: ['agencia', 'sessoes', arquivadas],
     queryFn: async (): Promise<AgenciaSessao[]> => {
       const { data, error } = await agencia()
         .from('sessoes')
         .select('*')
-        .eq('arquivada', false)
+        .eq('arquivada', arquivadas)
         .order('atualizada_em', { ascending: false });
       if (error) throw error;
       return (data ?? []) as AgenciaSessao[];
     },
   });
+}
+
+/**
+ * Organizar as próprias sessões. A RLS ("mexer nas proprias sessoes") só deixa
+ * mudar sessão da própria pessoa; se nada mudou, avisamos em vez de fingir que deu certo.
+ */
+export function useAcoesDaSessao() {
+  const client = useQueryClient();
+  const atualizar = async (id: string, mudanca: Partial<Pick<AgenciaSessao, 'titulo' | 'fixada' | 'arquivada'>>) => {
+    const { data, error } = await agencia().from('sessoes').update(mudanca).eq('id', id).select('id');
+    if (error) throw error;
+    if (!data?.length) throw new Error('Só quem começou a conversa pode mudá-la.');
+    await client.invalidateQueries({ queryKey: ['agencia', 'sessoes'] });
+    await client.invalidateQueries({ queryKey: ['agencia', 'sessao', id] });
+  };
+  return {
+    fixar: (id: string, fixada: boolean) => atualizar(id, { fixada }),
+    renomear: (id: string, titulo: string) => atualizar(id, { titulo: titulo.trim().slice(0, 120) }),
+    arquivar: (id: string, arquivada: boolean) => atualizar(id, { arquivada }),
+    excluir: async (id: string) => {
+      const { data, error } = await agencia().from('sessoes').delete().eq('id', id).select('id');
+      if (error) throw error;
+      if (!data?.length) throw new Error('Só quem começou a conversa pode excluí-la.');
+      await client.invalidateQueries({ queryKey: ['agencia', 'sessoes'] });
+    },
+  };
 }
 
 export function useAgenciaSessao(id?: string) {

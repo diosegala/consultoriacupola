@@ -27,7 +27,7 @@ type Banco = SupabaseClient<any, any, any>;
 
 export interface ContextoAgencia {
   user: User;
-  pessoa: { id: string; nome: string | null };
+  pessoa: { id: string; nome: string | null; funcao: string | null };
   /** Schema `agencia` como a pessoa (RLS vale). */
   db: Banco;
   /** Service role, só para ai_usage_logs. */
@@ -50,10 +50,10 @@ export async function contextoAgencia(req: Request): Promise<ContextoAgencia> {
 
   const db = createClient(url, anonKey, { ...comoPessoa, db: { schema: "agencia" } });
   const { data: pessoa } = await db
-    .from("pessoas").select("id, nome, ativa").eq("auth_id", user.id).maybeSingle();
+    .from("pessoas").select("id, nome, funcao, ativa").eq("auth_id", user.id).maybeSingle();
   if (!pessoa || pessoa.ativa === false) throw new ErroHttp(403, "Você não tem acesso à Agência.");
 
-  return { user, pessoa: { id: pessoa.id, nome: pessoa.nome ?? null }, db, admin: createClient(url, serviceKey) };
+  return { user, pessoa: { id: pessoa.id, nome: pessoa.nome ?? null, funcao: pessoa.funcao ?? null }, db, admin: createClient(url, serviceKey) };
 }
 
 /**

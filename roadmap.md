@@ -21,8 +21,13 @@ Plano aprovado em .lovable/plan/trazer-o-cupolaos-agência-de-marketing-para-den
 ## Paridade com CupolaOS (versão GitHub 25/09)
 - [feito 25/09] Etapa 1 banco: tabelas novas (agentes por cliente, experimentos/refino do blog, pranchas Google, pastas criadas, imagens planejamento, squads coord/atend, funcionalidade design-system)
 - [adiado] Etapa 1b: nova exportação de dados — só no dia da virada para produção
-- [feito 25/09] Etapa 2: menu estilo CupolaOS, Início/Meu dia, Projetos, Sessões, Skills, Produtos
+- [feito 25/09] Etapa 2: menu estilo CupolaOS, Início, Projetos, Sessões, Skills, Produtos. **Meu dia e Jornada não foram portados** (ações do dia, reuniões, tarefas, e-mail 48 h)
 - [feito 25/09] Etapa 3: News; Criador de Blog completo (texto final, refino com prompt reverso + comparação antes×depois, HTML final); Conteúdo de Redes por mês (/agencia/redes, fechar produção). Não portado: comparador de 4 variantes de prompt do CupolaOS
 - [adiado 25/09 — depois da 5] Etapa 4: JBA Design, cards Franciosi/Porta 8/Pantera/Góes/Story
 - [feito 25/09] Etapa 5: /agencia/gestao (só admin) — squads, acesso a agentes por área, métricas sem quebra por pessoa, auditoria. Não portado: Equipamentos, Fornecedores, Assinaturas, Recrutamento, Entregas, Keychain, Conectores, Egresso, Contexto
 - [ ] Etapa 6: Criador de Pastas e Imagens Planejamento (dependem do Drive)
+- [feito 25/09] Etapa 7: status do projeto alinhado ao banco (ativo/pausado/concluído) — o formulário gravava `em_andamento`, recusado pelo check
+- [feito 25/09] Etapa 8: conversa completa — contexto em camadas no servidor (`_shared/agencia-contexto.ts`: camada CUPOLA, perfil, identidade, regras da conta e do projeto, situação, mercado da praça, material pelo nome), funil `[[CONTA:id]]` sem conta, conferência de termos vetados, modo rápido/apurado (esforço de raciocínio), resposta em tempo real com markdown, copiar e avaliar, continuar sessão salva, fixar/renomear/arquivar/excluir sessões, caixa de conversa no Início (assistente `cupolaos`), aba Contexto na Gestão (`agencia.contexto_camadas` + `salvar_camada_contexto`). Não portado: busca na web com fontes, anexos, skills pelo `/`
+- [ ] Etapa 9: limites de gasto (SQL 07) e custos (SQL 13)
+- [ ] Etapa 10: conta (upload de material, regras à mão, arquivar/excluir) e página do projeto
+- [ ] Etapa 11: Meu dia; tela de acessos por pessoa; administração de agentes (SQL 04/05/06/11)

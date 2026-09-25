@@ -20,9 +20,9 @@ import {
 import { useSalvarProjeto, type ProjetoDados } from '@/hooks/agencia/useAgenciaEdicao';
 import type { AgenciaCliente, AgenciaEspaco, AgenciaProjeto } from '@/hooks/agencia/useAgencia';
 
+// Os mesmos valores aceitos pelo banco (check em agencia.projetos.status), como no CupolaOS.
 const STATUS = [
-  { valor: 'planejamento', rotulo: 'Planejamento' },
-  { valor: 'em_andamento', rotulo: 'Em andamento' },
+  { valor: 'ativo', rotulo: 'Ativo' },
   { valor: 'pausado', rotulo: 'Pausado' },
   { valor: 'concluido', rotulo: 'Concluído' },
 ];
@@ -52,7 +52,7 @@ export function ProjetoFormDialog({
     nome: '',
     cliente_id: clienteId ?? clientes[0]?.id ?? '',
     espaco_id: espacos[0]?.id ?? '',
-    status: 'em_andamento',
+    status: 'ativo',
     resumo: '',
     contexto: '',
   });
@@ -64,7 +64,7 @@ export function ProjetoFormDialog({
       nome: projeto?.nome ?? '',
       cliente_id: projeto?.cliente_id ?? clienteId ?? clientes[0]?.id ?? '',
       espaco_id: projeto?.espaco_id ?? espacos[0]?.id ?? '',
-      status: projeto?.status ?? 'em_andamento',
+      status: projeto?.status ?? 'ativo',
       resumo: projeto?.resumo ?? '',
       contexto: '',
     });
