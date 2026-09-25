@@ -96,7 +96,7 @@ export default function AgenciaContaBlog() {
 
   const copiar = async () => {
     if (!post) return;
-    await navigator.clipboard.writeText(textoCompleto(post));
+    await navigator.clipboard.writeText(post.texto_revisado?.trim() || textoCompleto(post));
     toast({ title: 'Texto copiado' });
   };
 
@@ -158,7 +158,7 @@ export default function AgenciaContaBlog() {
                 <button className="flex-1 text-left" onClick={() => setPostId(p.id)}>
                   <p className="text-sm font-medium">{p.titulo || p.tema || 'Sem título'}</p>
                   <p className="text-xs text-muted-foreground">
-                    Passo {p.passo_atual ?? 0} de {PASSOS.length}
+                    Passo {Math.max(p.passo_atual ?? 0, 0)} de 11
                   </p>
                 </button>
                 <Button
