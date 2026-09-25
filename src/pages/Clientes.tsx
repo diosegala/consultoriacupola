@@ -101,15 +101,16 @@ export default function Clientes() {
   const [tipoFilter, setTipoFilter] = useState(persisted.tipoFilter ?? 'todos');
   const [sortField, setSortField] = useState<SortField>((persisted.sortField as SortField) ?? 'nome');
   const [sortDirection, setSortDirection] = useState<SortDirection>((persisted.sortDirection as SortDirection) ?? 'asc');
+  const [modo, setModo] = useState<ModoVisao>((persisted.modo as ModoVisao) ?? 'grade');
   const [aliasCliente, setAliasCliente] = useState<ClienteComDetalhes | null>(null);
 
   // Mantém os filtros ao navegar para o detalhe do cliente e voltar
   useEffect(() => {
     sessionStorage.setItem(
       FILTERS_KEY,
-      JSON.stringify({ search, statusFilter, consultorFilter, tipoFilter, sortField, sortDirection })
+      JSON.stringify({ search, statusFilter, consultorFilter, tipoFilter, sortField, sortDirection, modo })
     );
-  }, [search, statusFilter, consultorFilter, tipoFilter, sortField, sortDirection]);
+  }, [search, statusFilter, consultorFilter, tipoFilter, sortField, sortDirection, modo]);
 
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [clienteToArchive, setClienteToArchive] = useState<ClienteComDetalhes | null>(null);
