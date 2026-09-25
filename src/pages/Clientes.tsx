@@ -554,6 +554,16 @@ export default function Clientes() {
                           : '-'}
                       </span>
                     </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Engajamento</span>
+                      {scoresMap?.[cliente.id] != null ? (
+                        <span className={cn('font-semibold', corDoScore(scoresMap[cliente.id]))}>
+                          {scoresMap[cliente.id].toFixed(1).replace('.', ',')}/10
+                        </span>
+                      ) : (
+                        <span className="text-foreground">-</span>
+                      )}
+                    </div>
                   </div>
                   <div className="mt-auto flex items-center justify-between gap-4 pt-2">
                     {acoesCliente(cliente)}
@@ -613,7 +623,7 @@ export default function Clientes() {
                     </div>
                   </div>
                   <div className="flex flex-col gap-4 border-t border-border pt-4 md:w-96 md:border-l md:border-t-0 md:pl-8 md:pt-0">
-                    <div className="grid grid-cols-3 gap-2 text-sm">
+                    <div className="grid grid-cols-2 gap-2 text-sm lg:grid-cols-4">
                       <div>
                         <p className="text-muted-foreground">Consultor</p>
                         <p className="text-foreground">{cliente.consultor?.nome || '-'}</p>
@@ -633,6 +643,16 @@ export default function Clientes() {
                             ? format(parseISO(cliente.contrato_ativo.data_fim), 'dd/MM/yyyy')
                             : '-'}
                         </p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Engajamento</p>
+                        {scoresMap?.[cliente.id] != null ? (
+                          <p className={cn('font-semibold', corDoScore(scoresMap[cliente.id]))}>
+                            {scoresMap[cliente.id].toFixed(1).replace('.', ',')}/10
+                          </p>
+                        ) : (
+                          <p className="text-foreground">-</p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center justify-between gap-4">
