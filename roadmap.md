@@ -16,3 +16,12 @@ Plano aprovado em .lovable/plan/trazer-o-cupolaos-agência-de-marketing-para-den
 - Chave de IA única (gateway Lovable já usado pela consultoria); custo medido por unidade/agente/cliente/usuário.
 - Usuários da agência usam nosso login; `pessoas` deles vira `agencia.pessoas`.
 - Trabalho inteiro em dev; produção só recebe na publicação.
+
+## Paridade com CupolaOS (versão GitHub 25/09)
+- [feito 25/09] Etapa 1 banco: tabelas novas (agentes por cliente, experimentos/refino do blog, pranchas Google, pastas criadas, imagens planejamento, squads coord/atend, funcionalidade design-system)
+- [ ] Etapa 1b: nova exportação de dados (VKR) — aguarda usuário
+- [ ] Etapa 2: menu estilo CupolaOS, Início/Meu dia, Projetos, Sessões, Skills, Produtos
+- [ ] Etapa 3: Criador de Blog completo, News, Conteúdo de Redes por mês
+- [ ] Etapa 4: JBA Design, cards Franciosi/Porta 8/Pantera/Góes/Story
+- [ ] Etapa 5: Gestão e Admin (auditoria, métricas, squads, limites)
+- [ ] Etapa 6: Criador de Pastas e Imagens Planejamento (dependem do Drive)
