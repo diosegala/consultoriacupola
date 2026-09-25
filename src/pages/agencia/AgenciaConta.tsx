@@ -108,8 +108,8 @@ function Etiqueta({ children, tom = 'neutro' }: { children: React.ReactNode; tom
     <span
       className={cn(
         'inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-widest',
-        tom === 'perigo' && 'border-destructive/40 text-destructive',
-        tom === 'marca' && 'border-primary/40 text-foreground',
+        tom === 'perigo' && 'border-destructive text-destructive',
+        tom === 'marca' && 'border-primary text-foreground',
         tom === 'neutro' && 'border-border text-muted-foreground',
       )}
     >
@@ -662,15 +662,15 @@ export default function AgenciaConta() {
                           FUNDOS_AREA[i % FUNDOS_AREA.length],
                         )}
                       >
-                        <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full border border-background/20" />
-                        <span className="w-fit rounded-full border border-background/40 px-3 py-1 text-xs">{espacoNome(a.espaco_id)}</span>
+                        <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full border border-background" />
+                        <span className="w-fit rounded-full border border-background px-3 py-1 text-xs">{espacoNome(a.espaco_id)}</span>
                         <div className="space-y-4">
-                          <div className="flex h-14 w-14 items-center justify-center rounded-full border border-background/40">
+                          <div className="flex h-14 w-14 items-center justify-center rounded-full border border-background">
                             <Icone className="h-5 w-5" />
                           </div>
                           <div className="space-y-1">
                             <p className="text-3xl font-medium">{a.nome}</p>
-                            <p className="line-clamp-1 text-sm opacity-80">{a.resumo || 'Em construção.'}</p>
+                            <p className="line-clamp-1 text-sm">{a.resumo || 'Em construção.'}</p>
                           </div>
                         </div>
                       </Link>

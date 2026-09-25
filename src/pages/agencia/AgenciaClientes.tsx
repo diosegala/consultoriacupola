@@ -152,7 +152,7 @@ export default function AgenciaClientes() {
               )}
             >
               {f.rotulo}
-              <span className="text-xs opacity-60">{contagens[f.id]}</span>
+              <span className="text-xs">{contagens[f.id]}</span>
             </button>
           ))}
         </div>
