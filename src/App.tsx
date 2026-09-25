@@ -43,6 +43,7 @@ import AgenciaAgenteConversa from "./pages/agencia/AgenciaAgenteConversa";
 import AgenciaEquipe from "./pages/agencia/AgenciaEquipe";
 import AgenciaMercado from "./pages/agencia/AgenciaMercado";
 import AgenciaRedesMes from "./pages/agencia/AgenciaRedesMes";
+import AgenciaGestao from "./pages/agencia/AgenciaGestao";
 import AgenciaInicio from "./pages/agencia/AgenciaInicio";
 import AgenciaProjetos from "./pages/agencia/AgenciaProjetos";
 import AgenciaSessoes from "./pages/agencia/AgenciaSessoes";
@@ -115,6 +116,7 @@ const App = () => (
               <Route path="/agencia/equipe" element={<AgenciaEquipe />} />
               <Route path="/agencia/mercado" element={<AgenciaMercado />} />
               <Route path="/agencia/redes" element={<AgenciaRedesMes />} />
+              <Route path="/agencia/gestao" element={<AgenciaGestao />} />
               <Route path="/agencia" element={<AgenciaInicio />} />
               <Route path="/agencia/projetos" element={<AgenciaProjetos />} />
               <Route path="/agencia/sessoes" element={<AgenciaSessoes />} />
