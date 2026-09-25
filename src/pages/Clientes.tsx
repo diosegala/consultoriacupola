@@ -815,6 +815,7 @@ export default function Clientes() {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Apelidos (edição rápida direto da listagem) */}
       <AliasesDialog
