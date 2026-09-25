@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Bot, Loader2, RotateCcw, Send } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,8 @@ export default function AgenciaAgenteConversa() {
   const { data: clientes } = useAgenciaClientes();
   const agente = useMemo(() => (agentes ?? []).find((a) => a.slug === slug), [agentes, slug]);
 
-  const [clienteId, setClienteId] = useState<string>('');
+  const [params] = useSearchParams();
+  const [clienteId, setClienteId] = useState<string>(params.get('conta') ?? '');
   const [texto, setTexto] = useState('');
   const { mensagens, enviar, enviando, erro, reiniciar } = useConversarComAgente(slug, clienteId || null);
   const fim = useRef<HTMLDivElement>(null);
