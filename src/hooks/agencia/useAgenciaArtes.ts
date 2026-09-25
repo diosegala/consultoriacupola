@@ -28,6 +28,30 @@ export interface IdentidadeVisual {
   logos: Array<{ id: string; nome: string; caminho: string | null }>;
 }
 
+export function useLogoConta(clienteId?: string) {
+  return useQuery({
+    queryKey: ['agencia', 'logo-conta', clienteId],
+    enabled: !!clienteId,
+    queryFn: async (): Promise<string | null> => {
+      const { data: logo, error } = await agencia()
+        .from('cliente_marca_arquivo')
+        .select('caminho')
+        .eq('cliente_id', clienteId)
+        .eq('papel', 'logo')
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      if (!logo?.caminho) return null;
+
+      const { data, error: signedUrlError } = await supabase.storage
+        .from('conhecimento')
+        .createSignedUrl(logo.caminho, 3600);
+      if (signedUrlError) throw signedUrlError;
+      return data.signedUrl;
+    },
+  });
+}
+
 export function useIdentidadeVisual(clienteId?: string) {
   return useQuery({
     queryKey: ['agencia', 'identidade-visual', clienteId],
