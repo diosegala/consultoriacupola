@@ -19,7 +19,12 @@ import {
   Search,
   MessageSquare,
   Building2,
-  Newspaper
+  Newspaper,
+  Home,
+  FolderKanban,
+  History,
+  Wand2,
+  Package
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -50,8 +55,13 @@ const adminMenuItems = [
 ];
 
 const agenciaMenuItems = [
+  { to: '/agencia', icon: Home, label: 'Início', exato: true },
   { to: '/agencia/contas', icon: Building2, label: 'Clientes' },
+  { to: '/agencia/projetos', icon: FolderKanban, label: 'Projetos' },
   { to: '/agencia/agentes', icon: Bot, label: 'Agentes' },
+  { to: '/agencia/skills', icon: Wand2, label: 'Skills' },
+  { to: '/agencia/sessoes', icon: History, label: 'Sessões' },
+  { to: '/agencia/produtos', icon: Package, label: 'Produtos' },
   { to: '/agencia/mercado', icon: Newspaper, label: 'Mercado' },
   { to: '/agencia/equipe', icon: Users, label: 'Time' },
 ];
@@ -148,7 +158,7 @@ export function Sidebar() {
               </p>
             )}
             {agenciaMenuItems.map((item) => {
-              const isActive = location.pathname.startsWith(item.to);
+              const isActive = (item as { exato?: boolean }).exato ? location.pathname === item.to : location.pathname.startsWith(item.to);
               return (
                 <NavLink
                   key={item.to}
