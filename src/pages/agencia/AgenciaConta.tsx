@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -9,13 +10,22 @@ import {
   Mic,
   Pencil,
   Plus,
+  ExternalLink,
 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { FichaAutomaticaDialog } from '@/components/agencia/FichaAutomaticaDialog';
 import { RecadoFaladoDialog } from '@/components/agencia/RecadoFaladoDialog';
 import { ContaFormDialog } from '@/components/agencia/ContaFormDialog';
 import { ContratoFormDialog } from '@/components/agencia/ContratoFormDialog';
 import { ProjetoFormDialog } from '@/components/agencia/ProjetoFormDialog';
-import { Button } from '@/design-system/design-system-hub-ba3841';
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/design-system/design-system-hub-ba3841';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -307,16 +317,26 @@ export default function AgenciaConta() {
                 </p>
               ) : (
                 (conhecimento ?? []).map((k) => (
-                  <div key={k.id} className="flex items-center justify-between border-b border-border pb-2 last:border-0">
-                    <div>
-                      <p className="text-sm font-medium">{k.nome}</p>
+                  <div key={k.id} className="flex items-center justify-between gap-4 border-b border-border pb-2 last:border-0">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{k.nome}</p>
                       <p className="text-xs text-muted-foreground">{k.origem}</p>
                     </div>
-                    {k.enviado_em && (
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(k.enviado_em).toLocaleDateString('pt-BR')}
-                      </span>
-                    )}
+                    <div className="flex shrink-0 items-center gap-1">
+                      {k.enviado_em && (
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(k.enviado_em).toLocaleDateString('pt-BR')}
+                        </span>
+                      )}
+                      {k.url && (
+                        <Button variant="ghost" size="sm" onClick={() => window.open(k.url!, '_blank', 'noopener')}>
+                          <ExternalLink />
+                          Abrir link
+                        </Button>
+                      )}
+                      {k.caminho && <MaterialArquivo caminho={k.caminho} />}
+                      {k.texto && <MaterialTextoDialog nome={k.nome} texto={k.texto} />}
+                    </div>
                   </div>
                 ))
               )}
@@ -325,5 +345,46 @@ export default function AgenciaConta() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function MaterialArquivo({ caminho }: { caminho: string }) {
+  const { data: url } = useQuery({
+    queryKey: ['agencia', 'material-url', caminho],
+    queryFn: async () => {
+      const { data, error } = await supabase.storage
+        .from('conhecimento')
+        .createSignedUrl(caminho, 3600);
+      if (error) throw error;
+      return data.signedUrl;
+    },
+  });
+  if (!url) return null;
+  return (
+    <Button variant="ghost" size="sm" onClick={() => window.open(url, '_blank', 'noopener')}>
+      <ExternalLink />
+      Abrir arquivo
+    </Button>
+  );
+}
+
+function MaterialTextoDialog({ nome, texto }: { nome: string; texto: string }) {
+  const [aberto, setAberto] = useState(false);
+  return (
+    <>
+      <Button variant="ghost" size="sm" onClick={() => setAberto(true)}>
+        <FileText />
+        Ver texto
+      </Button>
+      <Dialog open={aberto} onOpenChange={setAberto}>
+        <DialogContent className="max-h-screen overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{nome}</DialogTitle>
+            <DialogDescription>Conteúdo do material</DialogDescription>
+          </DialogHeader>
+          <div className="text-sm whitespace-pre-wrap">{texto}</div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

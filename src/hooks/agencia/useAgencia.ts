@@ -234,6 +234,7 @@ export function useAgenciaConhecimento(clienteId?: string) {
       return (data ?? []) as Array<{
         id: string; nome: string; origem: string | null; texto: string | null;
         enviado_em: string | null; url: string | null; tipo_arquivo: string | null;
+        caminho: string | null;
       }>;
     },
   });
