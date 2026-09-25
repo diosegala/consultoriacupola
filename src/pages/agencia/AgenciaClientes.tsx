@@ -13,6 +13,7 @@ import {
   useAgenciaPessoa,
   type AgenciaContrato,
 } from '@/hooks/agencia/useAgencia';
+import { useLogosContas } from '@/hooks/agencia/useAgenciaArtes';
 
 const STATUS_LABEL: Record<string, string> = {
   ativo: 'Contrato ativo',
@@ -30,6 +31,7 @@ export default function AgenciaClientes() {
   const { data: clientes, isLoading } = useAgenciaClientes();
   const { data: contratos } = useAgenciaContratos();
   const { data: pessoa } = useAgenciaPessoa();
+  const { data: logos } = useLogosContas();
   const [busca, setBusca] = useState('');
   const [formAberto, setFormAberto] = useState(false);
 
@@ -113,13 +115,24 @@ export default function AgenciaClientes() {
                 <Card className="h-full transition-colors hover:border-primary">
                   <CardContent className="p-5 space-y-3">
                     <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h2 className="font-semibold leading-tight">{c.nome}</h2>
-                        <p className="text-xs text-muted-foreground">
-                          {[TIPO_LABEL[c.tipo ?? ''] ?? c.tipo, c.cidade]
-                            .filter(Boolean)
-                            .join(' · ')}
-                        </p>
+                      <div className="flex items-center gap-3">
+                        {logos?.[c.id] ? (
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-card p-1">
+                            <img src={logos[c.id]} alt={`Logotipo da ${c.nome}`} className="max-h-full max-w-full object-contain" />
+                          </div>
+                        ) : (
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary/10">
+                            <Building2 className="h-5 w-5 text-primary" />
+                          </div>
+                        )}
+                        <div>
+                          <h2 className="font-semibold leading-tight">{c.nome}</h2>
+                          <p className="text-xs text-muted-foreground">
+                            {[TIPO_LABEL[c.tipo ?? ''] ?? c.tipo, c.cidade]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </p>
+                        </div>
                       </div>
                       <ArrowRight className="h-4 w-4 text-muted-foreground" />
                     </div>
