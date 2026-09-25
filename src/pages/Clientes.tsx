@@ -18,7 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Search, Plus, Trash2, Loader2, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle, Archive, ArchiveRestore, Tags, X } from 'lucide-react';
+import { Search, Plus, Trash2, Loader2, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle, Archive, ArchiveRestore, Tags, X, LayoutGrid, List, Table as TableIcon, ArrowRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { AliasesDialog } from '@/components/cliente/AliasesDialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -48,6 +48,14 @@ interface PersistedFilters {
   tipoFilter: string;
   sortField: string;
   sortDirection: string;
+  modo: string;
+}
+
+type ModoVisao = 'grade' | 'lista' | 'tabela';
+
+function iniciaisCliente(nome: string): string {
+  const partes = nome.trim().split(/\s+/);
+  return ((partes[0]?.[0] ?? '') + (partes.length > 1 ? partes[partes.length - 1][0] : '')).toUpperCase();
 }
 
 function loadFilters(): Partial<PersistedFilters> {
@@ -93,15 +101,16 @@ export default function Clientes() {
   const [tipoFilter, setTipoFilter] = useState(persisted.tipoFilter ?? 'todos');
   const [sortField, setSortField] = useState<SortField>((persisted.sortField as SortField) ?? 'nome');
   const [sortDirection, setSortDirection] = useState<SortDirection>((persisted.sortDirection as SortDirection) ?? 'asc');
+  const [modo, setModo] = useState<ModoVisao>((persisted.modo as ModoVisao) ?? 'grade');
   const [aliasCliente, setAliasCliente] = useState<ClienteComDetalhes | null>(null);
 
   // Mantém os filtros ao navegar para o detalhe do cliente e voltar
   useEffect(() => {
     sessionStorage.setItem(
       FILTERS_KEY,
-      JSON.stringify({ search, statusFilter, consultorFilter, tipoFilter, sortField, sortDirection })
+      JSON.stringify({ search, statusFilter, consultorFilter, tipoFilter, sortField, sortDirection, modo })
     );
-  }, [search, statusFilter, consultorFilter, tipoFilter, sortField, sortDirection]);
+  }, [search, statusFilter, consultorFilter, tipoFilter, sortField, sortDirection, modo]);
 
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [clienteToArchive, setClienteToArchive] = useState<ClienteComDetalhes | null>(null);
@@ -235,6 +244,69 @@ export default function Clientes() {
     }
   };
 
+  const acoesCliente = (cliente: ClienteComDetalhes) => (
+    <div className="flex gap-2">
+      <Button
+        variant="outline"
+        size="sm"
+        className="border-border"
+        onClick={(e) => {
+          e.stopPropagation();
+          navigate(`/clientes/${cliente.id}`);
+        }}
+      >
+        Ver
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        title="Gerenciar apelidos"
+        className="text-muted-foreground hover:text-foreground"
+        onClick={(e) => {
+          e.stopPropagation();
+          setAliasCliente(cliente);
+        }}
+      >
+        <Tags className="h-4 w-4" />
+      </Button>
+      {canArchive && (
+        <Button
+          variant="ghost"
+          size="icon"
+          title={cliente.arquivado_em ? 'Desarquivar' : 'Arquivar'}
+          className="text-muted-foreground hover:text-foreground"
+          onClick={(e) => openArchiveDialog(cliente, e)}
+        >
+          {cliente.arquivado_em
+            ? <ArchiveRestore className="h-4 w-4" />
+            : <Archive className="h-4 w-4" />}
+        </Button>
+      )}
+      {canHardDelete && (
+        <Button
+          variant="ghost"
+          size="icon"
+          title="Excluir permanentemente"
+          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+          onClick={(e) => openHardDeleteDialog(cliente, e)}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      )}
+    </div>
+  );
+
+  const seloCliente = (cliente: ClienteComDetalhes, tamanho: 'sm' | 'md') => (
+    <div
+      className={
+        'flex shrink-0 items-center justify-center rounded-2xl bg-primary/10 font-semibold text-primary ' +
+        (tamanho === 'md' ? 'h-16 w-16 text-lg' : 'h-12 w-12 text-sm')
+      }
+    >
+      {iniciaisCliente(cliente.nome)}
+    </div>
+  );
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -242,10 +314,41 @@ export default function Clientes() {
           <h1 className="text-2xl font-bold text-foreground">Clientes</h1>
           <p className="text-muted-foreground">Gerencie sua carteira de clientes</p>
         </div>
-        <Button onClick={() => navigate('/clientes/novo')} className="bg-primary text-primary-foreground hover:bg-primary/90">
-          <Plus className="h-4 w-4 mr-2" />
-          Novo Cliente
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1">
+            <Button
+              size="icon"
+              variant={modo === 'grade' ? 'default' : 'ghost'}
+              onClick={() => setModo('grade')}
+              aria-label="Ver em grade"
+              title="Ver em grade"
+            >
+              <LayoutGrid />
+            </Button>
+            <Button
+              size="icon"
+              variant={modo === 'lista' ? 'default' : 'ghost'}
+              onClick={() => setModo('lista')}
+              aria-label="Ver em lista"
+              title="Ver em lista"
+            >
+              <List />
+            </Button>
+            <Button
+              size="icon"
+              variant={modo === 'tabela' ? 'default' : 'ghost'}
+              onClick={() => setModo('tabela')}
+              aria-label="Ver em tabela"
+              title="Ver em tabela"
+            >
+              <TableIcon />
+            </Button>
+          </div>
+          <Button onClick={() => navigate('/clientes/novo')} className="bg-primary text-primary-foreground hover:bg-primary/90">
+            <Plus className="h-4 w-4 mr-2" />
+            Novo Cliente
+          </Button>
+        </div>
       </div>
 
       {/* Filtros */}
@@ -339,7 +442,182 @@ export default function Clientes() {
         </CardContent>
       </Card>
 
+      {/* Grade */}
+      {modo === 'grade' && (
+        isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        ) : clientesFiltrados?.length === 0 ? (
+          <Card className="bg-card border-border">
+            <CardContent className="py-16 text-center text-sm text-muted-foreground">
+              Nenhum cliente encontrado
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {clientesFiltrados?.map(cliente => (
+              <Card
+                key={cliente.id}
+                className="group h-full cursor-pointer rounded-3xl bg-card border-border transition-colors hover:border-primary"
+                onClick={() => navigate(`/clientes/${cliente.id}`)}
+              >
+                <CardContent className="flex h-full flex-col gap-4 p-6">
+                  <div className="flex items-start justify-between gap-2">
+                    {seloCliente(cliente, 'md')}
+                    <div className="flex items-center gap-2">
+                      <StatusBadge status={cliente.status} />
+                      {cliente._projeto_status_cliente &&
+                        cliente._projeto_status_cliente !== cliente.status && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <AlertTriangle className="h-4 w-4 text-warning" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                Status divergente — etapa do Kanban "{cliente._projeto_etapa_nome}" indica
+                                <strong> {cliente._projeto_status_cliente}</strong>. Verifique o Kanban.
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <h2 className="text-xl font-semibold text-foreground">{cliente.nome}</h2>
+                    {(aliasesMap?.[cliente.id]?.length ?? 0) > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {aliasesMap![cliente.id].map(a => (
+                          <Badge key={a} variant="outline" className="text-xs font-normal">
+                            {a}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-sm text-muted-foreground">{cliente.cidade}/{cliente.uf}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {cliente.contrato_ativo?.tipo_consultoria?.nome || 'Sem contrato ativo'}
+                    </p>
+                  </div>
+                  <div className="space-y-2 border-t border-border pt-4 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Consultor</span>
+                      <span className="text-foreground">{cliente.consultor?.nome || '-'}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">MRR</span>
+                      <span className="text-foreground">
+                        {cliente.contrato_ativo
+                          ? formatCurrency(Number(cliente.contrato_ativo.remuneracao_mensal))
+                          : '-'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Fim do contrato</span>
+                      <span className="text-foreground">
+                        {cliente.contrato_ativo?.data_fim
+                          ? format(parseISO(cliente.contrato_ativo.data_fim), 'dd/MM/yyyy')
+                          : '-'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-auto flex items-center justify-between gap-4 pt-2">
+                    {acoesCliente(cliente)}
+                    <span className="flex items-center gap-1 text-sm font-medium text-foreground">
+                      Abrir
+                      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )
+      )}
+
+      {/* Lista */}
+      {modo === 'lista' && (
+        isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        ) : clientesFiltrados?.length === 0 ? (
+          <Card className="bg-card border-border">
+            <CardContent className="py-16 text-center text-sm text-muted-foreground">
+              Nenhum cliente encontrado
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {clientesFiltrados?.map(cliente => (
+              <Card
+                key={cliente.id}
+                className="group cursor-pointer rounded-3xl bg-card border-border transition-colors hover:border-primary"
+                onClick={() => navigate(`/clientes/${cliente.id}`)}
+              >
+                <CardContent className="flex flex-col gap-6 p-6 md:flex-row md:items-center">
+                  <div className="flex min-w-0 flex-1 items-start gap-4">
+                    {seloCliente(cliente, 'md')}
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="text-xl font-semibold text-foreground">{cliente.nome}</h2>
+                        <StatusBadge status={cliente.status} />
+                      </div>
+                      <p className="text-sm text-muted-foreground">{cliente.cidade}/{cliente.uf}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {cliente.contrato_ativo?.tipo_consultoria?.nome || 'Sem contrato ativo'}
+                      </p>
+                      {(aliasesMap?.[cliente.id]?.length ?? 0) > 0 && (
+                        <div className="flex flex-wrap gap-1 pt-1">
+                          {aliasesMap![cliente.id].map(a => (
+                            <Badge key={a} variant="outline" className="text-xs font-normal">
+                              {a}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-4 border-t border-border pt-4 md:w-96 md:border-l md:border-t-0 md:pl-8 md:pt-0">
+                    <div className="grid grid-cols-3 gap-2 text-sm">
+                      <div>
+                        <p className="text-muted-foreground">Consultor</p>
+                        <p className="text-foreground">{cliente.consultor?.nome || '-'}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">MRR</p>
+                        <p className="text-foreground">
+                          {cliente.contrato_ativo
+                            ? formatCurrency(Number(cliente.contrato_ativo.remuneracao_mensal))
+                            : '-'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Fim do contrato</p>
+                        <p className="text-foreground">
+                          {cliente.contrato_ativo?.data_fim
+                            ? format(parseISO(cliente.contrato_ativo.data_fim), 'dd/MM/yyyy')
+                            : '-'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      {acoesCliente(cliente)}
+                      <span className="flex items-center gap-1 text-sm font-medium text-foreground">
+                        Abrir
+                        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )
+      )}
+
       {/* Tabela */}
+      {modo === 'tabela' && (
       <Card className="bg-card border-border">
         <CardHeader>
           <CardTitle className="text-foreground">
@@ -434,7 +712,7 @@ export default function Clientes() {
                           {(aliasesMap?.[cliente.id]?.length ?? 0) > 0 && (
                             <div className="flex flex-wrap gap-1">
                               {aliasesMap![cliente.id].map(a => (
-                                <Badge key={a} variant="outline" className="text-[10px] font-normal">
+                                <Badge key={a} variant="outline" className="text-xs font-normal">
                                   {a}
                                 </Badge>
                               ))}
@@ -461,7 +739,7 @@ export default function Clientes() {
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                    <AlertTriangle className="h-4 w-4 text-warning" />
                                   </TooltipTrigger>
                                   <TooltipContent>
                                     Status divergente — etapa do Kanban "{cliente._projeto_etapa_nome}" indica
@@ -537,6 +815,7 @@ export default function Clientes() {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Apelidos (edição rápida direto da listagem) */}
       <AliasesDialog
