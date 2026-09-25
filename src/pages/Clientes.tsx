@@ -29,6 +29,7 @@ import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyConsultorId } from '@/hooks/useConsultorUser';
+import { cn } from '@/lib/utils';
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('pt-BR', {
@@ -84,6 +85,39 @@ function useTodosAliases() {
   });
 }
 
+/** Média do score de engajamento (0-10) por cliente, das reuniões já analisadas. */
+function useScoresEngajamento() {
+  return useQuery({
+    queryKey: ['clientes-score-engajamento'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('reunioes')
+        .select('cliente_id, score_cliente')
+        .eq('status_analise', 'concluido')
+        .not('score_cliente', 'is', null);
+      if (error) throw error;
+      const acc = new Map<string, { soma: number; n: number }>();
+      (data ?? []).forEach(r => {
+        const atual = acc.get(r.cliente_id) ?? { soma: 0, n: 0 };
+        atual.soma += Number(r.score_cliente);
+        atual.n += 1;
+        acc.set(r.cliente_id, atual);
+      });
+      const map: Record<string, number> = {};
+      acc.forEach((v, k) => {
+        map[k] = v.soma / v.n;
+      });
+      return map;
+    },
+  });
+}
+
+function corDoScore(score: number): string {
+  if (score >= 7) return 'text-success';
+  if (score >= 5) return 'text-warning';
+  return 'text-destructive';
+}
+
 type SortField = 'nome' | 'cidade' | 'consultor' | 'tipo' | 'mrr' | 'status' | 'data_fim';
 type SortDirection = 'asc' | 'desc';
 
@@ -130,6 +164,7 @@ export default function Clientes() {
   });
 
   const { data: aliasesMap } = useTodosAliases();
+  const { data: scoresMap } = useScoresEngajamento();
   const { data: consultores } = useConsultores();
   const { data: tiposConsultoria } = useTiposConsultoria();
   const arquivarCliente = useArquivarCliente();
@@ -520,6 +555,16 @@ export default function Clientes() {
                           : '-'}
                       </span>
                     </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Engajamento</span>
+                      {scoresMap?.[cliente.id] != null ? (
+                        <span className={cn('font-semibold', corDoScore(scoresMap[cliente.id]))}>
+                          {scoresMap[cliente.id].toFixed(1).replace('.', ',')}/10
+                        </span>
+                      ) : (
+                        <span className="text-foreground">-</span>
+                      )}
+                    </div>
                   </div>
                   <div className="mt-auto flex items-center justify-between gap-4 pt-2">
                     {acoesCliente(cliente)}
@@ -579,7 +624,7 @@ export default function Clientes() {
                     </div>
                   </div>
                   <div className="flex flex-col gap-4 border-t border-border pt-4 md:w-96 md:border-l md:border-t-0 md:pl-8 md:pt-0">
-                    <div className="grid grid-cols-3 gap-2 text-sm">
+                    <div className="grid grid-cols-2 gap-2 text-sm lg:grid-cols-4">
                       <div>
                         <p className="text-muted-foreground">Consultor</p>
                         <p className="text-foreground">{cliente.consultor?.nome || '-'}</p>
@@ -599,6 +644,16 @@ export default function Clientes() {
                             ? format(parseISO(cliente.contrato_ativo.data_fim), 'dd/MM/yyyy')
                             : '-'}
                         </p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Engajamento</p>
+                        {scoresMap?.[cliente.id] != null ? (
+                          <p className={cn('font-semibold', corDoScore(scoresMap[cliente.id]))}>
+                            {scoresMap[cliente.id].toFixed(1).replace('.', ',')}/10
+                          </p>
+                        ) : (
+                          <p className="text-foreground">-</p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center justify-between gap-4">
