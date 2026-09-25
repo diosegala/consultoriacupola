@@ -50,14 +50,14 @@ export default function AgenciaAgentes() {
   });
 
   /** Áreas do tipo 'area' (Geral primeiro), com a cor de fundo fixa de cada uma. */
-  const areas = useMemo(() => {
+  const areas = useMemo<AreaComFundo[]>(() => {
     const lista = (espacos ?? [])
       .filter((e) => e.tipo === 'area')
       .sort((x, y) => (x.id === 'geral' ? -1 : y.id === 'geral' ? 1 : x.nome.localeCompare(y.nome)));
     return lista.map((e, i) => ({ ...e, fundo: FUNDOS_AREA[i % FUNDOS_AREA.length] }));
   }, [espacos]);
 
-  const areaDoAgente = (a: AgenciaAgente): AgenciaEspaco | undefined =>
+  const areaDoAgente = (a: AgenciaAgente): AreaComFundo | undefined =>
     areas.find((e) => e.id === (a.espaco_id ?? 'geral'));
 
   const contagens = useMemo(() => {
