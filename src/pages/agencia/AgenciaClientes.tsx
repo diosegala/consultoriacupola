@@ -271,37 +271,69 @@ export default function AgenciaClientes() {
           })}
         </div>
       ) : (
-        <Card className="rounded-3xl">
-          <CardContent className="divide-y divide-border p-2">
-            {lista.map((c) => {
-              const contrato = contratoPorCliente.get(c.id);
-              const cadastro = percentualCadastro(c);
-              return (
-                <Link
-                  key={c.id}
-                  to={`/agencia/contas/${c.slug}`}
-                  className="flex items-center gap-4 rounded-2xl p-4 hover:bg-muted"
-                >
-                  <SeloConta cliente={c} logoUrl={logos?.[c.id]} tamanho="sm" />
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium">{c.nome}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {[c.cidade, TIPO_LABEL[c.tipo ?? ''] ?? c.tipo].filter(Boolean).join(' · ')}
-                    </p>
-                  </div>
-                  <span className="hidden text-sm text-muted-foreground md:block">
-                    {contrato?.status ? STATUS_CONTRATO[contrato.status] ?? contrato.status : 'Sem contrato'}
-                  </span>
-                  <div className="hidden w-40 items-center gap-2 md:flex">
-                    <Progress value={cadastro} />
-                    <span className="text-xs text-muted-foreground">{cadastro}%</span>
-                  </div>
-                  <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                </Link>
-              );
-            })}
-          </CardContent>
-        </Card>
+        <div className="space-y-4">
+          {lista.map((c) => {
+            const contrato = contratoPorCliente.get(c.id);
+            const nProjetos = (projetos ?? []).filter((p) => p.cliente_id === c.id).length;
+            const nAgentes = agentesPorConta(c.id);
+            const atendimento = c.atendimento_id ? pessoaPorId.get(c.atendimento_id) : undefined;
+            const squad = carteira?.squads.find((s) => carteira.squadsPorCliente[c.id]?.includes(s.id));
+            const cadastro = percentualCadastro(c);
+            return (
+              <Link key={c.id} to={`/agencia/contas/${c.slug}`} className="group block">
+                <Card className="rounded-3xl transition-colors group-hover:border-primary">
+                  <CardContent className="flex flex-col gap-6 p-6 md:flex-row md:items-center">
+                    <div className="flex min-w-0 flex-1 items-start gap-4">
+                      <SeloConta cliente={c} logoUrl={logos?.[c.id]} tamanho="md" />
+                      <div className="min-w-0 space-y-1">
+                        <h2 className="text-xl font-semibold">{c.nome}</h2>
+                        <p className="text-sm text-muted-foreground">{c.cidade ?? 'Cidade não informada'}</p>
+                        <p className="text-sm text-muted-foreground">{TIPO_LABEL[c.tipo ?? ''] ?? c.tipo ?? '—'}</p>
+                        <div className="flex flex-wrap items-center gap-2 pt-2 text-sm text-muted-foreground">
+                          <span className="flex items-center gap-2">
+                            <span
+                              className={cn(
+                                'h-2 w-2 rounded-full',
+                                contrato?.status === 'ativo' ? 'bg-success' : 'bg-muted-foreground',
+                              )}
+                            />
+                            {contrato?.status ? STATUS_CONTRATO[contrato.status] ?? contrato.status : 'Sem contrato'}
+                          </span>
+                          <span>|</span>
+                          <span>{nProjetos} {nProjetos === 1 ? 'projeto' : 'projetos'}</span>
+                          <span>|</span>
+                          <span>{nAgentes} {nAgentes === 1 ? 'agente' : 'agentes'}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-4 border-t border-border pt-4 md:w-96 md:border-l md:border-t-0 md:pl-8 md:pt-0">
+                      <div className="flex flex-wrap items-center gap-6">
+                        {atendimento ? (
+                          <PessoaLinha nome={atendimento.nome} iniciais={atendimento.iniciais} detalhe="Atendimento" />
+                        ) : (
+                          <p className="text-sm text-muted-foreground">Sem coordenação definida</p>
+                        )}
+                        {squad && (
+                          <PessoaLinha nome={squad.nome} imagem={squad.logoUrl} detalhe="Squad responsável" />
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex flex-1 items-center gap-3">
+                          <Progress value={cadastro} className="w-16" />
+                          <span className="text-sm text-muted-foreground">Cadastro {cadastro}%</span>
+                        </div>
+                        <span className="flex items-center gap-1 text-sm font-medium">
+                          Abrir cliente
+                          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          })}
+        </div>
       )}
     </div>
   );
