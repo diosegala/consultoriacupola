@@ -84,6 +84,39 @@ function useTodosAliases() {
   });
 }
 
+/** Média do score de engajamento (0-10) por cliente, das reuniões já analisadas. */
+function useScoresEngajamento() {
+  return useQuery({
+    queryKey: ['clientes-score-engajamento'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('reunioes')
+        .select('cliente_id, score_cliente')
+        .eq('status_analise', 'concluido')
+        .not('score_cliente', 'is', null);
+      if (error) throw error;
+      const acc = new Map<string, { soma: number; n: number }>();
+      (data ?? []).forEach(r => {
+        const atual = acc.get(r.cliente_id) ?? { soma: 0, n: 0 };
+        atual.soma += Number(r.score_cliente);
+        atual.n += 1;
+        acc.set(r.cliente_id, atual);
+      });
+      const map: Record<string, number> = {};
+      acc.forEach((v, k) => {
+        map[k] = v.soma / v.n;
+      });
+      return map;
+    },
+  });
+}
+
+function corDoScore(score: number): string {
+  if (score >= 7) return 'text-success';
+  if (score >= 5) return 'text-warning';
+  return 'text-destructive';
+}
+
 type SortField = 'nome' | 'cidade' | 'consultor' | 'tipo' | 'mrr' | 'status' | 'data_fim';
 type SortDirection = 'asc' | 'desc';
 
