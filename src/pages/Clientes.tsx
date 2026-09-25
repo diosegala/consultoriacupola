@@ -244,6 +244,69 @@ export default function Clientes() {
     }
   };
 
+  const acoesCliente = (cliente: ClienteComDetalhes) => (
+    <div className="flex gap-2">
+      <Button
+        variant="outline"
+        size="sm"
+        className="border-border"
+        onClick={(e) => {
+          e.stopPropagation();
+          navigate(`/clientes/${cliente.id}`);
+        }}
+      >
+        Ver
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        title="Gerenciar apelidos"
+        className="text-muted-foreground hover:text-foreground"
+        onClick={(e) => {
+          e.stopPropagation();
+          setAliasCliente(cliente);
+        }}
+      >
+        <Tags className="h-4 w-4" />
+      </Button>
+      {canArchive && (
+        <Button
+          variant="ghost"
+          size="icon"
+          title={cliente.arquivado_em ? 'Desarquivar' : 'Arquivar'}
+          className="text-muted-foreground hover:text-foreground"
+          onClick={(e) => openArchiveDialog(cliente, e)}
+        >
+          {cliente.arquivado_em
+            ? <ArchiveRestore className="h-4 w-4" />
+            : <Archive className="h-4 w-4" />}
+        </Button>
+      )}
+      {canHardDelete && (
+        <Button
+          variant="ghost"
+          size="icon"
+          title="Excluir permanentemente"
+          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+          onClick={(e) => openHardDeleteDialog(cliente, e)}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      )}
+    </div>
+  );
+
+  const seloCliente = (cliente: ClienteComDetalhes, tamanho: 'sm' | 'md') => (
+    <div
+      className={
+        'flex shrink-0 items-center justify-center rounded-2xl bg-primary/10 font-semibold text-primary ' +
+        (tamanho === 'md' ? 'h-16 w-16 text-lg' : 'h-12 w-12 text-sm')
+      }
+    >
+      {iniciaisCliente(cliente.nome)}
+    </div>
+  );
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
