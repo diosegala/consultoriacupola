@@ -22,6 +22,6 @@ Plano aprovado em .lovable/plan/trazer-o-cupolaos-agência-de-marketing-para-den
 - [adiado] Etapa 1b: nova exportação de dados — só no dia da virada para produção
 - [feito 25/09] Etapa 2: menu estilo CupolaOS, Início/Meu dia, Projetos, Sessões, Skills, Produtos
 - [feito 25/09] Etapa 3: News; Criador de Blog completo (texto final, refino com prompt reverso + comparação antes×depois, HTML final); Conteúdo de Redes por mês (/agencia/redes, fechar produção). Não portado: comparador de 4 variantes de prompt do CupolaOS
-- [ ] Etapa 4: JBA Design, cards Franciosi/Porta 8/Pantera/Góes/Story
+- [adiado 25/09 — depois da 5] Etapa 4: JBA Design, cards Franciosi/Porta 8/Pantera/Góes/Story
 - [ ] Etapa 5: Gestão e Admin (auditoria, métricas, squads, limites)
 - [ ] Etapa 6: Criador de Pastas e Imagens Planejamento (dependem do Drive)
