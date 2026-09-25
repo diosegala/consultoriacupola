@@ -1,17 +1,9 @@
 // Inteligência de mercado da Agência: lê os feeds das fontes e guarda o que interessa.
 // Leitor de feed copiado do CupolaOS (_shared/rss.ts); a triagem, que era Gemini lá,
 // roda aqui pela chave única do gateway.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { logAiUsage } from "../_shared/ai-usage.ts";
+import { contextoAgencia, corsHeaders, ErroHttp, json, respostaDeErro } from "../_shared/agencia.ts";
 import { buscarFeed } from "../_shared/rss.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 const MODELO = "openai/gpt-6-astra";
 const POR_FONTE = 25;
@@ -154,24 +146,20 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) return json({ error: "Não autenticado." }, 401);
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const lovableKey = Deno.env.get("LOVABLE_API_KEY");
 
-    const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
-    const { data: userData } = await userClient.auth.getUser();
-    const user = userData?.user;
-    if (!user) return json({ error: "Não autenticado." }, 401);
+    // Fala com o banco como a pessoa: as regras (RLS) do schema agencia valem aqui também.
+    const { user, pessoa, db: ag, admin } = await contextoAgencia(req);
 
-    const admin = createClient(supabaseUrl, serviceKey);
-    const ag = createClient(supabaseUrl, serviceKey, { db: { schema: "agencia" } });
-
-    const { data: pessoa } = await ag.from("pessoas").select("id, ativa").eq("auth_id", user.id).maybeSingle();
-    if (!pessoa || pessoa.ativa === false) return json({ error: "Você não tem acesso à Agência." }, 403);
+    // Mesma trava de agencia_app.anotar_leitura_da_fonte: precisa abrir a inteligência de mercado.
+    const { data: acesso } = await ag
+      .from("acessos_funcionalidade").select("nivel")
+      .eq("pessoa_id", pessoa.id).eq("funcionalidade", "mercado").maybeSingle();
+    if (!["leitura", "escrita", "admin"].includes(acesso?.nivel ?? "")) {
+      throw new ErroHttp(403, "Você não tem acesso à inteligência de mercado.");
+    }
+    // Situação da leitura da fonte (última leitura/erro) é anotação do sistema, como na RPC original.
+    const fontesSistema = () => admin.schema("agencia").from("fontes_mercado");
 
     const body = (await req.json().catch(() => ({}))) as { fonte_id?: string };
 
@@ -231,21 +219,20 @@ Deno.serve(async (req) => {
           if (error) throw error;
         }
 
-        await ag.from("fontes_mercado")
+        await fontesSistema()
           .update({ ultima_leitura: new Date().toISOString(), ultimo_erro: null })
           .eq("id", fonte.id);
         resumo.push({ fonte: fonte.nome, novas: linhas.length });
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Não consegui ler o feed.";
         console.error("[agencia-mercado-ler]", fonte.id, msg);
-        await ag.from("fontes_mercado").update({ ultimo_erro: msg }).eq("id", fonte.id);
+        await fontesSistema().update({ ultimo_erro: msg }).eq("id", fonte.id);
         resumo.push({ fonte: fonte.nome, novas: 0, erro: msg });
       }
     }
 
     return json({ ok: true, resumo });
   } catch (e) {
-    console.error("agencia-mercado-ler error:", e);
-    return json({ error: e instanceof Error ? e.message : "Erro inesperado." }, 500);
+    return respostaDeErro("agencia-mercado-ler", e);
   }
 });

@@ -142,13 +142,15 @@ Deno.serve(async (req) => {
         .schema("agencia")
         .from("pessoas")
         .select("id, auth_id")
-        .ilike("email", email)
+        // ilike sem curingas: `_` e `%` no e-mail não podem casar com outra ficha.
+        .ilike("email", email.replace(/[\\%_]/g, (c: string) => `\\${c}`))
         .maybeSingle();
       if (ficha && !ficha.auth_id) {
+        // Só liga o login; ficha desligada continua desligada (reativar é pela gestão do time).
         const { error: linkErr } = await adminClient
           .schema("agencia")
           .from("pessoas")
-          .update({ auth_id: userId, ativa: true })
+          .update({ auth_id: userId })
           .eq("id", ficha.id);
         fichaAgenciaVinculada = !linkErr;
       } else if (ficha?.auth_id === userId) {

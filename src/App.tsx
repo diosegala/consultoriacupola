@@ -52,6 +52,7 @@ import AgenciaSkills from "./pages/agencia/AgenciaSkills";
 import AgenciaProdutos from "./pages/agencia/AgenciaProdutos";
 import AgenciaNews from "./pages/agencia/AgenciaNews";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
+import { RotaAgencia } from "@/components/agencia/RotaAgencia";
 import { ThemeProvider } from "next-themes";
 
 const queryClient = new QueryClient({
@@ -103,26 +104,28 @@ const App = () => (
               <Route path="/inteligencia" element={<Inteligencia />} />
               <Route path="/mensagens" element={<Mensagens />} />
               <Route path="/integracoes" element={<MinhasIntegracoes />} />
-              <Route path="/agencia/contas" element={<AgenciaClientes />} />
-              <Route path="/agencia/contas/:slug" element={<AgenciaConta />} />
-              <Route path="/agencia/contas/:slug/redes" element={<AgenciaContaRedes />} />
-              <Route path="/agencia/contas/:slug/blog" element={<AgenciaContaBlog />} />
-              <Route path="/agencia/agentes" element={<AgenciaAgentes />} />
-              <Route path="/agencia/agentes/news" element={<AgenciaNews />} />
-              <Route path="/agencia/agentes/:slug" element={<AgenciaAgenteConversa />} />
-              <Route path="/agencia/news" element={<AgenciaNews />} />
-              <Route path="/agencia/news/:slug" element={<AgenciaNews />} />
-              <Route path="/agencia/news/:slug/:mes" element={<AgenciaNews />} />
-              <Route path="/agencia/equipe" element={<AgenciaEquipe />} />
-              <Route path="/agencia/mercado" element={<AgenciaMercado />} />
-              <Route path="/agencia/redes" element={<AgenciaRedesMes />} />
-              <Route path="/agencia/gestao" element={<AgenciaGestao />} />
-              <Route path="/agencia" element={<AgenciaInicio />} />
-              <Route path="/agencia/projetos" element={<AgenciaProjetos />} />
-              <Route path="/agencia/sessoes" element={<AgenciaSessoes />} />
-              <Route path="/agencia/sessoes/:id" element={<AgenciaSessao />} />
-              <Route path="/agencia/skills" element={<AgenciaSkills />} />
-              <Route path="/agencia/produtos" element={<AgenciaProdutos />} />
+              <Route element={<RotaAgencia />}>
+                <Route path="/agencia/contas" element={<AgenciaClientes />} />
+                <Route path="/agencia/contas/:slug" element={<AgenciaConta />} />
+                <Route path="/agencia/contas/:slug/redes" element={<AgenciaContaRedes />} />
+                <Route path="/agencia/contas/:slug/blog" element={<AgenciaContaBlog />} />
+                <Route path="/agencia/agentes" element={<AgenciaAgentes />} />
+                <Route path="/agencia/agentes/news" element={<AgenciaNews />} />
+                <Route path="/agencia/agentes/:slug" element={<AgenciaAgenteConversa />} />
+                <Route path="/agencia/news" element={<AgenciaNews />} />
+                <Route path="/agencia/news/:slug" element={<AgenciaNews />} />
+                <Route path="/agencia/news/:slug/:mes" element={<AgenciaNews />} />
+                <Route path="/agencia/equipe" element={<AgenciaEquipe />} />
+                <Route path="/agencia/mercado" element={<AgenciaMercado />} />
+                <Route path="/agencia/redes" element={<AgenciaRedesMes />} />
+                <Route path="/agencia/gestao" element={<AgenciaGestao />} />
+                <Route path="/agencia" element={<AgenciaInicio />} />
+                <Route path="/agencia/projetos" element={<AgenciaProjetos />} />
+                <Route path="/agencia/sessoes" element={<AgenciaSessoes />} />
+                <Route path="/agencia/sessoes/:id" element={<AgenciaSessao />} />
+                <Route path="/agencia/skills" element={<AgenciaSkills />} />
+                <Route path="/agencia/produtos" element={<AgenciaProdutos />} />
+              </Route>
             </Route>
             <Route path="*" element={<NotFound />} />
             <Route path="/consultores/:id/relatorio" element={<RelatorioConsultor />} />

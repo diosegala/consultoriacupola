@@ -1,16 +1,8 @@
 // Agente de conteúdo de redes sociais da Agência.
 // Duas ações: "temas" (lista do mês) e "peca" (o texto de um tema).
 // Regras transcritas do CupoCont/CupolaOS; a IA roda pela chave única do gateway.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { logAiUsage } from "../_shared/ai-usage.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+import { contextoAgencia, corsHeaders, json, respostaDeErro } from "../_shared/agencia.ts";
 
 const MODELO = "openai/gpt-6-astra";
 const MODELO_IMAGEM = "openai/gpt-image-2.5-sunburst";
@@ -221,25 +213,11 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) return json({ error: "Não autenticado." }, 401);
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const lovableKey = Deno.env.get("LOVABLE_API_KEY");
     if (!lovableKey) return json({ error: "A chave de IA não está configurada." }, 500);
 
-    const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
-    const { data: userData } = await userClient.auth.getUser();
-    const user = userData?.user;
-    if (!user) return json({ error: "Não autenticado." }, 401);
-
-    const admin = createClient(supabaseUrl, serviceKey);
-    const ag = createClient(supabaseUrl, serviceKey, { db: { schema: "agencia" } });
-
-    const { data: pessoa } = await ag.from("pessoas").select("id, ativa").eq("auth_id", user.id).maybeSingle();
-    if (!pessoa || pessoa.ativa === false) return json({ error: "Você não tem acesso à Agência." }, 403);
+    // Fala com o banco como a pessoa: as regras (RLS) do schema agencia valem aqui também.
+    const { user, pessoa, db: ag, admin } = await contextoAgencia(req);
 
     const body = (await req.json().catch(() => ({}))) as {
       acao?: "temas" | "peca" | "arte";
@@ -262,7 +240,8 @@ Deno.serve(async (req) => {
       .select("id, nome, resumo, setor_descricao, publico_alvo, tom_de_voz, produtos_servicos, posicionamento, diferenciais, concorrencia, palavras_chave")
       .eq("id", clienteId)
       .maybeSingle();
-    if (!conta) return json({ error: "Conta não encontrada." }, 404);
+    // A conta é lida pela RLS: sem acesso a ela, a linha não volta.
+    if (!conta) return json({ error: "Você não tem acesso a esta conta." }, 403);
 
     // ---------------- imagem-base de uma arte ----------------
     if (body.acao === "arte") {
@@ -540,7 +519,6 @@ Deno.serve(async (req) => {
 
     return json({ ok: true, peca: { legenda, textoImagem, slides, stories, formato } });
   } catch (e) {
-    console.error("agencia-redes error:", e);
-    return json({ error: e instanceof Error ? e.message : "Erro inesperado." }, 500);
+    return respostaDeErro("agencia-redes", e);
   }
 });

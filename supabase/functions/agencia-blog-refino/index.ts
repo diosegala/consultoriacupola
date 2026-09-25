@@ -1,17 +1,10 @@
 // Etapa 10 do blog, opcional: refinar com o prompt reverso.
 // Isolada de propósito: só este arquivo lê as regras do refino.
 // Grava a proposta em texto_refinado; só vira texto_revisado quando alguém clica em "Usar".
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { logAiUsage } from "../_shared/ai-usage.ts";
+import { contextoAgencia, corsHeaders, exigirCliente, json, respostaDeErro } from "../_shared/agencia.ts";
 import { MARCA_DA_VALIDACAO } from "../_shared/blog-regras.ts";
 import { PAPEL, REGRAS_ADICIONAIS_DO_REFINO, REGRAS_DO_REFINO } from "./regras.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 const MODELO = "openai/gpt-6-astra";
 
@@ -81,26 +74,18 @@ async function perguntar(chave: string, sistema: string, pedido: string) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) return json({ error: "Não autenticado." }, 401);
-    const url = Deno.env.get("SUPABASE_URL")!;
-    const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const chave = Deno.env.get("LOVABLE_API_KEY");
     if (!chave) return json({ error: "A chave de IA não está configurada." }, 500);
 
-    const userClient = createClient(url, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
-    const { data: u } = await userClient.auth.getUser();
-    if (!u?.user) return json({ error: "Não autenticado." }, 401);
-    const admin = createClient(url, service);
-    const ag = createClient(url, service, { db: { schema: "agencia" } });
-    const { data: pessoa } = await ag.from("pessoas").select("id, ativa").eq("auth_id", u.user.id).maybeSingle();
-    if (!pessoa || pessoa.ativa === false) return json({ error: "Você não tem acesso à Agência." }, 403);
+    // Fala com o banco como a pessoa: as regras (RLS) do schema agencia valem aqui também.
+    const { user, pessoa, db: ag, admin } = await contextoAgencia(req);
 
     const body = await req.json().catch(() => ({})) as { post_id?: string };
     const postId = String(body.post_id ?? "").trim();
     if (!postId || postId.length > 100) return json({ error: "Informe o post." }, 400);
     const { data: post } = await ag.from("blog_posts").select("*").eq("id", postId).maybeSingle();
     if (!post) return json({ error: "Post não encontrado." }, 404);
+    await exigirCliente(ag, post.cliente_id);
 
     const texto = String(post.texto_revisado ?? "").trim();
     if (!texto) return json({ error: "O texto final ainda está vazio: preencha a revisão antes de refinar." }, 400);
@@ -118,7 +103,7 @@ Deno.serve(async (req) => {
     await logAiUsage({
       admin, provider: "lovable", model: MODELO, agente_tipo: "blog-refino", unidade: "agencia",
       agente_slug: "criador-de-post-news", agencia_cliente_id: post.cliente_id, agencia_pessoa_id: pessoa.id,
-      user_id: u.user.id, status: r.ok ? "success" : "error", error_message: r.ok ? undefined : r.erro,
+      user_id: user.id, status: r.ok ? "success" : "error", error_message: r.ok ? undefined : r.erro,
       usage: r.ok ? { input_tokens: r.usage?.input_tokens, output_tokens: r.usage?.output_tokens } : undefined,
     });
     if (!r.ok) return json({ error: r.erro }, r.status);
@@ -129,14 +114,14 @@ Deno.serve(async (req) => {
     const aviso = JSON.stringify(titulos(texto)) !== JSON.stringify(titulos(refinado))
       ? "O refino mudou os títulos (H2/H3) da estrutura aprovada. Confira antes de usar." : undefined;
 
-    await ag.from("blog_posts").update({
+    const { error: upErr } = await ag.from("blog_posts").update({
       texto_refinado: refinado, atualizado_em: new Date().toISOString(), atualizado_por: pessoa.id,
       passo_atual: Math.max(Number(post.passo_atual ?? 0), 10),
     }).eq("id", postId);
+    if (upErr) throw upErr;
 
     return json({ ok: true, texto: refinado, aviso, conferir: validar });
   } catch (e) {
-    console.error("[agencia-blog-refino]", e);
-    return json({ error: "Erro inesperado no refino." }, 500);
+    return respostaDeErro("agencia-blog-refino", e);
   }
 });
