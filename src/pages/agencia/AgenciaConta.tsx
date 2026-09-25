@@ -30,6 +30,7 @@ import {
   useAgenciaProjetos,
   type AgenciaProjeto,
 } from '@/hooks/agencia/useAgencia';
+import { useLogoConta } from '@/hooks/agencia/useAgenciaArtes';
 
 function Campo({ rotulo, valor }: { rotulo: string; valor?: string | null }) {
   if (!valor) return null;
@@ -50,6 +51,7 @@ export default function AgenciaConta() {
   const { data: projetos } = useAgenciaProjetos();
   const { data: espacos } = useAgenciaEspacos();
   const { data: pessoa } = useAgenciaPessoa();
+  const { data: logoUrl } = useLogoConta(cliente?.id);
   const [fichaAberta, setFichaAberta] = useState(false);
   const [recadoAberto, setRecadoAberto] = useState(false);
   const [contaAberta, setContaAberta] = useState(false);
@@ -88,9 +90,15 @@ export default function AgenciaConta() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="rounded-lg bg-primary/10 p-2">
-            <Building2 className="h-5 w-5 text-primary" />
-          </div>
+          {logoUrl ? (
+            <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-md border border-border bg-card p-2">
+              <img src={logoUrl} alt={`Logotipo da ${cliente.nome}`} className="max-h-full max-w-full object-contain" />
+            </div>
+          ) : (
+            <div className="rounded-lg bg-primary/10 p-2">
+              <Building2 className="h-5 w-5 text-primary" />
+            </div>
+          )}
           <div>
             <h1 className="text-2xl font-bold">{cliente.nome}</h1>
             <p className="text-sm text-muted-foreground">
