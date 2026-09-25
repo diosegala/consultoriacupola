@@ -62,6 +62,7 @@ const agenciaMenuItems = [
   { to: '/agencia/skills', icon: Wand2, label: 'Skills' },
   { to: '/agencia/sessoes', icon: History, label: 'Sessões' },
   { to: '/agencia/produtos', icon: Package, label: 'Produtos' },
+  { to: '/agencia/redes', icon: CalendarDays, label: 'Redes do mês' },
   { to: '/agencia/mercado', icon: Newspaper, label: 'Mercado' },
   { to: '/agencia/equipe', icon: Users, label: 'Time' },
 ];

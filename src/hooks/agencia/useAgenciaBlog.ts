@@ -33,6 +33,11 @@ export interface BlogPost {
   seo_description: string | null;
   seo_slug: string | null;
   atualizado_em: string | null;
+  texto_revisado: string | null;
+  texto_refinado: string | null;
+  texto_antes_do_refino: string | null;
+  html_final: string | null;
+  html_fonte: string | null;
 }
 
 export function useBlogPosts(clienteId?: string) {
@@ -166,5 +171,28 @@ export function useBlogAcoes(clienteId?: string) {
     return true;
   };
 
-  return { criarPost, salvarCampos, gerarPasso, conferirTexto, apagarPost, gerando, validar };
+  /** Etapa 10: refino com o prompt reverso. Grava só a proposta. */
+  const refinar = async (
+    postId: string,
+  ): Promise<{ aviso?: string; conferir: { ponto: string; motivo: string }[] } | null> => {
+    try {
+      const { data, error } = await supabase.functions.invoke('agencia-blog-refino', { body: { post_id: postId } });
+      if (error) {
+        let msg = error.message;
+        const ctx = (error as { context?: Response }).context;
+        if (ctx) msg = (await ctx.json().catch(() => null))?.error ?? msg;
+        throw new Error(msg);
+      }
+      if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
+      invalidar(postId);
+      const r = data as { aviso?: string; conferir?: { ponto: string; motivo: string }[] };
+      return { aviso: r.aviso, conferir: r.conferir ?? [] };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Erro inesperado.';
+      toast({ title: 'Não deu para refinar agora', description: msg, variant: 'destructive' });
+      return null;
+    }
+  };
+
+  return { criarPost, salvarCampos, gerarPasso, conferirTexto, apagarPost, refinar, gerando, validar };
 }
