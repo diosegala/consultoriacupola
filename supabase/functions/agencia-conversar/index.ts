@@ -10,7 +10,7 @@
 // Com `stream: true`, a resposta chega à tela aos pedaços (SSE):
 //   {tipo:"sessao", sessao_id} → {tipo:"delta", texto}… → {tipo:"fim", …} | {tipo:"erro", error}
 import { logAiUsage } from "../_shared/ai-usage.ts";
-import { contextoAgencia, corsHeaders, ErroHttp, exigirCliente, json, respostaDeErro } from "../_shared/agencia.ts";
+import { contextoAgencia, corsHeaders, ErroHttp, exigirCliente, exigirTeto, json, respostaDeErro } from "../_shared/agencia.ts";
 import {
   camadaDaCupola,
   conferir,
@@ -116,6 +116,8 @@ Deno.serve(async (req) => {
       clienteId = clienteId ?? pj.cliente_id ?? null;
     }
     if (clienteId) await exigirCliente(ag, clienteId);
+
+    await exigirTeto(ag, "conversa");
 
     if (!sessaoId) {
       // Arquivado não abre conversa nova; as antigas continuam legíveis no histórico.

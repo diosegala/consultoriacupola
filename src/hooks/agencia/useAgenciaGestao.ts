@@ -31,10 +31,11 @@ export interface UsoIa {
 /** Grava um evento no registro da agência. Falha de registro não trava a ação. */
 export async function registrarAuditoria(pessoaId: string | undefined, acao: string, alvo?: string, detalhe?: string) {
   if (!pessoaId) return;
-  await agencia().from('auditoria').insert({
+  const { error } = await agencia().from('auditoria').insert({
     id: crypto.randomUUID(), em: new Date().toISOString(), pessoa_id: pessoaId,
     acao, alvo: alvo ?? null, detalhe: detalhe ?? null, negado: false,
   });
+  if (error) console.warn('[auditoria] registro recusado:', acao, error.message);
 }
 
 export function useSquadsCompletos() {
@@ -182,5 +183,81 @@ export function useSalvarCamadaCupola(pessoaId?: string) {
     if (error) throw error;
     await registrarAuditoria(pessoaId, 'contexto.alterado', 'cupola');
     await client.invalidateQueries({ queryKey: ['agencia', 'gestao', 'contexto-cupola'] });
+  };
+}
+
+/* ---------------- Teto de gasto de IA ---------------- */
+
+export type PortaIa = 'conversa' | 'geracao';
+export interface LimiteIa {
+  escopo: string;
+  porta: PortaIa;
+  teto_usd: number;
+  definido_em: string;
+  definido_por: string | null;
+}
+export interface GastoIa {
+  pessoa_id: string | null;
+  area_id: string | null;
+  porta: PortaIa;
+  gasto: number;
+}
+export interface AvisoSistema {
+  id: string;
+  tom: 'risco' | 'atencao' | 'neutro';
+  titulo: string;
+  detalhe: string;
+  visto_em: string;
+}
+
+/** Os tetos em vigor. Sem linha = sem limite. */
+export function useLimitesIa() {
+  return useQuery({
+    queryKey: ['agencia', 'gestao', 'limites-ia'],
+    queryFn: async () => {
+      const { data, error } = await agencia().from('limites_ia').select('*');
+      if (error) throw error;
+      return ((data ?? []) as LimiteIa[]).map((l) => ({ ...l, teto_usd: Number(l.teto_usd) }));
+    },
+  });
+}
+
+/** O gasto do mês corrente (horário de São Paulo), por pessoa e porta. */
+export function useGastoIaDoMes() {
+  return useQuery({
+    queryKey: ['agencia', 'gestao', 'gasto-ia-mes'],
+    queryFn: async () => {
+      const { data, error } = await agencia().rpc('gasto_ia_do_mes');
+      if (error) throw error;
+      return ((data ?? []) as GastoIa[]).map((g) => ({ ...g, gasto: Number(g.gasto ?? 0) }));
+    },
+  });
+}
+
+/** Os avisos que o banco cria (hoje, o dos 80% do teto). Só a liderança lê. */
+export function useAvisosSistema() {
+  return useQuery({
+    queryKey: ['agencia', 'gestao', 'avisos'],
+    queryFn: async () => {
+      const { data, error } = await agencia().from('avisos_sistema').select('*').order('visto_em', { ascending: false }).limit(20);
+      if (error) throw error;
+      return (data ?? []) as AvisoSistema[];
+    },
+  });
+}
+
+/**
+ * Define, altera ou tira (teto nulo) um limite, pela função do banco, que confere
+ * quem pode mexer e grava a mudança na auditoria com o valor de antes e o de depois.
+ */
+export function useDefinirLimiteIa() {
+  const qc = useQueryClient();
+  return async (escopo: string, porta: PortaIa, teto: number | null) => {
+    const { error } = await agencia().rpc('definir_limite_ia', { p_escopo: escopo, p_teto: teto, p_porta: porta });
+    if (error) throw error;
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ['agencia', 'gestao', 'limites-ia'] }),
+      qc.invalidateQueries({ queryKey: ['agencia', 'gestao', 'auditoria'] }),
+    ]);
   };
 }

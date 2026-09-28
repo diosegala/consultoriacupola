@@ -2,7 +2,7 @@
 // Isolada de propósito: só este arquivo lê as regras do refino.
 // Grava a proposta em texto_refinado; só vira texto_revisado quando alguém clica em "Usar".
 import { logAiUsage } from "../_shared/ai-usage.ts";
-import { contextoAgencia, corsHeaders, exigirCliente, json, respostaDeErro } from "../_shared/agencia.ts";
+import { contextoAgencia, corsHeaders, exigirCliente, exigirTeto, json, respostaDeErro } from "../_shared/agencia.ts";
 import { MARCA_DA_VALIDACAO } from "../_shared/blog-regras.ts";
 import { PAPEL, REGRAS_ADICIONAIS_DO_REFINO, REGRAS_DO_REFINO } from "./regras.ts";
 
@@ -99,6 +99,7 @@ Deno.serve(async (req) => {
       "# TAREFA\nReescreva o artigo acima aplicando as REGRAS e as REGRAS ADICIONAIS. Preserve a estrutura aprovada (os mesmos H2 e H3, na mesma ordem), os dados, as fontes e os links que já estão no texto. Não acrescente conteúdo que não esteja no artigo ou nos DADOS E FONTES. Devolva o artigo em Markdown e, se houver, os pontos a conferir depois da marca.",
     ].join("\n\n");
 
+    await exigirTeto(ag, "geracao");
     const r = await perguntar(chave, sistema, pedido);
     await logAiUsage({
       admin, provider: "lovable", model: MODELO, agente_tipo: "blog-refino", unidade: "agencia",

@@ -10,8 +10,9 @@ import {
   useAgenciaAgentes, useAgenciaClientes, useAgenciaEspacos, useAgenciaPessoa, useAgenciaPessoas,
 } from '@/hooks/agencia/useAgencia';
 import {
-  useAcessosAgente, useAuditoria, useCamadaCupola, useGestaoAcoes, useSalvarCamadaCupola, useSessoesDesde,
-  useSquadsCompletos, useUsoIa, type Squad,
+  useAcessosAgente, useAuditoria, useAvisosSistema, useCamadaCupola, useDefinirLimiteIa, useGastoIaDoMes,
+  useGestaoAcoes, useLimitesIa, useSalvarCamadaCupola, useSessoesDesde, useSquadsCompletos, useUsoIa,
+  type PortaIa, type Squad,
 } from '@/hooks/agencia/useAgenciaGestao';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
@@ -28,6 +29,8 @@ const ROTULOS: Record<string, string> = {
   'agente.arquivado': 'Agente tirado do catálogo',
   'agente.devolvido': 'Agente devolvido ao catálogo',
   'contexto.alterado': 'Contexto da casa alterado',
+  'limite.definido': 'Limite de IA definido',
+  'limite.removido': 'Limite de IA retirado',
   entrou: 'Entrou no sistema',
 };
 
@@ -211,6 +214,217 @@ function AbaAcessos({ pessoaId }: { pessoaId?: string }) {
   );
 }
 
+/* ---------------- Limites de IA ---------------- */
+const PORTAS: { id: PortaIa; nome: string }[] = [
+  { id: 'conversa', nome: 'Conversa' },
+  { id: 'geracao', nome: 'Geração' },
+];
+
+type EditandoLimite = { escopo: string; porta: PortaIa; rotulo: string; atual: number | null };
+
+/** Gasto do mês contra o teto: barra só quando há teto, e muda de cor aos 80%. */
+function CelulaLimite({ gasto, teto, onEditar }: { gasto: number; teto: number | null; onEditar: () => void }) {
+  const fracao = teto == null ? 0 : teto === 0 ? 1 : Math.min(1, gasto / teto);
+  const cor = fracao >= 1 ? 'bg-destructive' : fracao >= 0.8 ? 'bg-amber-500' : 'bg-primary';
+  return (
+    <td className="p-3 align-top">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <p className="text-foreground">
+            {dolar(gasto)} <span className="text-muted-foreground">{teto == null ? '· sem limite' : `de ${dolar(teto)}`}</span>
+          </p>
+          {teto != null && (
+            <div className="h-1.5 w-32 rounded-full bg-muted">
+              <div className={`h-1.5 rounded-full ${cor}`} style={{ width: `${fracao * 100}%` }} />
+            </div>
+          )}
+        </div>
+        <Button size="sm" variant="outline" onClick={onEditar}>{teto == null ? 'Definir' : 'Alterar'}</Button>
+      </div>
+    </td>
+  );
+}
+
+function AbaLimites() {
+  const { data: limites, isLoading } = useLimitesIa();
+  const { data: gastos } = useGastoIaDoMes();
+  const { data: avisos } = useAvisosSistema();
+  const { data: espacos } = useAgenciaEspacos();
+  const { data: pessoas } = useAgenciaPessoas();
+  const { data: auditoria } = useAuditoria();
+  const definir = useDefinirLimiteIa();
+  const [editando, setEditando] = useState<EditandoLimite | null>(null);
+  const [valor, setValor] = useState('');
+  const [salvando, setSalvando] = useState(false);
+  const [incluidas, setIncluidas] = useState<string[]>([]);
+
+  const areas = (espacos ?? []).filter((e) => e.tipo === 'area');
+  const ativas = (pessoas ?? []).filter((p) => p.ativa !== false);
+  const teto = (escopo: string, porta: PortaIa) => limites?.find((l) => l.escopo === escopo && l.porta === porta)?.teto_usd ?? null;
+  const somar = (filtro: (g: NonNullable<typeof gastos>[number]) => boolean) =>
+    (gastos ?? []).filter(filtro).reduce((s, g) => s + g.gasto, 0);
+  const comLimite = new Set((limites ?? []).filter((l) => l.escopo.startsWith('pessoa:')).map((l) => l.escopo.slice(7)));
+  const listadas = ativas.filter((p) => comLimite.has(p.id) || incluidas.includes(p.id));
+  const disponiveis = ativas.filter((p) => !comLimite.has(p.id) && !incluidas.includes(p.id));
+  const nomeArea = (id: string | null) => areas.find((a) => a.id === id)?.nome ?? '—';
+
+  const mes = new Date().toISOString().slice(0, 7);
+  const avisosDoMes = (avisos ?? []).filter((a) => a.id.endsWith(mes));
+  const historico = (auditoria ?? []).filter((e) => e.acao.startsWith('limite.')).slice(0, 15);
+  const nomePessoa = (id: string | null) => pessoas?.find((p) => p.id === id)?.nome ?? 'Sistema';
+
+  const abrir = (escopo: string, porta: PortaIa, rotulo: string) => {
+    const atual = teto(escopo, porta);
+    setEditando({ escopo, porta, rotulo, atual });
+    setValor(atual == null ? '' : String(atual).replace('.', ','));
+  };
+
+  // "1.250,50" e "50,5" no jeito brasileiro; "50.5" também vale.
+  const numero = Number(valor.includes(',') ? valor.replace(/\./g, '').replace(',', '.') : valor);
+  const valorValido = valor.trim() !== '' && Number.isFinite(numero) && numero >= 0 && numero <= 100000;
+
+  const salvar = async (novo: number | null) => {
+    if (!editando) return;
+    setSalvando(true);
+    try {
+      await definir(editando.escopo, editando.porta, novo);
+      toast.success(novo == null ? `${editando.rotulo} ficou sem limite.` : `Limite de ${editando.rotulo} salvo.`);
+      setEditando(null);
+    } catch (e) {
+      toast.error((e as { message?: string })?.message || 'Não foi possível salvar o limite.');
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  if (isLoading) return <Skeleton className="h-64 w-full" />;
+  const mesExtenso = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+
+  const tabela = (linhas: { escopo: string; rotulo: string; sub?: string; gasto: (p: PortaIa) => number }[]) => (
+    <div className="overflow-x-auto rounded-2xl border border-border bg-card">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-border text-left text-muted-foreground">
+            <th className="p-3 font-medium">Nome</th>
+            {PORTAS.map((p) => <th key={p.id} className="p-3 font-medium">{p.nome}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {linhas.map((l) => (
+            <tr key={l.escopo} className="border-b border-border last:border-0">
+              <td className="p-3 align-top">
+                <p className="font-medium text-foreground">{l.rotulo}</p>
+                {l.sub && <p className="text-xs text-muted-foreground">{l.sub}</p>}
+              </td>
+              {PORTAS.map((p) => (
+                <CelulaLimite key={p.id} gasto={l.gasto(p.id)} teto={teto(l.escopo, p.id)}
+                  onEditar={() => abrir(l.escopo, p.id, l.rotulo)} />
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      <p className="max-w-3xl text-sm text-muted-foreground">
+        Teto mensal de gasto com IA, em dólares, por área e por pessoa. <strong>Conversa</strong> é a conversa com os agentes;{' '}
+        <strong>geração</strong> é o resto (blog, redes, news, ficha, recado falado, mercado). Sem limite, nada é barrado.
+        Quando o gasto chega ao teto, aquela porta para até o mês virar; aos 80%, aparece um aviso aqui. Gasto de {mesExtenso}.
+      </p>
+
+      {avisosDoMes.length > 0 && (
+        <div className="space-y-2">
+          {avisosDoMes.map((a) => (
+            <div key={a.id} className={`rounded-2xl border p-4 text-sm ${a.tom === 'risco' ? 'border-destructive/40 bg-destructive/5' : 'border-amber-500/40 bg-amber-500/5'}`}>
+              <p className="font-medium text-foreground">
+                <ShieldAlert className={`mr-1 inline h-4 w-4 ${a.tom === 'risco' ? 'text-destructive' : 'text-amber-600'}`} />
+                {a.titulo}
+              </p>
+              <p className="text-muted-foreground">{a.detalhe}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <section className="space-y-3">
+        <h3 className="font-medium text-foreground">Por área</h3>
+        {tabela(areas.map((a) => ({
+          escopo: `area:${a.id}`,
+          rotulo: a.nome,
+          gasto: (porta) => somar((g) => g.area_id === a.id && g.porta === porta),
+        })))}
+      </section>
+
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="font-medium text-foreground">Por pessoa</h3>
+          {disponiveis.length > 0 && (
+            <Select value="" onValueChange={(id) => setIncluidas((x) => [...x, id])}>
+              <SelectTrigger className="w-64"><SelectValue placeholder="Incluir pessoa…" /></SelectTrigger>
+              <SelectContent>
+                {disponiveis.map((p) => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+        {listadas.length === 0
+          ? <Vazio>Nenhuma pessoa com limite próprio. Sem ele, vale só o teto da área.</Vazio>
+          : tabela(listadas.map((p) => ({
+            escopo: `pessoa:${p.id}`,
+            rotulo: p.nome,
+            sub: nomeArea(p.area_id),
+            gasto: (porta) => somar((g) => g.pessoa_id === p.id && g.porta === porta),
+          })))}
+      </section>
+
+      {historico.length > 0 && (
+        <section className="space-y-3">
+          <h3 className="font-medium text-foreground">Últimas mudanças</h3>
+          <div className="divide-y divide-border rounded-2xl border border-border bg-card">
+            {historico.map((e) => (
+              <div key={e.id} className="flex flex-wrap items-start justify-between gap-2 p-4 text-sm">
+                <div>
+                  <p className="font-medium text-foreground">{e.alvo} · {e.detalhe}</p>
+                  <p className="text-muted-foreground">{nomePessoa(e.pessoa_id)}</p>
+                </div>
+                <span className="text-xs text-muted-foreground">{dataHora(e.em)}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <Dialog open={!!editando} onOpenChange={(o) => !o && setEditando(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Limite de {editando?.porta === 'conversa' ? 'conversa' : 'geração'} · {editando?.rotulo}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="teto-ia">Teto mensal (US$)</Label>
+            <Input id="teto-ia" inputMode="decimal" placeholder="Ex.: 50,00" value={valor}
+              onChange={(e) => setValor(e.target.value)} autoFocus />
+            <p className="text-xs text-muted-foreground">
+              {editando?.atual == null ? 'Hoje sem limite.' : `Hoje: ${dolar(editando.atual)}.`} Zero bloqueia a porta. Vale na hora, para o mês corrente.
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            {editando?.atual != null && (
+              <Button variant="outline" disabled={salvando} onClick={() => salvar(null)} className="sm:mr-auto">Tirar limite</Button>
+            )}
+            <Button variant="outline" onClick={() => setEditando(null)}>Cancelar</Button>
+            <Button disabled={!valorValido || salvando} onClick={() => salvar(Math.round(numero * 100) / 100)}>Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 /* ---------------- Auditoria ---------------- */
 function AbaAuditoria() {
   const { data, isLoading } = useAuditoria();
@@ -227,6 +441,7 @@ function AbaAuditoria() {
               {e.negado && <ShieldAlert className="mr-1 inline h-4 w-4 text-destructive" />}
               {ROTULOS[e.acao] ?? e.acao}{e.alvo ? ` · ${e.alvo}` : ''}
             </p>
+            {e.acao.startsWith('limite.') && e.detalhe && <p className="text-muted-foreground">{e.detalhe}</p>}
             <p className="text-muted-foreground">{nome(e.pessoa_id)}{e.negado ? ' · negado' : ''}</p>
           </div>
           <span className="text-xs text-muted-foreground">{dataHora(e.em)}</span>
@@ -396,18 +611,20 @@ export default function AgenciaGestao() {
   if (pessoa?.papel !== 'admin') return <Vazio>Esta área é só para administradores da agência.</Vazio>;
   return (
     <div className="space-y-6">
-      <CabecalhoPagina rotulo="Administração" titulo="Gestão da agência" descricao="Squads, quem usa cada agente, o registro de mudanças e o uso do sistema." />
+      <CabecalhoPagina rotulo="Administração" titulo="Gestão da agência" descricao="Squads, quem usa cada agente, limites de gasto com IA, o registro de mudanças e o uso do sistema." />
       <Tabs defaultValue="squads">
         <TabsList>
           <TabsTrigger value="squads">Squads</TabsTrigger>
           <TabsTrigger value="acessos">Acesso a agentes</TabsTrigger>
           <TabsTrigger value="metricas">Métricas</TabsTrigger>
+          <TabsTrigger value="limites">Limites de IA</TabsTrigger>
           <TabsTrigger value="auditoria">Auditoria</TabsTrigger>
           <TabsTrigger value="contexto">Contexto</TabsTrigger>
         </TabsList>
         <TabsContent value="squads" className="mt-6"><AbaSquads pessoaId={pessoa.id} /></TabsContent>
         <TabsContent value="acessos" className="mt-6"><AbaAcessos pessoaId={pessoa.id} /></TabsContent>
         <TabsContent value="metricas" className="mt-6"><AbaMetricas /></TabsContent>
+        <TabsContent value="limites" className="mt-6"><AbaLimites /></TabsContent>
         <TabsContent value="auditoria" className="mt-6"><AbaAuditoria /></TabsContent>
         <TabsContent value="contexto" className="mt-6"><AbaContexto pessoaId={pessoa.id} /></TabsContent>
       </Tabs>

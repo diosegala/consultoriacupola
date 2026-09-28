@@ -2,7 +2,7 @@
 // Lê o material já enviado da conta e PROPÕE o preenchimento dos campos,
 // sempre com a origem do trecho. Nada entra na conta sem aprovação campo a campo.
 import { logAiUsage } from "../_shared/ai-usage.ts";
-import { contextoAgencia, corsHeaders, ErroHttp, json, respostaDeErro } from "../_shared/agencia.ts";
+import { contextoAgencia, corsHeaders, ErroHttp, exigirTeto, json, respostaDeErro } from "../_shared/agencia.ts";
 
 const MODELO = "openai/gpt-6-astra";
 
@@ -201,6 +201,7 @@ Deno.serve(async (req) => {
       "Devolva um item por campo, todos presentes mesmo quando vazios.",
     ].filter(Boolean).join("\n\n");
 
+    await exigirTeto(ag, "geracao");
     const res = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
       method: "POST",
       headers: {

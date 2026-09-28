@@ -2,7 +2,7 @@
 // Regras editoriais vieram inteiras do CupolaOS (_shared/blog-regras.ts);
 // a IA roda pela chave única do gateway, como o resto da casa.
 import { logAiUsage } from "../_shared/ai-usage.ts";
-import { contextoAgencia, corsHeaders, json, respostaDeErro } from "../_shared/agencia.ts";
+import { contextoAgencia, corsHeaders, exigirTeto, json, respostaDeErro } from "../_shared/agencia.ts";
 import {
   ARQUITETURA_DA_INFORMACAO,
   ARQUITETURA_DE_CONTEUDO,
@@ -465,6 +465,7 @@ Deno.serve(async (req) => {
 
     const { contexto, cortados } = apararMaterial(cruContexto);
 
+    await exigirTeto(ag, "geracao");
     const r = await chamarIA({
       chave: lovableKey,
       sistema: sistemaDoPasso(passo),

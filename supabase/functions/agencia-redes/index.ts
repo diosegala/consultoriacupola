@@ -2,7 +2,7 @@
 // Duas ações: "temas" (lista do mês) e "peca" (o texto de um tema).
 // Regras transcritas do CupoCont/CupolaOS; a IA roda pela chave única do gateway.
 import { logAiUsage } from "../_shared/ai-usage.ts";
-import { contextoAgencia, corsHeaders, json, respostaDeErro } from "../_shared/agencia.ts";
+import { contextoAgencia, corsHeaders, exigirTeto, json, respostaDeErro } from "../_shared/agencia.ts";
 
 const MODELO = "openai/gpt-6-astra";
 const MODELO_IMAGEM = "openai/gpt-image-2.5-sunburst";
@@ -277,6 +277,7 @@ Deno.serve(async (req) => {
         (body.instrucoes_arte ?? "").trim() ? `Direção adicional: ${body.instrucoes_arte!.trim()}` : "",
       ].filter(Boolean).join("\n");
 
+      await exigirTeto(ag, "geracao");
       const chamarImagem = () => fetch("https://ai.gateway.lovable.dev/v1/images/generations", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${lovableKey}` },
@@ -386,6 +387,7 @@ Deno.serve(async (req) => {
         (antigos ?? []).map((t: { titulo: string }) => t.titulo).filter(Boolean),
       );
 
+      await exigirTeto(ag, "geracao");
       const r = await chamarIA({
         chave: lovableKey,
         sistema: SISTEMA_DOS_TEMAS,
@@ -464,6 +466,7 @@ Deno.serve(async (req) => {
     if ((body.instrucoes ?? "").trim()) partes.push(`## Instruções adicionais do redator\n${body.instrucoes!.trim()}`);
     partes.push("Escreva agora a peça para este tema.");
 
+    await exigirTeto(ag, "geracao");
     const r = await chamarIA({
       chave: lovableKey,
       sistema: formato === "card" ? SISTEMA_DO_CARD : SISTEMA_DO_CARROSSEL,

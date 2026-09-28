@@ -53,7 +53,7 @@ export async function logAiUsage(p: LogAiUsageParams): Promise<void> {
     const inTok = Number(p.usage?.input_tokens ?? 0);
     const outTok = Number(p.usage?.output_tokens ?? 0);
     const model = p.model ?? CLAUDE_MODEL;
-    await p.admin.from("ai_usage_logs").insert({
+    const { error } = await p.admin.from("ai_usage_logs").insert({
       provider: p.provider ?? "anthropic",
       model,
       agente_tipo: p.agente_tipo,
@@ -71,6 +71,8 @@ export async function logAiUsage(p: LogAiUsageParams): Promise<void> {
       agencia_pessoa_id: p.agencia_pessoa_id ?? null,
       sessao_id: p.sessao_id ?? null,
     });
+    // O supabase-js devolve o erro em vez de lançar: sem isto, a falha passava calada.
+    if (error) console.warn("[ai-usage] insert falhou:", error);
   } catch (err) {
     console.warn("[ai-usage] insert falhou:", err);
   }

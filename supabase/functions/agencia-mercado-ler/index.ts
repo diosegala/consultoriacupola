@@ -2,7 +2,7 @@
 // Leitor de feed copiado do CupolaOS (_shared/rss.ts); a triagem, que era Gemini lá,
 // roda aqui pela chave única do gateway.
 import { logAiUsage } from "../_shared/ai-usage.ts";
-import { contextoAgencia, corsHeaders, ErroHttp, json, respostaDeErro } from "../_shared/agencia.ts";
+import { contextoAgencia, corsHeaders, ErroHttp, exigirTeto, json, respostaDeErro } from "../_shared/agencia.ts";
 import { buscarFeed } from "../_shared/rss.ts";
 
 const MODELO = "openai/gpt-6-astra";
@@ -170,6 +170,7 @@ Deno.serve(async (req) => {
     if (fErr) throw fErr;
     if (!fontes?.length) return json({ error: "Nenhuma fonte com feed para ler." }, 400);
 
+    await exigirTeto(ag, "geracao");
     const resumo: { fonte: string; novas: number; erro?: string }[] = [];
 
     for (const fonte of fontes) {

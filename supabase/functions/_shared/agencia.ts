@@ -73,6 +73,52 @@ export async function exigirCliente<T = Record<string, unknown>>(
   return data as T;
 }
 
+/**
+ * O teto de gasto de IA do mês (agencia.limite_ia), conferido antes de chamar a IA.
+ * `conversa` é a agencia-conversar; o resto é `geracao`.
+ *
+ * Falha aberta, como no original: se a consulta cair, a chamada passa. Travar a
+ * agência inteira porque o controle caiu troca um problema de custo por trabalho
+ * parado, e o custo tem outras redes (painel de uso, fatura, limite do gateway).
+ */
+export async function exigirTeto(db: Banco, porta: "conversa" | "geracao"): Promise<void> {
+  const { data, error } = await db.rpc("limite_ia", { p_porta: porta });
+  if (error) {
+    console.error("[teto] limite_ia falhou; seguindo sem teto", error);
+    return;
+  }
+  const linha = (Array.isArray(data) ? data[0] : data) as {
+    gasto_pessoa: number | string | null;
+    teto_pessoa: number | string | null;
+    gasto_area: number | string | null;
+    teto_area: number | string | null;
+  } | undefined;
+  if (!linha) return;
+
+  const numero = (v: number | string | null) => (v == null ? null : Number(v));
+  const emDolar = (v: number) => `US$ ${v.toFixed(2).replace(".", ",")}`;
+  const nome = porta === "conversa" ? "conversa" : "geração";
+  const gastoPessoa = numero(linha.gasto_pessoa) ?? 0;
+  const tetoPessoa = numero(linha.teto_pessoa);
+  const gastoArea = numero(linha.gasto_area) ?? 0;
+  const tetoArea = numero(linha.teto_area);
+
+  if (tetoPessoa != null && gastoPessoa >= tetoPessoa) {
+    throw new ErroHttp(
+      429,
+      `Seu limite de ${nome} deste mês acabou: ${emDolar(gastoPessoa)} de ${emDolar(tetoPessoa)}. ` +
+        "Fale com a liderança da sua área.",
+    );
+  }
+  if (tetoArea != null && gastoArea >= tetoArea) {
+    throw new ErroHttp(
+      429,
+      `O limite de ${nome} da sua área acabou neste mês: ${emDolar(gastoArea)} de ${emDolar(tetoArea)}. ` +
+        "Quem pode aumentar é a administração da agência.",
+    );
+  }
+}
+
 /** Resposta padrão para erros capturados no `catch` da função. */
 export function respostaDeErro(nome: string, e: unknown): Response {
   if (e instanceof ErroHttp) return json({ error: e.message }, e.status);

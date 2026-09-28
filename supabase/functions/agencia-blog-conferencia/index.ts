@@ -3,7 +3,7 @@
 // Aqui é a leitura: o que o texto afirma e o material não sustenta.
 // Prompt copiado do CupolaOS (servidor/blog-conferencia.ts).
 import { logAiUsage } from "../_shared/ai-usage.ts";
-import { contextoAgencia, corsHeaders, json, respostaDeErro } from "../_shared/agencia.ts";
+import { contextoAgencia, corsHeaders, exigirTeto, json, respostaDeErro } from "../_shared/agencia.ts";
 
 const MODELO = "openai/gpt-6-astra";
 const TETO_DO_MATERIAL = 300_000;
@@ -132,6 +132,7 @@ Deno.serve(async (req) => {
 
     if (!texto) return json({ error: "Escreva o texto antes de conferir." }, 400);
 
+    await exigirTeto(ag, "geracao");
     const res = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Lovable-API-Key": lovableKey, "X-Lovable-AIG-SDK": "fetch" },

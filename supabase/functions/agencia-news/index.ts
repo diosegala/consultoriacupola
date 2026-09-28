@@ -1,7 +1,7 @@
 // News Blog da Agência — transforma os artigos aprovados do mês numa newsletter.
 // Regras de redação vieram do CupolaOS (servidor/news.ts).
 import { logAiUsage } from "../_shared/ai-usage.ts";
-import { contextoAgencia, corsHeaders, exigirCliente, json, respostaDeErro } from "../_shared/agencia.ts";
+import { contextoAgencia, corsHeaders, exigirCliente, exigirTeto, json, respostaDeErro } from "../_shared/agencia.ts";
 
 const MODELO = "openai/gpt-6-astra";
 
@@ -49,6 +49,7 @@ Deno.serve(async (req) => {
     const lista = artigos.map((p) => ({ titulo: titulo(p!), texto: p!.texto_revisado as string }));
     if (lista.reduce((n, a) => n + a.texto.length + a.titulo.length, 0) > 180000) return json({ error: "Os artigos ultrapassam 180 mil caracteres. Reduza a seleção." }, 400);
 
+    await exigirTeto(ag, "geracao");
     const res = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Lovable-API-Key": lovableKey, "X-Lovable-AIG-SDK": "fetch" },

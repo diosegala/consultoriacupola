@@ -2,7 +2,7 @@
 // O áudio é ouvido, o texto é gravado como material da conta e o áudio some —
 // nada de gravação de conversa com cliente guardada em lugar nenhum.
 import { logAiUsage } from "../_shared/ai-usage.ts";
-import { contextoAgencia, corsHeaders, json, respostaDeErro } from "../_shared/agencia.ts";
+import { contextoAgencia, corsHeaders, exigirTeto, json, respostaDeErro } from "../_shared/agencia.ts";
 
 const MODELO = "openai/gpt-6-astra";
 const MODELOS_ESCUTA = ["google/gemini-3.5-transcribe", "openai/gpt-4o-mini-transcribe"];
@@ -103,6 +103,8 @@ Deno.serve(async (req) => {
     const { data: conta } = await ag.from("clientes").select("id, nome").eq("id", clienteId).maybeSingle();
     // A conta é lida pela RLS: sem acesso a ela, a linha não volta.
     if (!conta) return json({ error: "Você não tem acesso a esta conta." }, 403);
+
+    await exigirTeto(ag, "geracao");
 
     // ---------- 1. ouvir ----------
     const binario = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
