@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { agencia } from '@/integrations/supabase/agencia';
 import { supabase } from '@/integrations/supabase/client';
 import { streamImage } from '@/lib/streamImage';
+import { SUPABASE_CHAVE_PUBLICA, urlDaFuncao } from '@/lib/supabaseFuncoes';
 
 export type FormatoArte = 'feed_4_5' | 'quadrado_1_1' | 'stories_9_16';
 
@@ -168,10 +169,10 @@ export async function gerarImagemArte(input: {
   const session = await supabase.auth.getSession();
   const token = session.data.session?.access_token;
   if (!token) throw new Error('Sua sessão expirou. Entre novamente.');
-  const endpoint = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/agencia-redes`;
+  const endpoint = urlDaFuncao('agencia-redes');
   return streamImage(endpoint, { acao: 'arte', cliente_id: input.clienteId, mes: input.mes, tema_id: input.temaId, formato_arte: input.formato, instrucoes_arte: input.instrucoes }, {
     Authorization: `Bearer ${token}`,
-    apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+    apikey: SUPABASE_CHAVE_PUBLICA,
   }, input.onFrame);
 }
 

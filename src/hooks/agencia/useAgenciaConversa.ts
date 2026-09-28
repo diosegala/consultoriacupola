@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { agencia } from '@/integrations/supabase/agencia';
+import { SUPABASE_CHAVE_PUBLICA, urlDaFuncao } from '@/lib/supabaseFuncoes';
 
 export interface Violacao {
   regra: string;
@@ -62,12 +63,12 @@ async function conversarEmFluxo(corpo: Record<string, unknown>, aoEvento: (ev: E
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   if (!token) throw new Error('Sua sessão expirou. Entre novamente.');
-  const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/agencia-conversar`, {
+  const res = await fetch(urlDaFuncao('agencia-conversar'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
-      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      apikey: SUPABASE_CHAVE_PUBLICA,
     },
     body: JSON.stringify({ ...corpo, stream: true }),
   });
@@ -75,6 +76,12 @@ async function conversarEmFluxo(corpo: Record<string, unknown>, aoEvento: (ev: E
     const erro = await res.json().catch(() => null);
     throw new Error(erro?.error ?? 'Não foi possível falar com o agente agora.');
   }
+  // Endereço errado cai no próprio site e volta HTML com status 200: sem esta
+  // checagem, a conversa terminava calada, sem resposta e sem erro.
+  if (!res.headers.get('content-type')?.includes('text/event-stream')) {
+    throw new Error('O servidor não respondeu como esperado. Recarregue a página e tente de novo.');
+  }
+  let terminou = false;
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
@@ -93,9 +100,11 @@ async function conversarEmFluxo(corpo: Record<string, unknown>, aoEvento: (ev: E
       } catch {
         continue; // evento parcial
       }
+      if (ev.tipo === 'fim' || ev.tipo === 'erro') terminou = true;
       aoEvento(ev);
     }
   }
+  if (!terminou) throw new Error('A resposta foi interrompida. Tente de novo.');
 }
 
 interface Opcoes {

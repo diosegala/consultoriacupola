@@ -11,9 +11,10 @@ import { Loader2, Check, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Estrutura, Pergunta, calcularProgresso, progressoSecao, isPreenchida } from '@/lib/questionario';
+import { SUPABASE_CHAVE_PUBLICA, SUPABASE_URL } from '@/lib/supabaseFuncoes';
 
-const FN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
-const ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const FN_URL = `${SUPABASE_URL}/functions/v1`;
+const ANON = SUPABASE_CHAVE_PUBLICA;
 
 interface InitialData {
   cliente_nome: string;
