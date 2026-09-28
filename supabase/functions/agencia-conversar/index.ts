@@ -88,8 +88,13 @@ Deno.serve(async (req) => {
     if (!pergunta) return json({ error: "Escreva uma mensagem." }, 400);
     if (pergunta.length > 20000) return json({ error: "Mensagem muito longa." }, 400);
 
-    const { data: agente } = await ag
-      .from("agentes").select("id, slug, nome, resumo, descricao, espaco_id, espacos(nome)").eq("slug", slug).maybeSingle();
+    // agentes e espacos se ligam por mais de um caminho (acessos_agente, sessoes, crons):
+    // sem nomear a chave, o PostgREST recusa a consulta (300) e o agente "some".
+    const { data: agente, error: agErr } = await ag
+      .from("agentes")
+      .select("id, slug, nome, resumo, descricao, espaco_id, espacos!agentes_espaco_id_fkey(nome)")
+      .eq("slug", slug).maybeSingle();
+    if (agErr) throw agErr;
     if (!agente) return json({ error: "Agente não encontrado." }, 404);
 
     // Sessão: reaproveita a informada (só se for da própria pessoa) ou cria uma nova.
