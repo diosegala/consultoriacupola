@@ -20,7 +20,7 @@ Plano aprovado em .lovable/plan/trazer-o-cupolaos-agência-de-marketing-para-den
 
 ## Paridade com CupolaOS (versão GitHub 25/09)
 - [feito 25/09] Etapa 1 banco: tabelas novas (agentes por cliente, experimentos/refino do blog, pranchas Google, pastas criadas, imagens planejamento, squads coord/atend, funcionalidade design-system)
-- [adiado] Etapa 1b: nova exportação de dados — só no dia da virada para produção
+- [adiado] Etapa 1b: nova exportação de dados — só no dia da virada para produção — conferir a contagem de **todas** as tabelas do dump que têm dados, não só as 30 da Fase 4 (a carga de 24/09 deixou de fora `agentes_arquivados`, `agentes_por_cliente`, `blog_experimentos`, `news_edicoes` e `pranchas_google`, porque essas tabelas ainda não existiam no clone)
 - [feito 25/09] Etapa 2: menu estilo CupolaOS, Início, Projetos, Sessões, Skills, Produtos. **Meu dia e Jornada não foram portados** (ações do dia, reuniões, tarefas, e-mail 48 h)
 - [feito 25/09] Etapa 3: News; Criador de Blog completo (texto final, refino com prompt reverso + comparação antes×depois, HTML final); Conteúdo de Redes por mês (/agencia/redes, fechar produção). Não portado: comparador de 4 variantes de prompt do CupolaOS
 - [adiado 25/09 — depois da 5] Etapa 4: JBA Design, cards Franciosi/Porta 8/Pantera/Góes/Story

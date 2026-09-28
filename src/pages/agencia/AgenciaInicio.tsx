@@ -23,6 +23,9 @@ function saudacao() {
 export default function AgenciaInicio() {
   const { pessoa } = useTemAcessoAgencia();
   const { data: agentes = [] } = useAgenciaAgentes();
+  const { data: todos = [] } = useAgenciaAgentes(true);
+  // Se a gestão arquivou o assistente geral, a caixa fecha e diz por quê.
+  const geralArquivado = todos.some((a) => a.slug === ASSISTENTE_GERAL && a.arquivado);
   const { data: clientes = [] } = useAgenciaClientes();
   const { data: sessoes = [] } = useAgenciaSessoes();
   const minhas = sessoes.filter((s) => s.pessoa_id === pessoa?.id).slice(0, 6);
@@ -37,7 +40,7 @@ export default function AgenciaInicio() {
   /** A conversa nasce no assistente geral, com a conta escolhida, e a tela dele envia o texto. */
   const conversar = () => {
     const pergunta = texto.trim();
-    if (!pergunta) return;
+    if (!pergunta || geralArquivado) return;
     if (!agentes.some((a) => a.slug === ASSISTENTE_GERAL)) {
       toast.error('Você não tem acesso ao assistente geral, que é quem atende esta caixa. Fale com a coordenação.');
       return;
@@ -64,6 +67,7 @@ export default function AgenciaInicio() {
           onChange={(e) => setTexto(e.target.value)}
           placeholder="Pergunte sobre o mercado, peça uma ideia, revise um raciocínio… (Ctrl+Enter envia)"
           rows={3}
+          disabled={geralArquivado}
           className="resize-none border-0 bg-transparent shadow-none focus-visible:ring-0"
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -101,10 +105,15 @@ export default function AgenciaInicio() {
               </button>
             ))}
           </div>
-          <Button size="sm" onClick={conversar} disabled={!texto.trim()} className="ml-auto gap-1.5">
+          <Button size="sm" onClick={conversar} disabled={!texto.trim() || geralArquivado} className="ml-auto gap-1.5">
             <Send className="h-3.5 w-3.5" /> Conversar
           </Button>
         </div>
+        {geralArquivado && (
+          <p className="px-1 text-xs text-muted-foreground">
+            O assistente geral, que atende esta caixa, foi arquivado pela gestão. Converse com um dos agentes abaixo.
+          </p>
+        )}
       </section>
 
       <section className="space-y-3">

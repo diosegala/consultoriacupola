@@ -42,7 +42,9 @@ type AreaComFundo = AgenciaEspaco & { fundo: string };
 export default function AgenciaAgentes() {
   const { data: pessoa } = useAgenciaPessoa();
   const podeGerenciar = pessoa?.papel === 'admin' || pessoa?.papel === 'gestor';
-  const { data: agentes, isLoading } = useAgenciaAgentes(podeGerenciar);
+  const { data: todos, isLoading } = useAgenciaAgentes(podeGerenciar);
+  // Arquivado sai do catálogo de todo mundo; a gestão devolve em Gestão → Acesso a agentes.
+  const agentes = useMemo(() => (todos ?? []).filter((a) => !a.arquivado), [todos]);
   const { data: espacos } = useAgenciaEspacos();
   const [busca, setBusca] = useState('');
   const [area, setArea] = useState<string>('todas');

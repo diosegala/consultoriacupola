@@ -118,6 +118,12 @@ Deno.serve(async (req) => {
     if (clienteId) await exigirCliente(ag, clienteId);
 
     if (!sessaoId) {
+      // Arquivado não abre conversa nova; as antigas continuam legíveis no histórico.
+      const { data: arquivado, error: aErr } = await ag
+        .from("agentes_arquivados").select("agente_id").eq("agente_id", agente.id).maybeSingle();
+      if (aErr) throw aErr;
+      if (arquivado) throw new ErroHttp(409, "Este agente foi arquivado.");
+
       sessaoId = novoId();
       const { error: sErr } = await ag.from("sessoes").insert({
         id: sessaoId,

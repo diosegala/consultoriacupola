@@ -149,7 +149,16 @@ export function useGestaoAcoes(pessoaId?: string) {
     recarregar('acessos-agente');
   };
 
-  return { salvarSquad, alternarVinculo, alternarAcessoAgente };
+  /** Tira do catálogo ou devolve, pela função do banco (só a liderança). */
+  const arquivarAgente = async (agenteId: string, arquivar: boolean, rotulo: string) => {
+    const { error } = await agencia().rpc('arquivar_agente', { p_id: agenteId, p_arquivado: arquivar });
+    if (!falhou(error)) return;
+    await registrarAuditoria(pessoaId, arquivar ? 'agente.arquivado' : 'agente.devolvido', rotulo);
+    await qc.invalidateQueries({ queryKey: ['agencia', 'agentes'] });
+    toast.success(arquivar ? `${rotulo} saiu do catálogo.` : `${rotulo} voltou ao catálogo.`);
+  };
+
+  return { salvarSquad, alternarVinculo, alternarAcessoAgente, arquivarAgente };
 }
 
 /** A camada da casa (essência e escrita) que entra em toda conversa com os agentes. */

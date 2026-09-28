@@ -71,6 +71,8 @@ export interface AgenciaAgente {
   por_conta: boolean | null;
   cliente_id: string | null;
   ordem: number | null;
+  /** Tirado do catálogo pela gestão (agencia.agentes_arquivados). Não vem do banco nesta tabela. */
+  arquivado?: boolean;
 }
 
 export interface AgenciaProjeto {
@@ -160,16 +162,25 @@ export function useAgenciaProjetos() {
   });
 }
 
+/**
+ * Catálogo de agentes. Sem `incluirOcultos`, ficam de fora os ocultos e os
+ * arquivados; com ele, vem tudo (cada um marcado com `arquivado`), para o
+ * histórico de sessões e a gestão continuarem mostrando o nome.
+ */
 export function useAgenciaAgentes(incluirOcultos = false) {
   return useQuery({
     queryKey: ['agencia', 'agentes', incluirOcultos],
     queryFn: async (): Promise<AgenciaAgente[]> => {
-      const { data, error } = await agencia()
-        .from('agentes')
-        .select('*')
-        .order('ordem', { ascending: true });
-      if (error) throw error;
-      return ((data ?? []) as AgenciaAgente[]).filter((a) => incluirOcultos || !a.oculto);
+      const [agentes, arquivados] = await Promise.all([
+        agencia().from('agentes').select('*').order('ordem', { ascending: true }),
+        agencia().from('agentes_arquivados').select('agente_id'),
+      ]);
+      if (agentes.error) throw agentes.error;
+      if (arquivados.error) throw arquivados.error;
+      const fora = new Set((arquivados.data ?? []).map((a: { agente_id: string }) => a.agente_id));
+      return ((agentes.data ?? []) as AgenciaAgente[])
+        .map((a) => ({ ...a, arquivado: fora.has(a.id) }))
+        .filter((a) => incluirOcultos || (!a.oculto && !a.arquivado));
     },
   });
 }

@@ -25,6 +25,8 @@ const ROTULOS: Record<string, string> = {
   'squad.carteira.removido': 'Cliente saiu da carteira do squad',
   'agente.acesso.liberado': 'Agente liberado para área',
   'agente.acesso.removido': 'Agente retirado de área',
+  'agente.arquivado': 'Agente tirado do catálogo',
+  'agente.devolvido': 'Agente devolvido ao catálogo',
   'contexto.alterado': 'Contexto da casa alterado',
   entrou: 'Entrou no sistema',
 };
@@ -154,7 +156,7 @@ function AbaAcessos({ pessoaId }: { pessoaId?: string }) {
   const { data: agentes } = useAgenciaAgentes(true);
   const { data: espacos } = useAgenciaEspacos();
   const { data: acessos, isLoading } = useAcessosAgente();
-  const { alternarAcessoAgente } = useGestaoAcoes(pessoaId);
+  const { alternarAcessoAgente, arquivarAgente } = useGestaoAcoes(pessoaId);
   const areas = (espacos ?? []).filter((e) => e.tipo === 'area');
   const liberado = useMemo(() => new Set((acessos ?? []).map((a) => `${a.agente_id}|${a.espaco_id}`)), [acessos]);
 
@@ -163,6 +165,7 @@ function AbaAcessos({ pessoaId }: { pessoaId?: string }) {
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
         Cada agente pertence a uma área. Marque as outras áreas que também podem usá-lo.
+        Arquivar tira o agente do catálogo de todo mundo e impede conversa nova com ele; o histórico continua.
       </p>
       <div className="overflow-x-auto rounded-2xl border border-border bg-card">
         <table className="w-full text-sm">
@@ -170,12 +173,16 @@ function AbaAcessos({ pessoaId }: { pessoaId?: string }) {
             <tr className="border-b border-border text-left text-muted-foreground">
               <th className="p-3 font-medium">Agente</th>
               {areas.map((a) => <th key={a.id} className="p-3 text-center font-medium">{a.nome}</th>)}
+              <th className="p-3 text-center font-medium">No catálogo</th>
             </tr>
           </thead>
           <tbody>
             {(agentes ?? []).map((ag) => (
               <tr key={ag.id} className="border-b border-border last:border-0">
-                <td className="p-3 text-foreground">{ag.nome}</td>
+                <td className="p-3 text-foreground">
+                  {ag.nome}
+                  {ag.arquivado && <span className="ml-2 text-xs text-muted-foreground">arquivado</span>}
+                </td>
                 {areas.map((a) => {
                   const dono = ag.espaco_id === a.id;
                   const ligado = liberado.has(`${ag.id}|${a.id}`);
@@ -190,6 +197,11 @@ function AbaAcessos({ pessoaId }: { pessoaId?: string }) {
                     </td>
                   );
                 })}
+                <td className="p-3 text-center">
+                  <Button size="sm" variant="outline" onClick={() => arquivarAgente(ag.id, !ag.arquivado, ag.nome)}>
+                    {ag.arquivado ? 'Devolver' : 'Arquivar'}
+                  </Button>
+                </td>
               </tr>
             ))}
           </tbody>
