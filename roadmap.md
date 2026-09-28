@@ -17,7 +17,8 @@ Plano aprovado em .lovable/plan/trazer-o-cupolaos-agência-de-marketing-para-den
   - Antes de publicar:
     - [ ] Backup do banco de produção (ou confirmar com o Lovable como restaurar).
     - [ ] Revisar tudo o que vai junto da consultoria desde a última publicação (ex.: `20260921133924` restringe quem abre conversa no chat a quem tem papel; funções da consultoria que usam `_shared/ai-usage.ts`) e avisar o time do que muda.
-    - [ ] Decidir a carga de dados da agência: `20260925220100_agencia_dados_pos_carga.sql` insere o dump **antigo** com `on conflict do nothing` e bloquearia os dados novos do dia da virada. Recomendado: retirar essa migration antes de publicar e fazer uma carga única, completa, no dia (Etapa 1b), carregando à mão a linha grande de `blog_experimentos`.
+    - [feito 28/09] Carga de dados da agência: **carga única e completa no dia da virada** (Etapa 1b). `20260925220100_agencia_dados_pos_carga.sql` foi esvaziada (não levar o dump antigo para produção). A carga do dia precisa **sobrescrever** (upsert, `on conflict ... do update`) as tabelas que as migrations de 18/09 já semeiam (espacos, squads, pessoas, pessoa_squads, agentes, acessos, fontes_mercado, produtos, contexto_camadas), senão ficam as versões do seed; a linha grande de `blog_experimentos` vai à mão.
+    - [feito 28/09] `20260919161446` gravava a ficha do Dioner com o id de login do Teste (falharia em produção, onde o id é outro); agora procura o login pelo e-mail.
     - [ ] Ensaio geral no Teste: carga de um dump novo, conferência da contagem de **todas** as tabelas com dados, teste das funções de IA.
   - Na virada:
     - [ ] Congelar o CupolaOS original (ninguém grava mais lá) e exportar o dump.
