@@ -238,23 +238,120 @@ export function lerFeed(xml) {
   };
 }
 
+// ----------------------------------------------------------- travas de busca
+// O endereço do feed é cadastrado por gente (quem tem acesso ao Mercado). Sem
+// travas, o servidor vira ponte para qualquer lugar: rede interna, metadados da
+// nuvem, arquivo sem fim. Não copiado do original — é a sugestão #6 da análise
+// de segurança do CupolaOS.
+const PRAZO_MS = 15_000;
+const TETO_BYTES = 5 * 1024 * 1024;
+const MAX_REDIRECIONAMENTOS = 3;
+
+function recusar(mensagem, status = 422) {
+  const e = new Error(mensagem);
+  e.status = status;
+  return e;
+}
+
+/** IPv4 de rede interna, loopback, link-local (metadados da nuvem) ou reservado. */
+function ipv4Interno(host) {
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  if (!m) return false;
+  const [a, b] = [Number(m[1]), Number(m[2])];
+  return a === 0 || a === 10 || a === 127 || a >= 224 ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168);
+}
+
+/** Recusa endereço que não seja http(s) público. Conferido a cada redirecionamento. */
+function conferirEndereco(bruto) {
+  let url;
+  try {
+    url = new URL(bruto);
+  } catch {
+    throw recusar("Endereço de feed inválido.");
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw recusar("O feed precisa começar com http:// ou https://.");
+  }
+  const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  const interno = host === "localhost" || host.endsWith(".localhost") ||
+    host.endsWith(".local") || host.endsWith(".internal") || !host.includes(".") && !host.includes(":") ||
+    ipv4Interno(host) ||
+    // IPv6: loopback, não especificado, local única (fc00::/7), link-local (fe80::/10), IPv4 mapeado.
+    host === "::1" || host === "::" || /^f[cd][0-9a-f]{0,2}:/.test(host) || /^fe[89ab][0-9a-f]?:/.test(host) ||
+    host.startsWith("::ffff:");
+  if (interno) throw recusar("Este endereço não é de um site público.");
+  return url;
+}
+
+/** Lê o corpo até o teto; passou disso, para no meio e recusa. */
+async function lerComTeto(resposta) {
+  const tamanho = Number(resposta.headers.get("content-length") ?? 0);
+  if (tamanho > TETO_BYTES) throw recusar("O feed é grande demais (mais de 5 MB).", 413);
+  const leitor = resposta.body?.getReader();
+  if (!leitor) return new Uint8Array();
+  const partes = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await leitor.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > TETO_BYTES) {
+      await leitor.cancel().catch(() => {});
+      throw recusar("O feed é grande demais (mais de 5 MB).", 413);
+    }
+    partes.push(value);
+  }
+  const bytes = new Uint8Array(total);
+  let pos = 0;
+  for (const p of partes) {
+    bytes.set(p, pos);
+    pos += p.byteLength;
+  }
+  return bytes;
+}
+
 /** Busca o feed e lê. Peça de servidor: o navegador não alcança outro site. */
 export async function buscarFeed(url) {
-  const resposta = await fetch(url, {
-    headers: {
-      // Alguns feeds recusam cliente sem cara de navegador, e o accept evita
-      // que o site devolva a página HTML no lugar do XML.
-      "user-agent": "Mozilla/5.0 (compatible; CupolaOS/1.0; +https://cupola-os.pages.dev)",
-      accept: "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
-    },
-  });
+  const prazo = AbortSignal.timeout(PRAZO_MS);
+  let destino = conferirEndereco(url);
+  let resposta;
+  // Redirecionamento seguido à mão: cada destino passa pela mesma conferência.
+  for (let saltos = 0; ; saltos += 1) {
+    try {
+      resposta = await fetch(destino, {
+        redirect: "manual",
+        signal: prazo,
+        headers: {
+          // Alguns feeds recusam cliente sem cara de navegador, e o accept evita
+          // que o site devolva a página HTML no lugar do XML.
+          "user-agent": "Mozilla/5.0 (compatible; CupolaOS/1.0; +https://cupola-os.pages.dev)",
+          accept: "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
+        },
+      });
+    } catch (e) {
+      if (e?.name === "TimeoutError" || e?.name === "AbortError") {
+        throw recusar("O feed demorou mais de 15 segundos para responder.", 504);
+      }
+      throw recusar("Não consegui alcançar o endereço do feed.", 502);
+    }
+    const proximo = resposta.headers.get("location");
+    if (resposta.status < 300 || resposta.status >= 400 || !proximo) break;
+    await resposta.body?.cancel().catch(() => {});
+    if (saltos >= MAX_REDIRECIONAMENTOS) throw recusar("O feed redireciona vezes demais.", 502);
+    destino = conferirEndereco(new URL(proximo, destino).toString());
+  }
   if (!resposta.ok) {
+    await resposta.body?.cancel().catch(() => {});
     const e = new Error(`O feed respondeu ${resposta.status}.`);
     e.status = resposta.status === 404 ? 404 : 502;
     throw e;
   }
   const texto = decodificar(
-    await resposta.arrayBuffer(),
+    await lerComTeto(resposta),
     resposta.headers.get("content-type") ?? "",
   );
   if (!/<(rss|feed|rdf:RDF)\b/i.test(texto)) {

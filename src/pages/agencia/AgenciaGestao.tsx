@@ -496,8 +496,8 @@ function AbaMetricas() {
     for (const u of uso ?? []) {
       const k = chave(u);
       const x = m.get(k) ?? { n: 0, custo: 0 };
-      x.n++;
-      x.custo += Number(u.custo ?? 0);
+      x.n += u.chamadas;
+      x.custo += u.custo;
       m.set(k, x);
     }
     return [...m.entries()].sort((a, b) => b[1].custo - a[1].custo)
@@ -505,7 +505,8 @@ function AbaMetricas() {
   };
   const nomeCliente = (id: string | null) => clientes?.find((c) => c.id === id)?.nome ?? 'Sem cliente';
   const nomeAgente = (id: string | null) => agentes?.find((a) => a.id === id || a.slug === id)?.nome ?? id ?? 'Outros';
-  const custo = (uso ?? []).reduce((s, u) => s + Number(u.custo ?? 0), 0);
+  const custo = (uso ?? []).reduce((s, u) => s + u.custo, 0);
+  const chamadas = (uso ?? []).reduce((s, u) => s + u.chamadas, 0);
   const agentesUsados = new Set((sessoes ?? []).map((s) => s.agente_id).filter(Boolean)).size;
 
   return (
@@ -525,7 +526,7 @@ function AbaMetricas() {
         <>
           <div className="grid gap-4 md:grid-cols-4">
             <Numero rotulo="Custo de IA" valor={dolar(custo)} />
-            <Numero rotulo="Chamadas de IA" valor={uso?.length ?? 0} />
+            <Numero rotulo="Chamadas de IA" valor={chamadas} />
             <Numero rotulo="Conversas ativas" valor={sessoes?.length ?? 0} />
             <Numero rotulo="Agentes usados" valor={agentesUsados} />
           </div>

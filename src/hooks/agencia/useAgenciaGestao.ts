@@ -18,14 +18,13 @@ export interface EventoAuditoria {
   detalhe: string | null;
   negado: boolean | null;
 }
+/** Uso de IA no período, já somado por agente × conta × modelo. */
 export interface UsoIa {
-  quando: string;
-  custo: number | null;
   agente: string | null;
   cliente_id: string | null;
   modelo: string | null;
-  entrada: number | null;
-  saida: number | null;
+  chamadas: number;
+  custo: number;
 }
 
 /** Grava um evento no registro da agência. Falha de registro não trava a ação. */
@@ -83,13 +82,10 @@ export function useUsoIa(desde: string) {
   return useQuery({
     queryKey: ['agencia', 'gestao', 'uso', desde],
     queryFn: async () => {
-      const { data, error } = await agencia()
-        .from('uso_de_ia')
-        .select('quando, custo, agente, cliente_id, modelo, entrada, saida')
-        .gte('quando', desde)
-        .limit(5000);
+      // Histórico importado do CupolaOS + uso deste sistema (public.ai_usage_logs), pela função do banco.
+      const { data, error } = await agencia().rpc('uso_ia_desde', { p_desde: desde });
       if (error) throw error;
-      return (data ?? []) as UsoIa[];
+      return ((data ?? []) as UsoIa[]).map((u) => ({ ...u, chamadas: Number(u.chamadas), custo: Number(u.custo ?? 0) }));
     },
   });
 }
