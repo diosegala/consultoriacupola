@@ -12,19 +12,19 @@ Plano aprovado em .lovable/plan/trazer-o-cupolaos-agência-de-marketing-para-den
 - [feito 25/09] Endurecimento (antes da Fase 5): edge functions `agencia-*` falam com o banco como a pessoa (`_shared/agencia.ts`), então a RLS copiada do CupolaOS volta a valer (conta por `pode_ver_cliente`, sessão só do dono, agente por espaço); mercado exige acesso a `mercado`; migration `20260925200000_endurecimento_agencia.sql` (sem autocadastro de ficha, sem entrar sozinho em squad, ligação de login só @cupola.com.br, religar login ao corrigir e-mail, colunas de ai_usage_logs, buckets); guarda `RotaAgencia` em /agencia/*. [feito 28/09] teto de gasto de IA (ver Etapa 9); avisos do sistema sem escrita direta; auditoria passou a aceitar as ações da Gestão (eram recusadas em silêncio). CORS `*` mantido de propósito (autenticação por token, sem cookie). [feito 28/09] leitor de feeds com travas (só http(s), sem endereço interno nem em redirecionamento, 15 s, 5 MB); sem leitura anônima de `agencia.espacos`/`agencia.squads`. Falta (usuário, no painel): incluir `agencia` em Exposed schemas (hoje só via `ALTER ROLE ... pgrst.db_schemas`).
 - [feito 28/09] Correções: conversa com os agentes nunca tinha funcionado no porte (embed `espacos(nome)` ambíguo → "Agente não encontrado"); chamadas por `fetch` a edge functions usavam `VITE_SUPABASE_*`, vazio no build do Lovable desde que o `.env` saiu do git (conversa, arte das Redes e questionário público da consultoria) — agora `src/lib/supabaseFuncoes.ts`
 - [decisão 28/09] Tudo o que falta da paridade (etapas 4, 6, 9 custos, 10, 11, Meu dia/Jornada, recursos da conversa, telas da Gestão não portadas, integrações Drive e RunRun.it) entra **antes** da virada.
-- [ ] Fase 5 — Validação com Giuliano e publicação (corte). A consultoria está em produção e em uso há meses: a publicação não pode afetar nada dela.
-  - Ambientes: o Supabase `gujsesjqersadunthqwm` é o **Teste** do Lovable; a produção (Live) é gerenciada pelo Lovable e não aparece na conta Supabase. Na publicação, o Lovable aplica em produção **todas** as migrations pendentes — da agência e da consultoria.
-  - Antes de publicar:
-    - [ ] Backup do banco de produção (ou confirmar com o Lovable como restaurar).
-    - [ ] Revisar tudo o que vai junto da consultoria desde a última publicação (ex.: `20260921133924` restringe quem abre conversa no chat a quem tem papel; funções da consultoria que usam `_shared/ai-usage.ts`) e avisar o time do que muda.
-    - [decisão 28/09] Carga de dados da agência: a migration `20260925220100_agencia_dados_pos_carga.sql` fica como está (esvaziada e restaurada no mesmo dia). **Os dados do Teste não vão para produção na publicação**: a carga de 24/09 (30 tabelas) foi feita à mão no Teste e não está em migration, e o Lovable publica só a estrutura. Em produção, essa migration quase não grava nada, porque as contas ainda não existem lá. No dia da virada entra o dump completo do dia por **upsert** (`on conflict ... do update`): atualiza o que já existe (inclusive o que as migrations de 18/09 semeiam: espacos, squads, pessoas, pessoa_squads, agentes, acessos, fontes_mercado, produtos, contexto_camadas), insere o que é novo e não apaga nada. A linha grande de `blog_experimentos` vai à mão.
-    - [feito 28/09] `20260919161446` gravava a ficha do Dioner com o id de login do Teste (falharia em produção, onde o id é outro); agora procura o login pelo e-mail.
-    - [ ] Ensaio geral no Teste: carga de um dump novo, conferência da contagem de **todas** as tabelas com dados, teste das funções de IA.
+- [ ] Fase 5 — Validação com Giuliano e publicação (corte). A consultoria está em produção e em uso há meses: nada pode afetá-la.
+  - Ambiente: **um banco só** (Supabase `gujsesjqersadunthqwm`), usado pela consultoria em produção e pelo preview; a consultoria no schema `public`, a agência no `agencia`. Por isso:
+    - migrations aplicadas e funções do servidor (o Lovable republica as edge functions a cada push) **já valem para os consultores na hora**; publicar no Lovable só leva as **telas**;
+    - dados criados nos testes da agência ficam no banco que a equipe vai usar.
+  - Antes da virada:
+    - [ ] Backup do banco (ou confirmar com o Lovable/Supabase como restaurar).
+    - [ ] Revisar o que muda nas **telas** da consultoria na publicação (tudo o que foi commitado desde a última publicação) e avisar o time.
+    - [ ] Listar e limpar dados de teste da agência (sessões, posts, limites de IA, avisos) antes da carga.
+  - Carga de dados da agência [decisão 28/09]: os dados de 24/09 já estão no banco. Na virada, entra só o que é **novo ou mudou** no CupolaOS depois de 24/09, por **upsert** (`on conflict ... do update`), a partir do dump do dia; nada é apagado. A migration `20260925220100_agencia_dados_pos_carga.sql` fica como está. A linha grande de `blog_experimentos` já foi carregada. Conferir a contagem de **todas** as tabelas com dados.
   - Na virada:
     - [ ] Congelar o CupolaOS original (ninguém grava mais lá) e exportar o dump.
-    - [ ] Publicar em horário de pouco uso da consultoria.
-    - [ ] Conferir que o schema `agencia` responde pela API em produção (hoje só exposto via `ALTER ROLE authenticator set pgrst.db_schemas` na migration `20260918191016`; o "Exposed schemas" do painel vale só para o Teste). Se não responder, pedir ao Lovable para expor `agencia` (nunca `agencia_app`).
-    - [ ] Carga dos dados + os 2 arquivos que faltam no Storage; logins das 24 pessoas.
+    - [ ] Carga do que mudou + os 2 arquivos que faltam no Storage; logins das 24 pessoas.
+    - [ ] Publicar no Lovable em horário de pouco uso da consultoria.
     - [ ] Teste rápido da consultoria (login, dados de um consultor, chat) e da agência (conversa, uma função de geração, Gestão).
   - Tabelas novas depois de 30/10/2026 precisam de `GRANT` explícito na mesma migration (mudança do Supabase).
 
