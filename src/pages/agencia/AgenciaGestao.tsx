@@ -332,6 +332,7 @@ function AbaLimites() {
       <p className="max-w-3xl text-sm text-muted-foreground">
         Teto mensal de gasto com IA, em dólares, por área e por pessoa. <strong>Conversa</strong> é a conversa com os agentes;{' '}
         <strong>geração</strong> é o resto (blog, redes, news, ficha, recado falado, mercado). Sem limite, nada é barrado.
+        O gasto conta na área <strong>de quem usa</strong> (a da ficha da pessoa), não na do agente.
         Quando o gasto chega ao teto, aquela porta para até o mês virar; aos 80%, aparece um aviso aqui. Gasto de {mesExtenso}.
       </p>
 
