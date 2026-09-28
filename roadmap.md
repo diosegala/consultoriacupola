@@ -12,7 +12,20 @@ Plano aprovado em .lovable/plan/trazer-o-cupolaos-agência-de-marketing-para-den
 - [feito 25/09] Endurecimento (antes da Fase 5): edge functions `agencia-*` falam com o banco como a pessoa (`_shared/agencia.ts`), então a RLS copiada do CupolaOS volta a valer (conta por `pode_ver_cliente`, sessão só do dono, agente por espaço); mercado exige acesso a `mercado`; migration `20260925200000_endurecimento_agencia.sql` (sem autocadastro de ficha, sem entrar sozinho em squad, ligação de login só @cupola.com.br, religar login ao corrigir e-mail, colunas de ai_usage_logs, buckets); guarda `RotaAgencia` em /agencia/*. [feito 28/09] teto de gasto de IA (ver Etapa 9); avisos do sistema sem escrita direta; auditoria passou a aceitar as ações da Gestão (eram recusadas em silêncio). CORS `*` mantido de propósito (autenticação por token, sem cookie). [feito 28/09] leitor de feeds com travas (só http(s), sem endereço interno nem em redirecionamento, 15 s, 5 MB); sem leitura anônima de `agencia.espacos`/`agencia.squads`. Falta (usuário, no painel): incluir `agencia` em Exposed schemas (hoje só via `ALTER ROLE ... pgrst.db_schemas`).
 - [feito 28/09] Correções: conversa com os agentes nunca tinha funcionado no porte (embed `espacos(nome)` ambíguo → "Agente não encontrado"); chamadas por `fetch` a edge functions usavam `VITE_SUPABASE_*`, vazio no build do Lovable desde que o `.env` saiu do git (conversa, arte das Redes e questionário público da consultoria) — agora `src/lib/supabaseFuncoes.ts`
 - [decisão 28/09] Tudo o que falta da paridade (etapas 4, 6, 9 custos, 10, 11, Meu dia/Jornada, recursos da conversa, telas da Gestão não portadas, integrações Drive e RunRun.it) entra **antes** da virada.
-- [ ] Fase 5 — Validação com Giuliano e publicação (corte)
+- [ ] Fase 5 — Validação com Giuliano e publicação (corte). A consultoria está em produção e em uso há meses: a publicação não pode afetar nada dela.
+  - Ambientes: o Supabase `gujsesjqersadunthqwm` é o **Teste** do Lovable; a produção (Live) é gerenciada pelo Lovable e não aparece na conta Supabase. Na publicação, o Lovable aplica em produção **todas** as migrations pendentes — da agência e da consultoria.
+  - Antes de publicar:
+    - [ ] Backup do banco de produção (ou confirmar com o Lovable como restaurar).
+    - [ ] Revisar tudo o que vai junto da consultoria desde a última publicação (ex.: `20260921133924` restringe quem abre conversa no chat a quem tem papel; funções da consultoria que usam `_shared/ai-usage.ts`) e avisar o time do que muda.
+    - [ ] Decidir a carga de dados da agência: `20260925220100_agencia_dados_pos_carga.sql` insere o dump **antigo** com `on conflict do nothing` e bloquearia os dados novos do dia da virada. Recomendado: retirar essa migration antes de publicar e fazer uma carga única, completa, no dia (Etapa 1b), carregando à mão a linha grande de `blog_experimentos`.
+    - [ ] Ensaio geral no Teste: carga de um dump novo, conferência da contagem de **todas** as tabelas com dados, teste das funções de IA.
+  - Na virada:
+    - [ ] Congelar o CupolaOS original (ninguém grava mais lá) e exportar o dump.
+    - [ ] Publicar em horário de pouco uso da consultoria.
+    - [ ] Conferir que o schema `agencia` responde pela API em produção (hoje só exposto via `ALTER ROLE authenticator set pgrst.db_schemas` na migration `20260918191016`; o "Exposed schemas" do painel vale só para o Teste). Se não responder, pedir ao Lovable para expor `agencia` (nunca `agencia_app`).
+    - [ ] Carga dos dados + os 2 arquivos que faltam no Storage; logins das 24 pessoas.
+    - [ ] Teste rápido da consultoria (login, dados de um consultor, chat) e da agência (conversa, uma função de geração, Gestão).
+  - Tabelas novas depois de 30/10/2026 precisam de `GRANT` explícito na mesma migration (mudança do Supabase).
 
 ## Decisões registradas
 - Tudo da agência vive no schema `agencia` (isolamento total da consultoria).
