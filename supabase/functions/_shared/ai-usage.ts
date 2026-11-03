@@ -1,10 +1,7 @@
 // Helper compartilhado para registrar uso de IA na tabela ai_usage_logs.
-// Cada linha guarda a unidade de negócio (consultoria | agencia), o agente,
-// o cliente e a pessoa — é o que alimenta o painel de custos.
+// Cada linha guarda o agente, o cliente e o consultor — é o que alimenta o painel de custos.
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { CLAUDE_MODEL } from "./anthropic.ts";
-
-export type Unidade = "consultoria" | "agencia";
 
 export interface LogAiUsageParams {
   admin: SupabaseClient;
@@ -17,14 +14,6 @@ export interface LogAiUsageParams {
   user_id?: string | null;
   status?: "success" | "error";
   error_message?: string | null;
-  /** Unidade de negócio. Sem informar, é consultoria. */
-  unidade?: Unidade;
-  /** Slug do agente (agência), quando houver. */
-  agente_slug?: string | null;
-  /** Ids no schema agencia (texto, não uuid). */
-  agencia_cliente_id?: string | null;
-  agencia_pessoa_id?: string | null;
-  sessao_id?: string | null;
 }
 
 /** Dólares por milhão de tokens, por modelo. Conferir ao alterar. */
@@ -65,11 +54,6 @@ export async function logAiUsage(p: LogAiUsageParams): Promise<void> {
       user_id: p.user_id ?? null,
       status: p.status ?? "success",
       error_message: p.error_message ?? null,
-      unidade: p.unidade ?? "consultoria",
-      agente_slug: p.agente_slug ?? null,
-      agencia_cliente_id: p.agencia_cliente_id ?? null,
-      agencia_pessoa_id: p.agencia_pessoa_id ?? null,
-      sessao_id: p.sessao_id ?? null,
     });
     // O supabase-js devolve o erro em vez de lançar: sem isto, a falha passava calada.
     if (error) console.warn("[ai-usage] insert falhou:", error);

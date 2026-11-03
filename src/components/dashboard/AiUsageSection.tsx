@@ -19,8 +19,7 @@ const AGENTE_LABEL: Record<string, string> = {
 
 export function AiUsageSection() {
   const [periodo, setPeriodo] = useState<'mes' | 'tudo'>('mes');
-  const [unidade, setUnidade] = useState<'todas' | 'consultoria' | 'agencia'>('todas');
-  const { data, isLoading } = useAiUsage(periodo, unidade);
+  const { data, isLoading } = useAiUsage(periodo);
 
   return (
     <Card className="bg-card border-border">
@@ -29,16 +28,6 @@ export function AiUsageSection() {
           <Sparkles className="h-5 w-5 text-primary" /> Custos de IA
         </CardTitle>
         <div className="flex items-center gap-2">
-        <Select value={unidade} onValueChange={(v) => setUnidade(v as typeof unidade)}>
-          <SelectTrigger className="w-[150px] h-8 bg-input border-border">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todas">Todas as unidades</SelectItem>
-            <SelectItem value="consultoria">Consultoria</SelectItem>
-            <SelectItem value="agencia">Agência</SelectItem>
-          </SelectContent>
-        </Select>
         <Select value={periodo} onValueChange={(v) => setPeriodo(v as 'mes' | 'tudo')}>
           <SelectTrigger className="w-[140px] h-8 bg-input border-border">
             <SelectValue />
@@ -68,23 +57,12 @@ export function AiUsageSection() {
 
             <Tabs defaultValue="cliente">
               <TabsList>
-                <TabsTrigger value="unidade">Por unidade</TabsTrigger>
                 <TabsTrigger value="cliente">Por cliente</TabsTrigger>
                 <TabsTrigger value="consultor">Por consultor</TabsTrigger>
                 <TabsTrigger value="agente">Por agente</TabsTrigger>
                 <TabsTrigger value="recentes">Últimas chamadas</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="unidade">
-                <RankingTable
-                  rows={data.porUnidade.map((u) => ({
-                    label: u.unidade === 'agencia' ? 'Agência' : 'Consultoria',
-                    calls: u.calls,
-                    cost: u.cost_usd,
-                  }))}
-                  colLabel="Unidade"
-                />
-              </TabsContent>
               <TabsContent value="cliente">
                 <RankingTable
                   rows={data.porCliente.map((c) => ({ label: c.nome, calls: c.calls, cost: c.cost_usd }))}

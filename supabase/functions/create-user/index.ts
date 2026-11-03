@@ -60,8 +60,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (role !== "consultor" && role !== "director" && role !== "agencia") {
-      return new Response(JSON.stringify({ error: "Papel inválido. Use 'consultor', 'director' ou 'agencia'." }), {
+    if (role !== "consultor" && role !== "director") {
+      return new Response(JSON.stringify({ error: "Papel inválido. Use 'consultor' ou 'director'." }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -134,32 +134,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Quem entra pela agência já tem ficha em agencia.pessoas: liga o login à ficha
-    // pelo e-mail, para a pessoa enxergar a seção Agência no primeiro acesso.
-    let fichaAgenciaVinculada = false;
-    if (role === "agencia") {
-      const { data: ficha } = await adminClient
-        .schema("agencia")
-        .from("pessoas")
-        .select("id, auth_id")
-        // ilike sem curingas: `_` e `%` no e-mail não podem casar com outra ficha.
-        .ilike("email", email.replace(/[\\%_]/g, (c: string) => `\\${c}`))
-        .maybeSingle();
-      if (ficha && !ficha.auth_id) {
-        // Só liga o login; ficha desligada continua desligada (reativar é pela gestão do time).
-        const { error: linkErr } = await adminClient
-          .schema("agencia")
-          .from("pessoas")
-          .update({ auth_id: userId })
-          .eq("id", ficha.id);
-        fichaAgenciaVinculada = !linkErr;
-      } else if (ficha?.auth_id === userId) {
-        fichaAgenciaVinculada = true;
-      }
-    }
-
     return new Response(
-      JSON.stringify({ success: true, user_id: userId, ficha_agencia: fichaAgenciaVinculada }),
+      JSON.stringify({ success: true, user_id: userId }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {

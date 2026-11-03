@@ -30,7 +30,6 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChatBadge } from '@/components/chat/useChatBadge';
-import { useTemAcessoAgencia } from '@/hooks/agencia/useAgencia';
 import cupolaLogo from '@/design-system/design-system-hub-ba3841/assets/cupola-logo.svg.asset.json';
 import cupolaIcon from '@/assets/cupola-icon.png';
 import { Button } from '@/components/ui/button';
@@ -55,20 +54,6 @@ const adminMenuItems = [
   { to: '/configuracoes', icon: Settings, label: 'Configurações' },
 ];
 
-const agenciaMenuItems = [
-  { to: '/agencia', icon: Home, label: 'Início', exato: true },
-  { to: '/agencia/contas', icon: Building2, label: 'Clientes' },
-  { to: '/agencia/projetos', icon: FolderKanban, label: 'Projetos' },
-  { to: '/agencia/agentes', icon: Bot, label: 'Agentes' },
-  { to: '/agencia/skills', icon: Wand2, label: 'Skills' },
-  { to: '/agencia/sessoes', icon: History, label: 'Sessões' },
-  { to: '/agencia/produtos', icon: Package, label: 'Produtos' },
-  { to: '/agencia/redes', icon: CalendarDays, label: 'Redes do mês' },
-  { to: '/agencia/mercado', icon: Newspaper, label: 'Mercado' },
-  { to: '/agencia/equipe', icon: Users, label: 'Time' },
-  { to: '/agencia/gestao', icon: ShieldCheck, label: 'Gestão' },
-];
-
 const consultorMenuItems = [
   { to: '/meu-painel', icon: LayoutDashboard, label: 'Meu Painel' },
   { to: '/clientes', icon: Users, label: 'Meus Clientes' },
@@ -85,17 +70,11 @@ const consultorMenuItems = [
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
-  const { signOut, user, isConsultor, isAgencia } = useAuth();
+  const { signOut, user, isConsultor } = useAuth();
   const location = useLocation();
   const { total: chatNaoLidas } = useChatBadge();
 
-  const menuItems = isAgencia
-    ? [{ to: '/mensagens', icon: MessageSquare, label: 'Mensagens' }]
-    : isConsultor
-      ? consultorMenuItems
-      : adminMenuItems;
-  const { temAcesso: temAgenciaFicha } = useTemAcessoAgencia();
-  const temAgencia = isAgencia || temAgenciaFicha;
+  const menuItems = isConsultor ? consultorMenuItems : adminMenuItems;
 
   return (
     <aside 
@@ -153,34 +132,6 @@ export function Sidebar() {
           );
         })}
 
-        {temAgencia && (
-          <div className="pt-4 mt-2 border-t border-sidebar-border space-y-1">
-            {!collapsed && (
-              <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Agência
-              </p>
-            )}
-            {agenciaMenuItems.map((item) => {
-              const isActive = (item as { exato?: boolean }).exato ? location.pathname === item.to : location.pathname.startsWith(item.to);
-              return (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  className={cn(
-                    "flex items-center gap-3 px-3 py-2 rounded-md transition-colors",
-                    isActive
-                      ? "bg-primary text-primary-foreground"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent",
-                    collapsed && "justify-center"
-                  )}
-                >
-                  <item.icon className="h-5 w-5 flex-shrink-0" />
-                  {!collapsed && <span>{item.label}</span>}
-                </NavLink>
-              );
-            })}
-          </div>
-        )}
       </nav>
 
       {/* User section */}

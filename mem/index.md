@@ -24,7 +24,6 @@ System-only notifications (no emails). No data/report exports. Hard deletes use 
 - [Contract Detail Interaction](mem://ui/contract-detail-interaction) — Modal with inline edit instead of redirect
 
 ### Clients & Contracts
-- [Permissões da Agência](mem://features/agencia-permissoes-funcionalidade) — Escrita em contas/pessoas/agentes vem de acessos_funcionalidade; admins e gestores ajustados em 22/09/2026
 - [Client Detail Structure](mem://features/client-detail-structure) — Tabs: Contrato, Onboarding, Atendimento, Ferramentas
 - [Client Management Rules](mem://features/client-management-rules) — Auto status transitions (New -> Active -> Closed)
 - [Contracts Consolidated View](mem://features/contracts-consolidated-view) — Global grid for active/inactive contracts
@@ -63,16 +62,13 @@ System-only notifications (no emails). No data/report exports. Hard deletes use 
 - [AI Agent Management](mem://features/ai-agent-management) — Admin config for prompts, ref docs, Gemini/GPT-4o
 - [AI Engine Integration](mem://technical/ai-engine-integration) — Gemini fallback logic + GPT-4o secret handling
 
-- [Produção visual de redes](mem://features/producao-visual-redes) — Imagem com aprovação, editor, versões e exportação 4:5, 1:1 e 9:16
 
 ### Auth & Integrations
 - [RBAC Roles Access](mem://auth/rbac-roles-access) — Admin/director vs consultant access rules
-- [Acesso Agência](mem://auth/acesso-agencia) — Papel `agencia`: só telas da Agência + chat; ligação automática com `agencia.pessoas`
 - [User Management UI](mem://auth/user-management-ui) — Admin mapping auth -> consultant with temp passwords
 - [Password Management](mem://auth/password-management) — Reset via /reset-password
 - [Onboarding Security](mem://auth/onboarding-security) — force_password_change flag on first login
 - [Edge Functions Security](mem://technical/edge-functions-security) — Admin RLS + Zod on critical functions
 - [Pipedrive Webhook Automation](mem://integrations/pipedrive-webhook-automation) — Auto-creates client/contract on Deal Won
 - [Pipedrive Webhook Security](mem://integrations/pipedrive-webhook-security) — HTTP Basic Auth + Zod
-- [Integrações pelo admin](mem://integrations/integracoes-pelo-admin) — Firecrawl, RunRun.it e Drive da agência conectados na tela, nunca por conector do Lovable
 - [Pipedrive V2 Compatibility](mem://integrations/pipedrive-v2-compatibility) — Handles 'data'/'current' and 'change'->'won' mappings

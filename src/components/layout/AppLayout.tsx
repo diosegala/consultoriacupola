@@ -42,13 +42,6 @@ export function AppLayout() {
 
   const currentPath = location.pathname;
 
-  // Acesso "Agência": só as telas da Agência e o chat interno
-  if (userRole === 'agencia') {
-    const permitido = currentPath.startsWith('/agencia') || currentPath.startsWith('/mensagens');
-    if (!permitido) {
-      return <Navigate to="/agencia/contas" replace />;
-    }
-  }
 
   // Consultors accessing restricted routes get redirected to /projetos
   const isConsultor = userRole === 'consultor';
