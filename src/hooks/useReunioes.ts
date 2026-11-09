@@ -56,12 +56,21 @@ export function useReunioesDriveIds() {
     queryKey: ['reunioes', 'drive-ids'],
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('reunioes_importadas_log' as any)
-        .select(sel('reuniao_id'))
-        .not('reuniao_id', 'is', null);
-      if (error) throw error;
-      return new Set(((data || []) as any[]).map((l) => l.reuniao_id as string));
+      const ids = new Set<string>();
+      const pageSize = 1000;
+      for (let from = 0; ; from += pageSize) {
+        const { data, error } = await supabase
+          .from('reunioes_importadas_log' as any)
+          .select(sel('reuniao_id'))
+          .not('reuniao_id', 'is', null)
+          .order('id')
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        const rows = (data || []) as any[];
+        rows.forEach((l) => ids.add(l.reuniao_id as string));
+        if (rows.length < pageSize) break;
+      }
+      return ids;
     },
   });
 }
@@ -185,40 +194,39 @@ export function useReunioesPendentesIds(consultorId?: string | null) {
 }
 
 /** Paginated listing (50 per page) with optional origem filter. */
-export function useAllReunioes(opts: { origem?: 'all' | 'drive' | 'manual' } = {}) {
-  const { origem = 'all' } = opts;
-  const { data: driveIds, isLoading: loadingIds } = useReunioesDriveIds();
-  const needsIds = origem !== 'all';
+/**
+ * Lista paginada de todas as reuniões. O filtro por origem (Drive/manual) é feito na tela:
+ * mandar centenas de ids na URL estourava o limite e a consulta voltava vazia.
+ */
+interface PaginaReunioes {
+  raw: number;
+  rows: ReuniaoResumo[];
+}
+
+export function useAllReunioes() {
+  const { data: driveIds } = useReunioesDriveIds();
 
   return useInfiniteQuery({
-    queryKey: ['reunioes', 'all', origem, driveIds ? driveIds.size : null],
-    enabled: !needsIds || !loadingIds,
+    queryKey: ['reunioes', 'all', driveIds ? driveIds.size : null],
+    enabled: !!driveIds,
     initialPageParam: 0,
-    getNextPageParam: (lastPage: ReuniaoResumo[], allPages) =>
-      lastPage.length < REUNIOES_PAGE_SIZE ? undefined : allPages.length,
+    getNextPageParam: (lastPage: PaginaReunioes, allPages) =>
+      lastPage.raw < REUNIOES_PAGE_SIZE ? undefined : allPages.length,
     queryFn: async ({ pageParam }) => {
       const page = pageParam as number;
       const from = page * REUNIOES_PAGE_SIZE;
       const to = from + REUNIOES_PAGE_SIZE - 1;
-      const ids = driveIds ? Array.from(driveIds) : [];
 
-      let q = supabase
+      const { data, error } = await supabase
         .from('reunioes')
         .select(sel(LIST_COLS))
         .order('data_reuniao', { ascending: false })
         .order('id', { ascending: false })
-        .range(from, to);
-
-      if (origem === 'drive') {
-        if (!ids.length) return [] as ReuniaoResumo[];
-        q = q.in('id', ids);
-      } else if (origem === 'manual' && ids.length) {
-        q = q.not('id', 'in', `(${ids.join(',')})`);
-      }
-
-      const { data, error } = await q.returns<ReuniaoResumo[]>();
+        .range(from, to)
+        .returns<ReuniaoResumo[]>();
       if (error) throw error;
-      return withOrigem(data || [], driveIds);
+      const rows = data || [];
+      return { raw: rows.length, rows: withOrigem(rows, driveIds) } as PaginaReunioes;
     },
   });
 }

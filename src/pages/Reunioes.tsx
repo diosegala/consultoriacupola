@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -31,10 +31,10 @@ async function runQueue<T>(items: T[], limit: number, worker: (item: T) => Promi
 export default function Reunioes() {
   const { isAdmin, loading } = useAuth();
   const { toast } = useToast();
-  const [origem, setOrigem] = useState<'all' | 'drive' | 'manual'>('drive');
+  const [origem, setOrigem] = useState<'all' | 'drive' | 'manual'>('all');
   const { data: myConsultorId } = useMyConsultorId();
 
-  const allQuery = useAllReunioes({ origem });
+  const allQuery = useAllReunioes();
   const consultorQuery = useReunioesByConsultor(isAdmin ? undefined : myConsultorId ?? undefined);
 
   const scopedConsultorId = isAdmin ? null : myConsultorId ?? null;
@@ -42,11 +42,23 @@ export default function Reunioes() {
   const { data: pendentesIds } = useReunioesPendentesIds(scopedConsultorId);
 
   const reunioes = useMemo(() => {
-    if (isAdmin) return allQuery.data?.pages.flat() ?? [];
+    if (isAdmin) {
+      const todas = allQuery.data?.pages.flatMap((p) => p.rows) ?? [];
+      return origem === 'all' ? todas : todas.filter((r) => r.origem === origem);
+    }
     return consultorQuery.data ?? [];
-  }, [isAdmin, allQuery.data, consultorQuery.data]);
+  }, [isAdmin, origem, allQuery.data, consultorQuery.data]);
 
-  const isLoading = isAdmin ? allQuery.isLoading : consultorQuery.isLoading;
+  // Com filtro de origem, a página pode vir sem nenhuma reunião do tipo escolhido:
+  // continua buscando até aparecer algo (ou acabar).
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = allQuery;
+  useEffect(() => {
+    if (isAdmin && origem !== 'all' && reunioes.length < 50 && hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [isAdmin, origem, reunioes.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  const isLoading = isAdmin ? allQuery.isLoading || (origem !== 'all' && reunioes.length < 50 && !!hasNextPage) : consultorQuery.isLoading;
 
   const analisar = useAnalisarReuniao();
   const [analisandoLote, setAnalisandoLote] = useState(false);
