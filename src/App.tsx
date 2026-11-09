@@ -25,6 +25,7 @@ import Reunioes from "./pages/Reunioes";
 import GoogleCallback from "./pages/GoogleCallback";
 import NotFound from "./pages/NotFound";
 import QuestionarioPublico from "./pages/QuestionarioPublico";
+import QuestionarioPreenchimento from "./pages/QuestionarioPreenchimento";
 import Agenda from "./pages/Agenda";
 import Oraculo from "./pages/Oraculo";
 import OraculoBase from "./pages/OraculoBase";
@@ -69,6 +70,7 @@ const App = () => (
               <Route path="/clientes" element={<Clientes />} />
               <Route path="/clientes/novo" element={<ClienteNovo />} />
               <Route path="/clientes/:id" element={<ClienteDetalhe />} />
+              <Route path="/clientes/:id/questionario" element={<QuestionarioPreenchimento />} />
               <Route path="/contratos" element={<Contratos />} />
               <Route path="/consultores" element={<Consultores />} />
               <Route path="/consultores/:id" element={<ConsultorDetalhe />} />

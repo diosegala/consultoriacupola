@@ -31,7 +31,7 @@ serve(async (req) => {
 
     const { data: questionarios } = await admin
       .from("questionarios")
-      .select("cliente_id, respostas, status")
+      .select("cliente_id, respostas, status, template_id")
       .in("status", ["respondido", "finalizado", "concluido"]);
 
     let reunioesQuery = admin
@@ -57,8 +57,29 @@ serve(async (req) => {
       .from("clientes")
       .select("id, nome, contratos(tipos_consultoria(nome))");
 
+    // As respostas são guardadas por id de pergunta; o modelo precisa ler o texto da pergunta.
+    const templateIds = [...new Set((questionarios || []).map((q: any) => q.template_id).filter(Boolean))];
+    const { data: templates } = templateIds.length
+      ? await admin.from("questionarios_template").select("id, estrutura").in("id", templateIds)
+      : { data: [] as any[] };
+    const rotulos = new Map<string, Map<string, string>>();
+    for (const t of templates || []) {
+      const m = new Map<string, string>();
+      for (const sec of (t as any).estrutura?.secoes ?? []) {
+        for (const p of sec.perguntas ?? []) m.set(p.id, `${sec.titulo} › ${p.codigo ? p.codigo + " " : ""}${p.label}`);
+      }
+      rotulos.set((t as any).id, m);
+    }
     const qMap = new Map<string, any>();
-    for (const q of questionarios || []) qMap.set(q.cliente_id, q.respostas);
+    for (const q of questionarios || []) {
+      const m = rotulos.get((q as any).template_id);
+      const respostas: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries((q.respostas as Record<string, unknown>) ?? {})) {
+        if (v === "" || v == null || (Array.isArray(v) && !v.length)) continue;
+        respostas[m?.get(k) ?? k] = v;
+      }
+      qMap.set(q.cliente_id, respostas);
+    }
 
     const diagSet = new Set((docs || []).map((d: any) => d.cliente_id));
     const clienteInfo = new Map<string, any>();

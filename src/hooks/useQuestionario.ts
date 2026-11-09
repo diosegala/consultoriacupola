@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import type { Estrutura } from '@/lib/questionario';
 
 export interface QuestionarioRow {
   id: string;
@@ -35,19 +36,101 @@ export function useQuestionarioCliente(clienteId?: string) {
   });
 }
 
-export function useTemplateAtivo() {
+export interface TemplateQuestionario {
+  id: string;
+  nome: string;
+  versao: number;
+  ativo: boolean;
+  segmento: string | null;
+  estrutura: Estrutura;
+}
+
+const COLUNAS_TEMPLATE = 'id, nome, versao, ativo, segmento, estrutura';
+
+/** Templates ativos (um por segmento: vendas, locação). */
+export function useTemplatesAtivos() {
   return useQuery({
-    queryKey: ['questionario-template-ativo'],
+    queryKey: ['questionario-templates-ativos'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('questionarios_template' as any)
-        .select('id, nome, estrutura, versao')
+        .select(COLUNAS_TEMPLATE)
         .eq('ativo', true)
-        .order('versao', { ascending: false })
-        .limit(1)
+        .not('segmento', 'is', null)
+        .order('nome');
+      if (error) throw error;
+      return (data ?? []) as unknown as TemplateQuestionario[];
+    },
+  });
+}
+
+/** Template usado por um questionário específico (mesmo que já tenha sido desativado). */
+export function useTemplateDoQuestionario(templateId?: string) {
+  return useQuery({
+    queryKey: ['questionario-template', templateId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('questionarios_template' as any)
+        .select(COLUNAS_TEMPLATE)
+        .eq('id', templateId!)
         .maybeSingle();
       if (error) throw error;
-      return data as any;
+      return data as unknown as TemplateQuestionario | null;
+    },
+    enabled: !!templateId,
+  });
+}
+
+/** Admin: salva a estrutura inteira de um template (perguntas, ativação, ordem). */
+export function useSalvarEstruturaTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ templateId, estrutura }: { templateId: string; estrutura: Estrutura }) => {
+      const { error } = await supabase
+        .from('questionarios_template' as any)
+        .update({ estrutura })
+        .eq('id', templateId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['questionario-templates-ativos'] });
+      qc.invalidateQueries({ queryKey: ['questionario-template'] });
+    },
+  });
+}
+
+/** Consultor/admin: grava as respostas direto (preenchimento em reunião). */
+export function useSalvarRespostas() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      respostas,
+      progresso_pct,
+      concluir,
+      statusAtual,
+    }: {
+      id: string;
+      respostas: Record<string, unknown>;
+      progresso_pct: number;
+      concluir?: boolean;
+      statusAtual: QuestionarioRow['status'];
+    }) => {
+      const agora = new Date().toISOString();
+      const update: Record<string, unknown> = {
+        respostas,
+        progresso_pct,
+        ultimo_salvamento_em: agora,
+        status: concluir || statusAtual === 'concluido' ? 'concluido' : 'em_andamento',
+      };
+      if (statusAtual === 'nao_iniciado') update.iniciado_em = agora;
+      if (concluir) update.concluido_em = agora;
+      const { error } = await supabase.from('questionarios' as any).update(update).eq('id', id);
+      if (error) throw error;
+      return agora;
+    },
+    onSuccess: (_d, v) => {
+      if (v.concluir) qc.invalidateQueries({ queryKey: ['questionario'] });
     },
   });
 }

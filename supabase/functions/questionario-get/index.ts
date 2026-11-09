@@ -39,10 +39,22 @@ Deno.serve(async (req) => {
       supabase.from("questionarios_template").select("nome, estrutura").eq("id", q.template_id).maybeSingle(),
     ]);
 
+    // Só perguntas ativas vão para o cliente; notas internas de revisão não saem daqui.
+    const estruturaAtiva = {
+      secoes: ((template?.estrutura as any)?.secoes ?? [])
+        .map((s: any) => ({
+          ...s,
+          perguntas: (s.perguntas ?? [])
+            .filter((p: any) => p.ativo !== false)
+            .map(({ nota_revisao: _n, ...p }: any) => p),
+        }))
+        .filter((s: any) => s.perguntas.length > 0),
+    };
+
     return json({
       cliente_nome: cliente?.nome ?? "",
       template_nome: template?.nome ?? "",
-      estrutura: template?.estrutura ?? { secoes: [] },
+      estrutura: estruturaAtiva,
       respostas: q.respostas ?? {},
       status: q.status,
       progresso_pct: q.progresso_pct,

@@ -19,7 +19,7 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 function computeProgress(estrutura: any, respostas: Record<string, unknown>) {
   const perguntas: any[] = [];
   for (const sec of estrutura?.secoes ?? []) {
-    for (const p of sec.perguntas ?? []) perguntas.push(p);
+    for (const p of sec.perguntas ?? []) if (p.ativo !== false) perguntas.push(p);
   }
   if (!perguntas.length) return { pct: 0, faltamObrigatorias: [] as string[] };
   let preenchidas = 0;
@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
 
     const { data: q, error } = await supabase
       .from("questionarios")
-      .select("id, status, template_id, cliente_id, expira_em")
+      .select("id, status, template_id, cliente_id, expira_em, respostas")
       .eq("token", body.token)
       .maybeSingle();
 
@@ -78,6 +78,15 @@ Deno.serve(async (req) => {
       } else {
         respostasLimpas[k] = v;
       }
+    }
+
+    // Respostas de perguntas que foram inativadas depois de respondidas não se perdem.
+    const inativas = new Set<string>();
+    for (const sec of (template?.estrutura as any)?.secoes ?? []) {
+      for (const p of sec.perguntas ?? []) if (p.ativo === false) inativas.add(p.id);
+    }
+    for (const [k, v] of Object.entries((q.respostas as Record<string, unknown>) ?? {})) {
+      if (inativas.has(k)) respostasLimpas[k] = v;
     }
 
     const { pct, faltamObrigatorias } = computeProgress(template?.estrutura, respostasLimpas);

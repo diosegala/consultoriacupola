@@ -14,16 +14,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Loader2, Copy, RefreshCw, Eye, ClipboardList, Sparkles } from 'lucide-react';
+import { Loader2, Copy, RefreshCw, Eye, ClipboardList, Sparkles, PencilLine } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
+import { Link } from 'react-router-dom';
 import {
   useQuestionarioCliente,
-  useTemplateAtivo,
+  useTemplatesAtivos,
+  useTemplateDoQuestionario,
   useCriarQuestionario,
   useRegenerarToken,
 } from '@/hooks/useQuestionario';
-import { Estrutura, isPreenchida } from '@/lib/questionario';
+import { Estrutura, isAtiva, isPreenchida, SEGMENTOS_QUESTIONARIO } from '@/lib/questionario';
 
 interface Props {
   clienteId: string;
@@ -43,20 +45,22 @@ function buildLink(token: string) {
 
 export function QuestionarioBloco({ clienteId, compact }: Props) {
   const { data: q, isLoading } = useQuestionarioCliente(clienteId);
-  const { data: template } = useTemplateAtivo();
+  const { data: templates = [] } = useTemplatesAtivos();
+  const { data: template } = useTemplateDoQuestionario(q?.template_id);
   const criar = useCriarQuestionario();
   const regenerar = useRegenerarToken();
   const [verAberto, setVerAberto] = useState(false);
   const [confirmRegen, setConfirmRegen] = useState(false);
 
-  const handleCriar = async () => {
-    if (!template?.id) {
-      toast.error('Nenhum template de questionário ativo');
+  const handleCriar = async (segmento: string) => {
+    const modelo = templates.find((t) => t.segmento === segmento);
+    if (!modelo) {
+      toast.error('Nenhum modelo de questionário ativo para este segmento');
       return;
     }
     try {
-      await criar.mutateAsync({ clienteId, templateId: template.id });
-      toast.success('Questionário criado. Compartilhe o link com o cliente.');
+      await criar.mutateAsync({ clienteId, templateId: modelo.id });
+      toast.success('Questionário criado. Preencha com o cliente na reunião de onboarding.');
     } catch (e: any) {
       toast.error(e.message ?? 'Erro ao criar questionário');
     }
@@ -88,12 +92,21 @@ export function QuestionarioBloco({ clienteId, compact }: Props) {
         </CardHeader>
         <CardContent className="text-center space-y-3">
           <p className="text-muted-foreground text-sm">
-            Gere um link único para o cliente preencher o questionário de pré-onboarding.
+            Questionário de pré-onboarding, preenchido pelo consultor junto com o cliente na reunião online.
+            Escolha o segmento da imobiliária:
           </p>
-          <Button onClick={handleCriar} disabled={criar.isPending || !template}>
-            {criar.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Gerar questionário
-          </Button>
+          <div className="flex flex-wrap justify-center gap-2">
+            {SEGMENTOS_QUESTIONARIO.map((seg) => (
+              <Button
+                key={seg.id}
+                onClick={() => handleCriar(seg.id)}
+                disabled={criar.isPending || !templates.some((t) => t.segmento === seg.id)}
+              >
+                {criar.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Questionário de {seg.label}
+              </Button>
+            ))}
+          </div>
         </CardContent>
       </Card>
     );
@@ -103,7 +116,7 @@ export function QuestionarioBloco({ clienteId, compact }: Props) {
     <>
       <div className="rounded-md border border-primary/30 bg-primary/5 text-primary px-3 py-2 mb-3 text-xs flex items-center gap-2">
         <Sparkles className="h-3.5 w-3.5 shrink-0" />
-        As respostas deste questionário serão utilizadas automaticamente pelo agente de diagnóstico.
+        As respostas deste questionário serão utilizadas automaticamente pelos agentes de mapeamento e diagnóstico.
       </div>
       <Card className="bg-card border-border">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
@@ -134,6 +147,12 @@ export function QuestionarioBloco({ clienteId, compact }: Props) {
           )}
 
           <div className="flex flex-wrap gap-2">
+            <Button size="sm" asChild>
+              <Link to={`/clientes/${clienteId}/questionario`}>
+                <PencilLine className="h-3.5 w-3.5 mr-1.5" />
+                {q.status === 'nao_iniciado' ? 'Preencher com o cliente' : q.status === 'concluido' ? 'Abrir questionário' : 'Continuar preenchimento'}
+              </Link>
+            </Button>
             {q.status !== 'concluido' && (
               <Button size="sm" variant="outline" onClick={handleCopy}>
                 <Copy className="h-3.5 w-3.5 mr-1.5" /> Copiar link
@@ -192,11 +211,15 @@ export function QuestionarioBloco({ clienteId, compact }: Props) {
 function RespostasView({ estrutura, respostas }: { estrutura: Estrutura; respostas: Record<string, unknown> }) {
   return (
     <div className="space-y-6">
-      {estrutura.secoes.map((sec) => (
+      {estrutura.secoes.map((sec) => {
+        // Perguntas inativadas só aparecem se já tinham resposta.
+        const visiveis = sec.perguntas.filter((p) => isAtiva(p) || isPreenchida(p, respostas[p.id]));
+        if (!visiveis.length) return null;
+        return (
         <div key={sec.id} className="space-y-3">
           <h3 className="font-semibold text-foreground border-b border-border pb-1">{sec.titulo}</h3>
           <dl className="space-y-3">
-            {sec.perguntas.map((p) => {
+            {visiveis.map((p) => {
               const v = respostas[p.id];
               const preenchida = isPreenchida(p, v);
               return (
@@ -212,7 +235,8 @@ function RespostasView({ estrutura, respostas }: { estrutura: Estrutura; respost
             })}
           </dl>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

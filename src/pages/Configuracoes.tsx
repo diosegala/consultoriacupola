@@ -38,6 +38,7 @@ import { PoliticaRiscoChurnCard } from '@/components/configuracoes/PoliticaRisco
 import { DiretrizesAgentesCard } from '@/components/configuracoes/DiretrizesAgentesCard';
 import { useMyConsultorId } from '@/hooks/useDisc';
 import { AcessosLogCard } from '@/components/configuracoes/AcessosLogCard';
+import { QuestionariosAdminCard } from '@/components/configuracoes/QuestionariosAdminCard';
 import { AiUsageSection } from '@/components/dashboard/AiUsageSection';
 
 export default function Configuracoes() {
@@ -419,6 +420,7 @@ export default function Configuracoes() {
           <TabsTrigger value="crms">CRMs</TabsTrigger>
           {isAdmin && <TabsTrigger value="etapas">Etapas do Kanban</TabsTrigger>}
           {(isAdmin || isDirector) && <TabsTrigger value="politicas">Políticas</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="questionarios">Questionários</TabsTrigger>}
           {isAdmin && <TabsTrigger value="oraculo">Oráculo</TabsTrigger>}
           {(isAdmin || isDirector) && <TabsTrigger value="ia">Inteligência Artificial</TabsTrigger>}
         </TabsList>
@@ -429,6 +431,12 @@ export default function Configuracoes() {
           </TabsContent>
         )}
 
+
+        {isAdmin && (
+          <TabsContent value="questionarios" className="mt-6">
+            <QuestionariosAdminCard />
+          </TabsContent>
+        )}
 
         {(isAdmin || isDirector) && (
           <TabsContent value="politicas" className="mt-6">

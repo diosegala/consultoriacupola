@@ -18,7 +18,8 @@ import { DocumentoFeedback } from '@/components/cliente/DocumentoFeedback';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
-import { useQuestionarioCliente } from '@/hooks/useQuestionario';
+import { useQuestionarioCliente, useTemplateDoQuestionario } from '@/hooks/useQuestionario';
+import { respostasComRotulos } from '@/lib/questionario';
 import { useCliente } from '@/hooks/useClientes';
 import {
   useClienteDocumentos,
@@ -179,6 +180,12 @@ function formatarMinutosFala(palavras: number) {
 
 export function AgentesTab({ clienteId }: Props) {
   const { data: questionario } = useQuestionarioCliente(clienteId);
+  const { data: templateQuestionario } = useTemplateDoQuestionario(questionario?.template_id);
+  // Respostas com o texto da pergunta como chave: é isso que o agente lê.
+  const questionarioParaAgente = useMemo(
+    () => (questionario?.respostas ? respostasComRotulos(templateQuestionario?.estrutura, questionario.respostas) : null),
+    [questionario, templateQuestionario],
+  );
   const { data: documentos } = useClienteDocumentos(clienteId);
   const { data: cliente } = useCliente(clienteId);
   const { data: rascunho, isLoading: loadingRascunho } = useAgenteRascunho<AgentesDraftState>(clienteId);
@@ -926,7 +933,7 @@ export function AgentesTab({ clienteId }: Props) {
         body: {
           tipo: 'pre_analise',
           cliente_id: clienteId,
-          questionario_data: (questionario?.respostas as Record<string, unknown>) ?? null,
+          questionario_data: questionarioParaAgente,
           transcricoes_textos: transcricoesProntas.map((f) => ({
             label: rotuloTranscricao(f),
             conteudo: f.conteudo!,
@@ -994,7 +1001,7 @@ export function AgentesTab({ clienteId }: Props) {
     gerarComTempo('diagnostico', {
       tipo: 'diagnostico',
       cliente_id: clienteId,
-      questionario_data: (questionario?.respostas as Record<string, unknown>) ?? null,
+      questionario_data: questionarioParaAgente,
       // Fluxo novo: envia sumarios_ids (map-reduce). Só envia transcrições brutas
       // como fallback para as fontes que ainda não têm sumário.
       sumarios_ids: sumariosIds,
