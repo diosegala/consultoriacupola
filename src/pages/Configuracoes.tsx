@@ -406,7 +406,7 @@ export default function Configuracoes() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Configurações</h1>
+        <h1 className="titulo-marca text-lg text-foreground">Configurações</h1>
         <p className="text-muted-foreground">Gerencie os cadastros auxiliares do sistema</p>
       </div>
 

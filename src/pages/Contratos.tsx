@@ -323,7 +323,7 @@ export default function Contratos() {
         <div className="flex items-center gap-3">
           <FileText className="h-8 w-8 text-primary" />
           <div>
-            <h1 className="text-2xl font-bold">Contratos</h1>
+            <h1 className="titulo-marca text-lg">Contratos</h1>
             <p className="text-muted-foreground">Visão consolidada de todos os contratos</p>
           </div>
         </div>

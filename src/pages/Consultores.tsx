@@ -165,7 +165,7 @@ export default function Consultores() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Consultores</h1>
+          <h1 className="titulo-marca text-lg text-foreground">Consultores</h1>
           <p className="text-muted-foreground">Gerencie a equipe de consultores</p>
         </div>
         <Button onClick={openNewDialog} className="bg-primary text-primary-foreground hover:bg-primary/90">

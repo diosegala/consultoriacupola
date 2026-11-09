@@ -130,7 +130,7 @@ export default function MinhasIntegracoes() {
   return (
     <div className="p-6 space-y-6 max-w-3xl">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Minhas Integrações</h1>
+        <h1 className="titulo-marca text-lg text-foreground">Minhas Integrações</h1>
         <p className="text-muted-foreground text-sm">Conecte sua conta Google para importar transcrições automaticamente.</p>
       </div>
 

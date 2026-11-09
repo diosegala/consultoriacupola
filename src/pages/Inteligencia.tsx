@@ -724,7 +724,7 @@ export default function Inteligencia() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Inteligência</h1>
+        <h1 className="titulo-marca text-lg">Inteligência</h1>
         <p className="text-sm text-muted-foreground">Análises agregadas sobre dores, perfis e oportunidades de produto, separadas por operação de vendas e de locação.</p>
       </div>
       <Tabs defaultValue="dores">

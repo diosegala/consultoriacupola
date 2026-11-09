@@ -135,7 +135,7 @@ export default function Agentes() {
           <Sparkles className="h-5 w-5 text-primary" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold">Agentes de IA</h1>
+          <h1 className="titulo-marca text-lg">Agentes de IA</h1>
           <p className="text-sm text-muted-foreground">
             {agente
               ? 'Escolha o cliente que servirá de contexto para o agente.'

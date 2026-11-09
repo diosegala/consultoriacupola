@@ -3,19 +3,65 @@
 
 @config "../tailwind.config.ts";
 
+/* Identidade CUPOLA, a mesma do Mapeamento (mapeamentoaluguel.cupola.com.br):
+   grafite #0f1114, lima #b0f90a, areia #faf7f1, Funnel Display e Boldonse, raio 1rem. */
+@theme inline {
+  --font-sans: "Funnel Display", "Helvetica Neue", Arial, ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Boldonse", "Arial Black", Impact, sans-serif;
+  --color-primary-hover: var(--primary-hover);
+  --color-foreground-muted: var(--foreground-muted);
+  --color-foreground-subtle: var(--foreground-subtle);
+  --color-dark-background: var(--dark-background);
+  --color-dark-border: var(--dark-border);
+}
+
 :root {
+  --radius: 1rem;
+
+  --brand: #b0f90a;
   --primary: var(--brand);
-  --primary-foreground: var(--secondary-foreground);
+  --primary-hover: #9fe000;
+  --primary-foreground: #0f1114;
   --ring: var(--brand);
+
+  --background: #faf7f1;
+  --foreground: #0f1114;
+  --foreground-muted: #3a3f47;
+  --foreground-subtle: #6b7078;
+  --card: #ffffff;
+  --card-foreground: #0f1114;
+  --popover: #ffffff;
+  --popover-foreground: #0f1114;
+  --secondary: #f5f2eb;
+  --secondary-foreground: #0f1114;
+  --muted: #f5f2eb;
+  --muted-foreground: #3a3f47;
+  --accent: #f2fbd9;
+  --accent-foreground: #0f1114;
+  --border: #e4dfd4;
+  --input: #d8d2c5;
+  --destructive: #d92d20;
+  --destructive-foreground: #ffffff;
+
+  --dark-background: #0f1114;
+  --dark-border: #2a2e35;
+
+  --sidebar: #0f1114;
+  --sidebar-foreground: #f5f2eb;
   --sidebar-primary: var(--brand);
-  --sidebar-primary-foreground: var(--secondary-foreground);
+  --sidebar-primary-foreground: #0f1114;
+  --sidebar-accent: #2a2e35;
+  --sidebar-accent-foreground: #f5f2eb;
+  --sidebar-border: #2a2e35;
   --sidebar-ring: var(--brand);
 }
 
 /* Tema escuro Cupola: superfícies neutras (preto/grafite), sem o azul-marinho do tema base. */
 .dark {
   --background: oklch(0 0 0);
-  --foreground: oklch(0.985 0 0);
+  --foreground: #f5f2eb;
+  --border: #2a2e35;
+  --input: #2a2e35;
   --card: oklch(0.18 0 0);
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.18 0 0);
@@ -29,14 +75,15 @@
   --destructive-foreground: oklch(0.985 0 0);
   --chart-1: var(--brand);
   --sidebar: oklch(0.13 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.26 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-foreground: #f5f2eb;
+  --sidebar-border: #2a2e35;
+  --sidebar-accent: #2a2e35;
+  --sidebar-accent-foreground: #f5f2eb;
   --primary: var(--brand);
-  --primary-foreground: var(--background);
+  --primary-foreground: #0f1114;
   --ring: var(--brand);
   --sidebar-primary: var(--brand);
-  --sidebar-primary-foreground: var(--background);
+  --sidebar-primary-foreground: #0f1114;
   --sidebar-ring: var(--brand);
 }
 
@@ -68,6 +115,14 @@
   ::-webkit-scrollbar-thumb:hover {
     background: var(--muted-foreground);
   }
+}
+
+/* Títulos de marca: Boldonse em caixa-alta. É larga, então pede entrelinha generosa. */
+@utility titulo-marca {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  line-height: 1.45;
+  letter-spacing: 0;
 }
 
 /* Kanban card styles */

@@ -106,7 +106,7 @@ export default function MinhasTarefas() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Minhas tarefas</h1>
+          <h1 className="titulo-marca text-lg text-foreground">Minhas tarefas</h1>
           <p className="text-sm text-muted-foreground">Itens de checklist atribuídos a você e seu to-do pessoal.</p>
         </div>
         <Button onClick={() => setNovaTarefaOpen(true)}>

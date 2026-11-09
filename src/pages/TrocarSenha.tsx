@@ -106,7 +106,7 @@ export default function TrocarSenha() {
       <Card className="w-full max-w-md border-border bg-card">
         <CardHeader className="text-center space-y-4">
           <div className="mx-auto">
-            <h1 className="text-3xl font-bold text-primary">CUPOLA</h1>
+            <h1 className="titulo-marca text-2xl text-primary">CUPOLA</h1>
             <p className="text-xs text-muted-foreground tracking-widest">CONSULTORIA</p>
           </div>
           <CardTitle className="text-foreground">Trocar Senha</CardTitle>

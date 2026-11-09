@@ -346,7 +346,7 @@ export default function Clientes() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Clientes</h1>
+          <h1 className="titulo-marca text-lg text-foreground">Clientes</h1>
           <p className="text-muted-foreground">Gerencie sua carteira de clientes</p>
         </div>
         <div className="flex items-center gap-2">

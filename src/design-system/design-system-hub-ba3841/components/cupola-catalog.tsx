@@ -172,7 +172,7 @@ function Sidebar({ onSearch }: { onSearch: () => void }) {
   return (
     <aside className="sidebar">
       <div className="brand-lockup">
-        <img src={logo.url} alt="CupolaOS UI" />
+        <img src={logo.url} alt="Cupola UI" />
         <span>1.0</span>
       </div>
       <Button variant="ghost" className="workspace">
@@ -211,7 +211,7 @@ function Sidebar({ onSearch }: { onSearch: () => void }) {
       <div className="sidebar-foot">
         <img src={mark.url} alt="" />
         <span>
-          <b>CupolaOS</b>Inteligência em conjunto.
+          <b>Cupola</b>Inteligência em conjunto.
         </span>
       </div>
     </aside>
@@ -273,7 +273,7 @@ function Hero() {
     <section className="hero" id="overview">
       <div className="hero-copy">
         <p className="eyebrow bright">
-          <i /> CupolaOS / DESIGN SYSTEM
+          <i /> Cupola / DESIGN SYSTEM
         </p>
         <h1>
           Inteligência em conjunto.
@@ -297,7 +297,7 @@ function Hero() {
       <div className="hero-symbol">
         <span className="orbit orbit-one" />
         <span className="orbit orbit-two" />
-        <img src={mark.url} alt="Símbolo CupolaOS" />
+        <img src={mark.url} alt="Símbolo Cupola" />
         <p>CONEXÕES QUE CRIAM.</p>
       </div>
       <div className="hero-bottom">
@@ -335,7 +335,7 @@ function Foundations() {
   return (
     <section className="catalog-section" id="foundations">
       <SectionHeading
-        eyebrow="01 / CupolaOS"
+        eyebrow="01 / Cupola"
         title="Fundamentos"
         description="Uma base compartilhada para todas as experiências."
       />
@@ -620,7 +620,7 @@ function Basics() {
   return (
     <section className="catalog-section" id="basics">
       <SectionHeading
-        eyebrow="02 / CupolaOS"
+        eyebrow="02 / Cupola"
         title="Componentes básicos"
         description="Peças essenciais, prontas para se combinar."
       />
@@ -844,7 +844,7 @@ function AiSection() {
   return (
     <section className="catalog-section" id="ai">
       <SectionHeading
-        eyebrow="03 / CupolaOS"
+        eyebrow="03 / Cupola"
         title="Componentes de IA"
         description="Inteligência com contexto, clareza e controle."
       />
@@ -1125,7 +1125,7 @@ export function CupolaCatalog() {
           >
             <X />
           </Button>
-          <img src={logo.url} alt="CupolaOS" />
+          <img src={logo.url} alt="Cupola" />
           {sections.map((id) => (
             <Button
               variant="ghost"
@@ -1202,7 +1202,7 @@ export function CupolaCatalog() {
         <footer>
           <img src={mark.url} alt="" />
           <span>
-            <b>CupolaOS</b>Uma linguagem compartilhada para construir o próximo passo.
+            <b>Cupola</b>Uma linguagem compartilhada para construir o próximo passo.
           </span>
           <small>DESIGN SYSTEM · 2026</small>
         </footer>

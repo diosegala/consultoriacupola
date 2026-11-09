@@ -163,7 +163,7 @@ export default function OraculoBase() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold flex items-center gap-2">
+          <h1 className="titulo-marca text-lg flex items-center gap-2">
             <BookOpen className="h-5 w-5 text-primary" />
             Base de Conhecimento do Oráculo
           </h1>
