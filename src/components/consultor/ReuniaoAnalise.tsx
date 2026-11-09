@@ -68,7 +68,7 @@ export function ReuniaoAnalise({ reuniaoId, open, onOpenChange }: ReuniaoAnalise
       <DialogContent className="bg-card border-border max-w-3xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle className="text-foreground">
-            Análise da Reunião — {reuniao.clientes?.nome}
+            {analise ? 'Análise da Reunião' : 'Reunião'} — {reuniao.clientes?.nome}
           </DialogTitle>
           <p className="text-sm text-muted-foreground">
             {format(parseISO(reuniao.data_reuniao), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
@@ -89,6 +89,12 @@ export function ReuniaoAnalise({ reuniaoId, open, onOpenChange }: ReuniaoAnalise
                   <p className="text-sm text-muted-foreground">Média dos 5 critérios avaliados</p>
                 </div>
               </div>
+            )}
+
+            {!analise && (
+              <p className="text-sm text-muted-foreground rounded-md border border-border bg-secondary p-3">
+                Esta reunião ainda não foi analisada pela IA. A transcrição está disponível abaixo.
+              </p>
             )}
 
             <Separator className="bg-border" />
@@ -162,7 +168,7 @@ export function ReuniaoAnalise({ reuniaoId, open, onOpenChange }: ReuniaoAnalise
             )}
 
             {/* Transcrição */}
-            {reuniao.transcricao && (
+            {reuniao.transcricao ? (
               <div>
                 <h3 className="text-sm font-semibold text-foreground mb-2">Transcrição</h3>
                 <div className="bg-secondary rounded-md p-4 max-h-[300px] overflow-y-auto">
@@ -171,6 +177,8 @@ export function ReuniaoAnalise({ reuniaoId, open, onOpenChange }: ReuniaoAnalise
                   </pre>
                 </div>
               </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Esta reunião não tem transcrição registrada.</p>
             )}
 
             {(compromissos?.length ?? 0) > 0 && (

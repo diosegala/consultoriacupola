@@ -96,6 +96,7 @@ export function usePausarContrato() {
       queryClient.invalidateQueries({ queryKey: ['contratos'] });
       queryClient.invalidateQueries({ queryKey: ['all-contratos'] });
       queryClient.invalidateQueries({ queryKey: ['contrato-ativo'] });
+      queryClient.invalidateQueries({ queryKey: ['contratos-ativos'] });
     }
   });
 }
@@ -174,6 +175,7 @@ export function useRetomarContrato() {
       queryClient.invalidateQueries({ queryKey: ['contratos'] });
       queryClient.invalidateQueries({ queryKey: ['all-contratos'] });
       queryClient.invalidateQueries({ queryKey: ['contrato-ativo'] });
+      queryClient.invalidateQueries({ queryKey: ['contratos-ativos'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     }
   });
@@ -239,6 +241,7 @@ export function useProrrogarContrato() {
       queryClient.invalidateQueries({ queryKey: ['contratos'] });
       queryClient.invalidateQueries({ queryKey: ['all-contratos'] });
       queryClient.invalidateQueries({ queryKey: ['contrato-ativo'] });
+      queryClient.invalidateQueries({ queryKey: ['contratos-ativos'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     }
   });

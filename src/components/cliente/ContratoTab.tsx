@@ -14,7 +14,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Loader2, Plus, Pencil, RefreshCw, Trash2 } from 'lucide-react';
-import { useContratos, useContratoAtivo, ContratoComTipo, useDeleteContrato } from '@/hooks/useContratos';
+import { useContratos, useContratosAtivos, ContratoComTipo, useDeleteContrato } from '@/hooks/useContratos';
 import { format, parseISO } from 'date-fns';
 import { ContratoFormDialog, RenovarContratoDialog } from './ClienteDialogs';
 import { toast } from 'sonner';
@@ -37,13 +37,12 @@ function formatCurrency(value: number): string {
 
 export function ContratoTab({ clienteId, clienteStatus, consultorId }: ContratoTabProps) {
   const { data: contratos, isLoading } = useContratos(clienteId);
-  const { data: contratoAtivo } = useContratoAtivo(clienteId);
-  const contratoEncerradoComPagamento = contratoAtivo && (contratoAtivo as any).encerrado_em;
+  const { data: contratosAtivos = [] } = useContratosAtivos(clienteId);
   const { isConsultor } = useAuth();
 
   const [showForm, setShowForm] = useState(false);
   const [editingContrato, setEditingContrato] = useState<ContratoComTipo | null>(null);
-  const [showRenovar, setShowRenovar] = useState(false);
+  const [renovando, setRenovando] = useState<ContratoComTipo | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingContrato, setDeletingContrato] = useState<ContratoComTipo | null>(null);
   
@@ -71,13 +70,15 @@ export function ContratoTab({ clienteId, clienteStatus, consultorId }: ContratoT
     <div className="space-y-6">
       <QuestionarioBloco clienteId={clienteId} compact />
       {/* Contrato Ativo */}
-      {contratoAtivo ? (
-        <Card className="bg-card border-border border-l-4 border-l-primary">
+      {contratosAtivos.length > 0 ? (
+        <>
+        {contratosAtivos.map((contratoAtivo) => (
+        <Card key={contratoAtivo.id} className="bg-card border-border border-l-4 border-l-primary">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle className="text-foreground flex items-center gap-2">
-                Contrato Ativo
-                {contratoEncerradoComPagamento && (
+                {contratosAtivos.length > 1 ? `Contrato Ativo — ${getTipoConsultoriaLabel(contratoAtivo, 'Tipo não definido')}` : 'Contrato Ativo'}
+                {(contratoAtivo as any).encerrado_em && (
                   <Badge variant="outline" className="border-primary/50 text-primary">
                     Encerrado — aguardando última parcela
                     {(contratoAtivo as any).data_fim_pagamento && (
@@ -96,7 +97,7 @@ export function ContratoTab({ clienteId, clienteStatus, consultorId }: ContratoT
                 <Pencil className="h-4 w-4 mr-2" />
                 Editar
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setShowRenovar(true)}>
+              <Button variant="outline" size="sm" onClick={() => setRenovando(contratoAtivo)}>
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Renovar
               </Button>
@@ -184,6 +185,14 @@ export function ContratoTab({ clienteId, clienteStatus, consultorId }: ContratoT
             )}
           </CardContent>
         </Card>
+        ))}
+        <div className="flex justify-end">
+          <Button variant="outline" onClick={handleNewContrato}>
+            <Plus className="h-4 w-4 mr-2" />
+            Adicionar outro contrato
+          </Button>
+        </div>
+        </>
       ) : (
         <Card className="bg-card border-border border-dashed">
           <CardContent className="py-8 text-center">
@@ -269,12 +278,12 @@ export function ContratoTab({ clienteId, clienteStatus, consultorId }: ContratoT
         consultorId={consultorId}
       />
 
-      {contratoAtivo && (
+      {renovando && (
         <RenovarContratoDialog
-          open={showRenovar}
-          onOpenChange={setShowRenovar}
+          open
+          onOpenChange={(open) => !open && setRenovando(null)}
           clienteId={clienteId}
-          contratoAtual={contratoAtivo}
+          contratoAtual={renovando}
         />
       )}
 

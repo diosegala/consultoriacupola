@@ -161,11 +161,14 @@ export function ReunioesList({
               <TableCell>{getStatusBadge(reuniao.status_analise)}</TableCell>
               <TableCell className="text-right">
                 <div className="flex gap-1 justify-end">
-                  {reuniao.status_analise === 'concluido' && (
-                    <Button variant="ghost" size="icon" onClick={() => setSelectedReuniaoId(reuniao.id)}>
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setSelectedReuniaoId(reuniao.id)}
+                    title={reuniao.status_analise === 'concluido' ? 'Ver análise e transcrição' : 'Ver transcrição'}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
                   {isAdmin && (reuniao.status_analise === 'erro' || reuniao.status_analise === 'pendente' || reuniao.status_analise === 'concluido') && (
                     <Button
                       variant="ghost"

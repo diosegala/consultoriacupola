@@ -33,6 +33,32 @@ export function useContratos(clienteId: string | undefined) {
   });
 }
 
+/** Todos os contratos ativos do cliente (pode haver mais de um ao mesmo tempo). */
+export function useContratosAtivos(clienteId: string | undefined) {
+  return useQuery({
+    queryKey: ['contratos-ativos', clienteId],
+    queryFn: async () => {
+      if (!clienteId) return [];
+
+      const { data, error } = await supabase
+        .from('contratos')
+        .select(`
+          *,
+          tipo_consultoria:tipos_consultoria(*)
+        `)
+        .eq('cliente_id', clienteId)
+        .eq('ativo', true)
+        .order('data_inicio', { ascending: true })
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      return (data ?? []) as ContratoComTipo[];
+    },
+    enabled: !!clienteId
+  });
+}
+
+/** Contrato ativo "principal" (o que vence por último). Telas que precisam de um só usam este. */
 export function useContratoAtivo(clienteId: string | undefined) {
   return useQuery({
     queryKey: ['contrato-ativo', clienteId],
@@ -47,6 +73,8 @@ export function useContratoAtivo(clienteId: string | undefined) {
         `)
         .eq('cliente_id', clienteId)
         .eq('ativo', true)
+        .order('data_fim', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (error) throw error;
@@ -84,6 +112,7 @@ export function useCreateContrato() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['contratos', variables.cliente_id] });
       queryClient.invalidateQueries({ queryKey: ['contrato-ativo', variables.cliente_id] });
+      queryClient.invalidateQueries({ queryKey: ['contratos-ativos', variables.cliente_id] });
       queryClient.invalidateQueries({ queryKey: ['all-contratos'] });
       queryClient.invalidateQueries({ queryKey: ['clientes'] });
       queryClient.invalidateQueries({ queryKey: ['cliente', variables.cliente_id] });
@@ -110,6 +139,7 @@ export function useUpdateContrato() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['contratos', data.cliente_id] });
       queryClient.invalidateQueries({ queryKey: ['contrato-ativo', data.cliente_id] });
+      queryClient.invalidateQueries({ queryKey: ['contratos-ativos', data.cliente_id] });
       queryClient.invalidateQueries({ queryKey: ['all-contratos'] });
       queryClient.invalidateQueries({ queryKey: ['clientes'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
@@ -236,6 +266,7 @@ export function useRenovarContrato() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['contratos', data.cliente_id] });
       queryClient.invalidateQueries({ queryKey: ['contrato-ativo', data.cliente_id] });
+      queryClient.invalidateQueries({ queryKey: ['contratos-ativos', data.cliente_id] });
       queryClient.invalidateQueries({ queryKey: ['all-contratos'] });
       queryClient.invalidateQueries({ queryKey: ['clientes'] });
       queryClient.invalidateQueries({ queryKey: ['cliente', data.cliente_id] });
@@ -429,6 +460,7 @@ export function useDeleteContrato() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['contratos', data.clienteId] });
       queryClient.invalidateQueries({ queryKey: ['contrato-ativo', data.clienteId] });
+      queryClient.invalidateQueries({ queryKey: ['contratos-ativos', data.clienteId] });
       queryClient.invalidateQueries({ queryKey: ['all-contratos'] });
       queryClient.invalidateQueries({ queryKey: ['clientes'] });
       queryClient.invalidateQueries({ queryKey: ['cliente', data.clienteId] });
