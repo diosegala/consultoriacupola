@@ -81,8 +81,9 @@ function withOrigem(rows: ReuniaoResumo[], driveIds: Set<string> | undefined): R
 }
 
 export function useReunioesByConsultor(consultorId: string | undefined) {
+  const { data: driveIds } = useReunioesDriveIds();
   return useQuery({
-    queryKey: ['reunioes', 'consultor', consultorId],
+    queryKey: ['reunioes', 'consultor', consultorId, !!driveIds],
     enabled: !!consultorId,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -93,7 +94,7 @@ export function useReunioesByConsultor(consultorId: string | undefined) {
         .returns<ReuniaoResumo[]>();
 
       if (error) throw error;
-      return data || [];
+      return withOrigem(data || [], driveIds);
     },
   });
 }
