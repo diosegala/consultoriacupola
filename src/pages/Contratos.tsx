@@ -148,7 +148,7 @@ export default function Contratos() {
       }
       if ((data as any)?.url) {
         window.open((data as any).url, '_blank');
-        toast.success(`Planilha criada com ${(data as any).total} clientes`);
+        toast.success(`Planilha criada com ${(data as any).total} contratos ativos`);
       } else {
         toast.error((data as any)?.error || 'Falha ao exportar');
       }
@@ -329,7 +329,7 @@ export default function Contratos() {
         </div>
         <Button onClick={handleExportSheets} disabled={isExporting} variant="outline">
           {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sheet className="h-4 w-4 mr-2" />}
-          Exportar clientes ativos (Google Sheets)
+          Exportar relatório de clientes (Google Sheets)
         </Button>
       </div>
 
