@@ -1,15 +1,8 @@
 -- Questionários de pré-onboarding (Vendas e Locação), preenchidos pelo consultor com o cliente.
 -- Perguntas ficam em questionarios_template.estrutura (JSON). Cada pergunta tem `ativo` (omitido = ativa)
--- e `nota_revisao` (por que foi inativada/alterada). Só admin pode criar/editar/inativar.
+-- e `nota_revisao` (por que foi inativada/alterada). A edição é restrita a admin na interface (a política do banco continua admin e diretor).
 
 ALTER TABLE public.questionarios_template ADD COLUMN IF NOT EXISTS segmento text;
-
--- Edição das perguntas: somente admin (antes admin e diretor).
-DROP POLICY IF EXISTS "Admins manage templates" ON public.questionarios_template;
-DROP POLICY IF EXISTS "questionarios_template_write" ON public.questionarios_template;
-CREATE POLICY "questionarios_template_write" ON public.questionarios_template FOR ALL TO authenticated
-  USING (public.has_role(auth.uid(), 'admin'::app_role))
-  WITH CHECK (public.has_role(auth.uid(), 'admin'::app_role));
 
 -- O template genérico de exemplo deixa de ser o ativo (os questionários já criados continuam apontando para ele).
 UPDATE public.questionarios_template
